@@ -1,0 +1,27 @@
+# Environment / secrets
+.env
+
+# Composer — vendor ignored, composer.lock committed (reproducible deploys)
+vendor/
+composer.phar
+
+# PHP cache / logs
+*.log
+*.cache
+/tmp/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Claude Code project settings
+.claude/
+
+# 10x Dev workflow context — internal planning docs, infrastructure details
+# (PRD, tech-stack decisions, infra.md with server details — not for public repo)
+context/

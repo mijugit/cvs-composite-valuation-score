@@ -1,0 +1,217 @@
+/* ============================================================
+   CVS — Composite Valuation Score | Base stylesheet
+   ============================================================ */
+
+/* --- Reset & variables ------------------------------------ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+    --c-bg:        #0f1117;
+    --c-surface:   #1a1d27;
+    --c-border:    #2a2d3a;
+    --c-primary:   #4f8ef7;
+    --c-success:   #34c77b;
+    --c-warn:      #f5a623;
+    --c-danger:    #e05555;
+    --c-text:      #dde1f0;
+    --c-muted:     #7a7f99;
+    --radius:      8px;
+    --shadow:      0 2px 12px rgba(0,0,0,.4);
+}
+
+html { font-size: 16px; }
+body {
+    background: var(--c-bg);
+    color: var(--c-text);
+    font-family: system-ui, -apple-system, sans-serif;
+    line-height: 1.6;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+a { color: var(--c-primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* --- Layout ----------------------------------------------- */
+.container { max-width: 960px; margin: 0 auto; padding: 0 1.25rem; }
+
+.site-header {
+    background: var(--c-surface);
+    border-bottom: 1px solid var(--c-border);
+    padding: .75rem 0;
+}
+.site-header .container {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+.site-logo { font-weight: 700; font-size: 1.25rem; color: var(--c-primary); }
+.site-tagline { font-size: .85rem; color: var(--c-muted); flex: 1; }
+.site-nav { display: flex; gap: 1rem; font-size: .9rem; }
+
+.site-main { flex: 1; padding: 2rem 0; }
+
+.site-footer {
+    background: var(--c-surface);
+    border-top: 1px solid var(--c-border);
+    padding: 1rem 0;
+    font-size: .8rem;
+    color: var(--c-muted);
+    text-align: center;
+}
+
+/* --- Card ------------------------------------------------- */
+.card {
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+    margin-bottom: 1.5rem;
+}
+.card--fail  { border-color: var(--c-danger); }
+.card--result { border-color: var(--c-primary); }
+
+/* --- Forms ------------------------------------------------ */
+.form { display: flex; flex-direction: column; gap: 1rem; }
+.form-group { display: flex; flex-direction: column; gap: .35rem; }
+.form-group label { font-size: .875rem; color: var(--c-muted); }
+.form-group input,
+.form-group textarea {
+    background: var(--c-bg);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius);
+    color: var(--c-text);
+    padding: .6rem .85rem;
+    font-size: 1rem;
+    width: 100%;
+    transition: border-color .15s;
+}
+.form-group input:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: var(--c-primary);
+}
+
+/* --- Buttons ---------------------------------------------- */
+.btn {
+    display: inline-block;
+    padding: .6rem 1.5rem;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 1rem;
+    cursor: pointer;
+    transition: opacity .15s;
+}
+.btn:hover { opacity: .85; }
+.btn--primary { background: var(--c-primary); color: #fff; }
+
+/* --- Alerts ----------------------------------------------- */
+.alert {
+    padding: .75rem 1rem;
+    border-radius: var(--radius);
+    font-size: .9rem;
+    margin-bottom: 1rem;
+}
+.alert--error { background: rgba(224,85,85,.15); border: 1px solid var(--c-danger); color: #f07070; }
+
+/* --- Auth box --------------------------------------------- */
+.auth-box {
+    max-width: 420px;
+    margin: 3rem auto;
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius);
+    padding: 2rem;
+    box-shadow: var(--shadow);
+}
+.auth-box h1 { margin-bottom: 1.25rem; }
+.auth-switch { margin-top: 1.25rem; font-size: .9rem; color: var(--c-muted); }
+
+/* --- Dashboard -------------------------------------------- */
+.hint { font-size: .875rem; color: var(--c-muted); margin-bottom: 1rem; }
+code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-size: .9em; }
+
+.results-section { margin-top: 2rem; }
+.results-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1rem;
+}
+
+/* Result card rendered by JS */
+.result-card {
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    position: relative;
+}
+.result-card--fail  { border-color: var(--c-danger); }
+.result-card--buy   { border-color: var(--c-success); }
+.result-card--warn  { border-color: var(--c-warn); }
+.result-card--sell  { border-color: var(--c-danger); }
+
+.result-card__ticker { font-weight: 700; font-size: 1.1rem; }
+.result-card__reco   { font-size: .85rem; margin: .25rem 0; color: var(--c-muted); }
+.result-card__cvs    { font-size: 2rem; font-weight: 700; }
+.result-card__link   { display: block; margin-top: .75rem; font-size: .875rem; }
+
+/* --- Spinner ---------------------------------------------- */
+.spinner {
+    text-align: center;
+    padding: 1.5rem;
+    color: var(--c-muted);
+    font-style: italic;
+}
+
+/* --- Analysis detail -------------------------------------- */
+.cvs-score-header {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+.cvs-badge {
+    background: var(--c-primary);
+    color: #fff;
+    padding: .3rem .9rem;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 1rem;
+}
+.cvs-number { font-size: 2.5rem; font-weight: 700; }
+
+.pillar-table { width: 100%; border-collapse: collapse; margin-top: .75rem; }
+.pillar-table th,
+.pillar-table td { padding: .6rem .5rem; text-align: left; border-bottom: 1px solid var(--c-border); }
+.pillar-table th { font-size: .8rem; color: var(--c-muted); text-transform: uppercase; }
+
+.pillar-bar {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+}
+.pillar-bar__fill {
+    height: 10px;
+    background: var(--c-primary);
+    border-radius: 999px;
+    transition: width .4s ease;
+}
+
+.failure-list { padding-left: 1.25rem; margin-top: .5rem; }
+.failure-list li { color: var(--c-danger); margin-bottom: .25rem; }
+
+.disclaimer-inline {
+    font-size: .78rem;
+    color: var(--c-muted);
+    margin-top: 1rem;
+    font-style: italic;
+}
+
+/* --- Responsive ------------------------------------------- */
+@media (max-width: 600px) {
+    .cvs-number { font-size: 1.75rem; }
+    .results-grid { grid-template-columns: 1fr; }
+}
