@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Never hardcode weights or thresholds.** Always read from `config/cvs-weights.php` — this is FR-010. The config is injected into `CVSModel::__construct(array $config)`.
 - **Quality Gate is binary.** A company that fails returns `CVSResult::failed($ticker, $failures)` — not a CVS score of 0. Do not assign any numerical score when the gate rejects.
 - **CVS must be deterministic.** Same `$financials` input → identical CVS and recommendation. No randomness, no `date()`/`time()` calls inside scoring logic.
-- **Sector medians may be `null`.** `SectorBenchmarkPillar` returns neutral 50 when `sector_pe_median` etc. are null — this is expected, not an error. Yahoo Finance doesn't expose sector medians directly.
+- **SectorBenchmarkPillar uses hardcoded sector benchmarks** (EV/FCF medians from `config/cvs-weights.php → benchmarks`). Returns neutral 50 only when growth data is unavailable or `shares_outstanding` is null. `Financial Services` and `Real Estate` sectors work but have lower model accuracy (known limitation).
 
 ### Disclaimer — mandatory on every result
 

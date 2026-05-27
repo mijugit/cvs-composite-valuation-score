@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace CVS\Tests\CVS;
 
 use CVS\CVS\CVSModel;
+use CVS\CVS\Pillars\SectorBenchmarkPillar;
+use CVS\CVS\Pillars\MomentumPillar;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -112,7 +114,7 @@ class CVSModelTest extends TestCase
             // Strong momentum: stock up 67% in 6M while SPY only +6%
             'monthly_closes'        => [60.0, 65.0, 70.0, 76.0, 82.0, 90.0, 100.0],
             'spy_closes'            => [100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0],
-            // Near 52-week low (for 52W component compatibility)
+            // Near 52-week low
             'current_price'         => 100.0,
             'fifty_two_week_low'    =>  95.0,
             'fifty_two_week_high'   => 200.0,
@@ -135,11 +137,70 @@ class CVSModelTest extends TestCase
     }
 
     // ------------------------------------------------------------------
+    // SectorBenchmarkPillar — new behaviour
+    // ------------------------------------------------------------------
+
+    public function test_sector_pillar_returns_non_neutral_score(): void
+    {
+        // baseFinancials includes Technology sector with valid EV/FCF inputs
+        // → SectorBenchmarkPillar must compute a real score, not default 50.
+        $pillar = new SectorBenchmarkPillar($this->config['benchmarks']);
+        $score  = $pillar->score($this->baseFinancials());
+
+        $this->assertNotEquals(50.0, $score);
+        $this->assertGreaterThanOrEqual(0.0, $score);
+        $this->assertLessThanOrEqual(100.0, $score);
+    }
+
+    public function test_sector_pillar_returns_neutral_when_no_growth_data(): void
+    {
+        // When forward_eps, trailing_eps, revenue_growth and earnings_quarterly_growth
+        // are all null/missing, extractForwardGrowth() returns null → neutral 50.
+        $pillar = new SectorBenchmarkPillar($this->config['benchmarks']);
+        $score  = $pillar->score($this->baseFinancials([
+            'forward_eps'                => null,
+            'trailing_eps'               => null,
+            'revenue_growth'             => null,
+            'earnings_quarterly_growth'  => null,
+        ]));
+
+        $this->assertEquals(50.0, $score);
+    }
+
+    // ------------------------------------------------------------------
+    // MomentumPillar — new behaviour
+    // ------------------------------------------------------------------
+
+    public function test_momentum_pillar_returns_non_neutral_score(): void
+    {
+        // baseFinancials includes monthly_closes with 7 entries and visible momentum
+        // → MomentumPillar must produce a score different from neutral 50.
+        $pillar = new MomentumPillar($this->config['momentum']);
+        $score  = $pillar->score($this->baseFinancials());
+
+        $this->assertNotEquals(50.0, $score);
+        $this->assertGreaterThanOrEqual(0.0, $score);
+        $this->assertLessThanOrEqual(100.0, $score);
+    }
+
+    public function test_momentum_pillar_returns_neutral_when_insufficient_history(): void
+    {
+        // Fewer than 7 monthly closes → cannot compute ROC → neutral 50.
+        $pillar = new MomentumPillar($this->config['momentum']);
+        $score  = $pillar->score($this->baseFinancials([
+            'monthly_closes' => [140.0, 145.0, 150.0, 148.0, 155.0], // only 5
+        ]));
+
+        $this->assertEquals(50.0, $score);
+    }
+
+    // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
 
     /**
-     * Build a minimal set of financials that passes the Quality Gate.
+     * Build a minimal set of financials that passes the Quality Gate
+     * and provides sensible inputs for all four pillars.
      *
      * @param array<string, mixed> $overrides
      * @return array<string, mixed>
@@ -147,35 +208,43 @@ class CVSModelTest extends TestCase
     private function baseFinancials(array $overrides = []): array
     {
         return array_merge([
+            // Company metadata (SectorBenchmarkPillar)
+            'sector'                     => 'Technology',
             // Pricing
-            'current_price'         => 150.0,
-            'fifty_two_week_low'    => 100.0,
-            'fifty_two_week_high'   => 200.0,
-            'moving_average_200'    => 145.0,
+            'current_price'              => 150.0,
+            'fifty_two_week_low'         => 100.0,
+            'fifty_two_week_high'        => 200.0,
+            'moving_average_200'         => 145.0,
             // Income
-            'revenue'               => 10_000_000,
-            'gross_profit'          =>  3_000_000, // 30% margin
-            'ebitda'                =>  2_000_000,
-            'revenue_history'       => [7_000_000, 8_000_000, 9_000_000, 10_000_000],
-            'gross_margin_history'  => [0.29, 0.30, 0.30, 0.30],
+            'revenue'                    => 10_000_000,
+            'gross_profit'               =>  3_000_000, // 30% margin
+            'ebitda'                     =>  2_000_000,
+            'revenue_history'            => [7_000_000, 8_000_000, 9_000_000, 10_000_000],
+            'gross_margin_history'       => [0.29, 0.30, 0.30, 0.30],
             // Balance sheet
-            'total_debt'            =>  1_000_000,
-            'total_equity'          =>  5_000_000,  // D/E = 0.2 → PASS
-            'cash'                  =>    500_000,
-            'current_assets'        =>  3_000_000,
-            'current_liabilities'   =>  1_500_000,  // current ratio = 2.0 → PASS
+            'total_debt'                 =>  1_000_000,
+            'total_equity'               =>  5_000_000,  // D/E = 0.2 → PASS
+            'cash'                       =>    500_000,
+            'current_assets'             =>  3_000_000,
+            'current_liabilities'        =>  1_500_000,  // current ratio = 2.0 → PASS
             // Cash flow
-            'free_cash_flow'        =>  1_500_000,
+            'free_cash_flow'             =>  1_500_000,
             // Quality
-            'return_on_equity'      => 0.18,
-            // Multiples
-            'pe_ratio'              => 22.0,
-            'ps_ratio'              =>  2.5,
-            'ev_ebitda'             => 10.0,
-            // Sector medians (nullable — pillar (b) neutrals on null)
-            'sector_pe_median'      => 25.0,
-            'sector_ps_median'      =>  3.0,
-            'sector_ev_ebitda_median' => 12.0,
+            'return_on_equity'           => 0.18,
+            // Valuation multiples (no longer used by SectorBenchmarkPillar but kept for completeness)
+            'pe_ratio'                   => 22.0,
+            'ps_ratio'                   =>  2.5,
+            'ev_ebitda'                  => 10.0,
+            // EV / Sector fields (SectorBenchmarkPillar — EV/FCF logic)
+            'shares_outstanding'         => 15_000_000_000.0, // 15B shares
+            'gross_margins'              => 0.45,              // 45%
+            'forward_eps'                => 7.0,
+            'trailing_eps'               => 6.0,               // implied EPS growth ~17%
+            'revenue_growth'             => 0.10,              // 10%
+            'earnings_quarterly_growth'  => null,
+            // Price history (MomentumPillar — 7 monthly closes minimum)
+            'monthly_closes'             => [140.0, 145.0, 150.0, 148.0, 155.0, 160.0, 162.0],
+            'spy_closes'                 => [430.0, 432.0, 435.0, 433.0, 438.0, 440.0, 442.0],
         ], $overrides);
     }
 }

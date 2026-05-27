@@ -33,10 +33,10 @@
                     <tbody>
                         <?php
                         $pillarLabels = [
-                            'growth'  => '(a) Wzrost vs własna trajektoria',
-                            'sector'  => '(b) Benchmark sektorowy',
-                            'history' => '(c) Percentyl cenowy',
-                            'quality' => '(d) Jakość fundamentalna',
+                            'growth'   => '(a) Wzrost vs własna trajektoria',
+                            'sector'   => '(b) Benchmark sektorowy (EV/FCF)',
+                            'momentum' => '(c) Momentum (ROC vs SPY)',
+                            'quality'  => '(d) Jakość fundamentalna',
                         ];
                         foreach ($result['pillar_scores'] as $key => $score):
                         ?>

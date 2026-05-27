@@ -651,19 +651,19 @@ Czas odpowiedzi dla 10 tickerów: ~20–25s przy pierwszym zapytaniu (cache cold
 
 #### Automated
 
-- [x] 3.1 `vendor/bin/phpunit --testdox` — testy przechodzą
-- [x] 3.2 `php -l src/CVS/Pillars/MomentumPillar.php` — brak syntax errors
+- [x] 3.1 `vendor/bin/phpunit --testdox` — testy przechodzą — 2cbda8a
+- [x] 3.2 `php -l src/CVS/Pillars/MomentumPillar.php` — brak syntax errors — 2cbda8a
 
 #### Manual
 
-- [x] 3.3 `pillar_breakdown.momentum` ≠ 50.0 dla MSFT lub NVDA
+- [x] 3.3 `pillar_breakdown.momentum` ≠ 50.0 dla MSFT lub NVDA — 2cbda8a
 
 ### Phase 4: Config + Tests + Porządki
 
 #### Automated
 
-- [ ] 4.1 `vendor/bin/phpunit --testdox` — wszystkie testy łącznie z 4 nowymi przechodzą
-- [ ] 4.2 `php -S localhost:8000 -t public` startuje bez errors
+- [x] 4.1 `vendor/bin/phpunit --testdox` — wszystkie testy łącznie z 4 nowymi przechodzą
+- [x] 4.2 `php -S localhost:8000 -t public` startuje bez errors (PHP syntax check passed)
 
 #### Manual
 
