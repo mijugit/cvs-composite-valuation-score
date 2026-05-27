@@ -11,7 +11,17 @@ namespace CVS\Api;
  * normalises it into the flat array structure consumed by the CVS pillars,
  * and caches the result in $_SESSION for `cache_ttl` seconds.
  *
- * Cache strategy: per-session, keyed by ticker.
+ * Also fetches monthly price history via the chart endpoint (v8) for both
+ * the target ticker and SPY (used by MomentumPillar).
+ *
+ * Yahoo Finance crumb flow (required since 2024):
+ *   1. GET https://fc.yahoo.com  → set A3 cookie
+ *   2. GET /v1/test/getcrumb     → obtain crumb string
+ *   3. All API calls include Cookie: A3=… and &crumb=… in URL
+ * The crumb + cookie are cached in $_SESSION under `cvs_yahoo_crumb` for 1 hour.
+ *
+ * Cache strategy: per-session, keyed by ticker. SPY closes are shared across
+ * all tickers under the key `cvs_spy_closes` (fetched once per session).
  * This is intentionally simple (no Redis / APCu) to stay dependency-free
  * on shared hosting.  The cache is invalidated automatically when the
  * session expires.
@@ -23,9 +33,13 @@ namespace CVS\Api;
  */
 class FinancialDataFetcher
 {
-    private const BASE_URL = 'https://query2.finance.yahoo.com/v10/finance/quoteSummary/';
+    private const BASE_URL    = 'https://query2.finance.yahoo.com/v10/finance/quoteSummary/';
+    private const CHART_URL   = 'https://query1.finance.yahoo.com/v8/finance/chart/';
+    private const CONSENT_URL = 'https://fc.yahoo.com';
+    private const CRUMB_URL   = 'https://query2.finance.yahoo.com/v1/test/getcrumb';
 
     private const MODULES = [
+        'assetProfile',
         'financialData',
         'defaultKeyStatistics',
         'summaryDetail',
@@ -55,7 +69,7 @@ class FinancialDataFetcher
      */
     public function fetch(string $ticker): ?array
     {
-        $ticker = strtoupper(trim($ticker));
+        $ticker   = strtoupper(trim($ticker));
         $cacheKey = 'cvs_fin_' . $ticker;
         $ttl      = (int) ($this->config['cache_ttl'] ?? 3600);
 
@@ -72,7 +86,10 @@ class FinancialDataFetcher
             return null;
         }
 
-        $normalised = $this->normalise($raw);
+        $closes    = $this->fetchChartData($ticker, '3y');
+        $spyCloses = $this->fetchSpyCloses();
+
+        $normalised = $this->normalise($raw, $closes, $spyCloses);
 
         if ($normalised === null) {
             return null;
@@ -86,29 +103,209 @@ class FinancialDataFetcher
     }
 
     // ------------------------------------------------------------------
-    // API call
+    // Crumb / Cookie management
+    // ------------------------------------------------------------------
+
+    /**
+     * Return the Yahoo Finance crumb string and A3 cookie for authenticated requests.
+     *
+     * Cached in $_SESSION under `cvs_yahoo_crumb` for 1 hour. On any failure
+     * returns ['crumb' => '', 'cookie' => ''] so callers can still try without auth.
+     *
+     * @return array{crumb: string, cookie: string}
+     */
+    private function getCrumbAndCookie(): array
+    {
+        $cacheKey = 'cvs_yahoo_crumb';
+        $ttl      = 3600;
+
+        if (isset($_SESSION[$cacheKey], $_SESSION[$cacheKey . '_ts'])) {
+            if (time() - $_SESSION[$cacheKey . '_ts'] < $ttl) {
+                return $_SESSION[$cacheKey]; // @phpstan-ignore-line
+            }
+        }
+
+        // Step 1: visit consent URL to receive the A3 cookie.
+        $consentResult = $this->curlGetWithHeaders(self::CONSENT_URL, '', []);
+        $cookie        = $consentResult['cookie'] ?? '';
+
+        if ($cookie === '') {
+            return ['crumb' => '', 'cookie' => ''];
+        }
+
+        // Step 2: fetch crumb using the A3 cookie.
+        $crumbResult = $this->curlGetWithHeaders(self::CRUMB_URL, $cookie, []);
+        $crumb       = trim($crumbResult['body'] ?? '');
+
+        // Validate: crumb should be a short alphanumeric-ish string.
+        if ($crumb === '' || strlen($crumb) > 64 || str_starts_with($crumb, '{')) {
+            return ['crumb' => '', 'cookie' => ''];
+        }
+
+        $data = ['crumb' => $crumb, 'cookie' => $cookie];
+
+        $_SESSION[$cacheKey]         = $data;
+        $_SESSION[$cacheKey . '_ts'] = time();
+
+        return $data;
+    }
+
+    // ------------------------------------------------------------------
+    // API calls
     // ------------------------------------------------------------------
 
     /** @return array<string, mixed>|null */
     private function callApi(string $ticker): ?array
     {
+        $auth    = $this->getCrumbAndCookie();
         $modules = implode(',', self::MODULES);
         $url     = self::BASE_URL . urlencode($ticker)
                  . '?modules=' . urlencode($modules)
-                 . '&crumb=&lang=en-US&region=US';
+                 . '&crumb=' . urlencode($auth['crumb'])
+                 . '&lang=en-US&region=US';
 
+        $result = $this->curlGetWithHeaders($url, $auth['cookie'], []);
+        $body   = $result['body'] ?? null;
+
+        if ($body === null) {
+            return null;
+        }
+
+        try {
+            $decoded = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return null;
+        }
+
+        $result2 = $decoded['quoteSummary']['result'][0] ?? null;
+
+        return is_array($result2) ? $result2 : null;
+    }
+
+    /**
+     * Fetch monthly closing prices for a ticker via the chart endpoint.
+     *
+     * Returns an array of float closes (oldest first), or an empty array
+     * on any failure (MomentumPillar falls back to neutral 50 when < 7 entries).
+     *
+     * @return float[]
+     */
+    private function fetchChartData(string $ticker, string $range): array
+    {
+        $auth = $this->getCrumbAndCookie();
+        $url  = self::CHART_URL . urlencode($ticker)
+              . '?interval=1mo&range=' . urlencode($range)
+              . '&crumb=' . urlencode($auth['crumb']);
+
+        $result = $this->curlGetWithHeaders($url, $auth['cookie'], []);
+        $body   = $result['body'] ?? null;
+
+        if ($body === null) {
+            return [];
+        }
+
+        try {
+            $decoded = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return [];
+        }
+
+        $chartResult = $decoded['chart']['result'][0] ?? null;
+        if (!is_array($chartResult)) {
+            return [];
+        }
+
+        $closes = $chartResult['indicators']['quote'][0]['close'] ?? [];
+        if (!is_array($closes)) {
+            return [];
+        }
+
+        // Filter nulls (incomplete months), cast to float, preserve order oldest→newest.
+        $filtered = [];
+        foreach ($closes as $c) {
+            if ($c !== null) {
+                $filtered[] = (float) $c;
+            }
+        }
+
+        return $filtered;
+    }
+
+    /**
+     * Fetch monthly SPY closing prices, lazily cached in session under `cvs_spy_closes`.
+     *
+     * SPY data is shared across all tickers in a single analysis run,
+     * so we cache it separately from individual ticker data.
+     *
+     * @return float[]
+     */
+    private function fetchSpyCloses(): array
+    {
+        $spyCacheKey = 'cvs_spy_closes';
+        $ttl         = (int) ($this->config['cache_ttl'] ?? 3600);
+
+        if (isset($_SESSION[$spyCacheKey], $_SESSION[$spyCacheKey . '_ts'])) {
+            if (time() - $_SESSION[$spyCacheKey . '_ts'] < $ttl) {
+                return $_SESSION[$spyCacheKey]; // @phpstan-ignore-line
+            }
+        }
+
+        $closes = $this->fetchChartData('SPY', '1y');
+
+        $_SESSION[$spyCacheKey]         = $closes;
+        $_SESSION[$spyCacheKey . '_ts'] = time();
+
+        return $closes;
+    }
+
+    // ------------------------------------------------------------------
+    // HTTP helpers
+    // ------------------------------------------------------------------
+
+    /**
+     * Perform a cURL GET request and return body + extracted A3 cookie.
+     *
+     * @param string   $url
+     * @param string   $cookie  Value for Cookie header (e.g. "A3=d=AQA…"), or empty
+     * @param string[] $extraHeaders
+     * @return array{body: string|null, cookie: string}
+     */
+    private function curlGetWithHeaders(string $url, string $cookie, array $extraHeaders): array
+    {
         $timeout = (int) ($this->config['timeout_seconds'] ?? 25);
+
+        $headers = [
+            'Accept: application/json, text/plain, */*',
+            'Accept-Language: en-US,en;q=0.9',
+        ];
+
+        if ($cookie !== '') {
+            $headers[] = 'Cookie: ' . $cookie;
+        }
+
+        foreach ($extraHeaders as $h) {
+            $headers[] = $h;
+        }
+
+        $receivedCookie = '';
 
         $ch = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => $timeout,
             CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_MAXREDIRS      => 3,
-            CURLOPT_USERAGENT      => 'Mozilla/5.0 (compatible; CVS-App/1.0)',
-            CURLOPT_HTTPHEADER     => [
-                'Accept: application/json',
-            ],
+            CURLOPT_MAXREDIRS      => 5,
+            CURLOPT_USERAGENT      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            CURLOPT_HTTPHEADER     => $headers,
+            CURLOPT_HEADERFUNCTION => static function ($ch, string $header) use (&$receivedCookie): int {
+                // Extract A3 cookie from Set-Cookie headers.
+                if (stripos($header, 'set-cookie:') === 0) {
+                    if (preg_match('/A3=([^;]+)/i', $header, $m)) {
+                        $receivedCookie = 'A3=' . $m[1];
+                    }
+                }
+                return strlen($header);
+            },
         ]);
 
         $body = curl_exec($ch);
@@ -116,18 +313,10 @@ class FinancialDataFetcher
         curl_close($ch);
 
         if ($body === false || $code !== 200) {
-            return null;
+            return ['body' => null, 'cookie' => $receivedCookie];
         }
 
-        try {
-            $decoded = json_decode((string) $body, true, 512, JSON_THROW_ON_ERROR);
-        } catch (\JsonException) {
-            return null;
-        }
-
-        $result = $decoded['quoteSummary']['result'][0] ?? null;
-
-        return is_array($result) ? $result : null;
+        return ['body' => (string) $body, 'cookie' => $receivedCookie];
     }
 
     // ------------------------------------------------------------------
@@ -141,16 +330,18 @@ class FinancialDataFetcher
      * Returns null if critical fields are absent.
      *
      * @param array<string, mixed> $raw
+     * @param float[]              $closes     Monthly closes for the ticker (oldest first)
+     * @param float[]              $spyCloses  Monthly SPY closes (oldest first)
      * @return array<string, mixed>|null
      */
-    private function normalise(array $raw): ?array
+    private function normalise(array $raw, array $closes, array $spyCloses): ?array
     {
-        $fin  = $raw['financialData']         ?? [];
-        $ks   = $raw['defaultKeyStatistics']  ?? [];
-        $sd   = $raw['summaryDetail']         ?? [];
+        $ap   = $raw['assetProfile']            ?? [];
+        $fin  = $raw['financialData']           ?? [];
+        $ks   = $raw['defaultKeyStatistics']    ?? [];
+        $sd   = $raw['summaryDetail']           ?? [];
         $is   = $raw['incomeStatementHistory']['incomeStatementHistory'] ?? [];
         $bs   = $raw['balanceSheetHistory']['balanceSheetStatements']    ?? [];
-        $cf   = $raw['cashflowStatementHistory']['cashflowStatements']   ?? [];
 
         // Helper: extract raw value from Yahoo's {"raw": x, "fmt": "y"} objects.
         $v = static fn($obj): ?float =>
@@ -181,50 +372,56 @@ class FinancialDataFetcher
             }
         }
 
-        // Latest balance-sheet figures.
-        $latestBs     = $bs[0]  ?? [];
-        $latestIs     = $is[0]  ?? [];
-        $latestCf     = $cf[0]  ?? [];
+        // Latest balance-sheet / income-statement figures.
+        $latestBs = $bs[0] ?? [];
+        $latestIs = $is[0] ?? [];
 
         return [
+            // Company metadata
+            'sector'                     => is_string($ap['sector'] ?? null) ? $ap['sector'] : null,
+
             // Pricing
-            'current_price'         => $currentPrice,
-            'fifty_two_week_low'    => $v($sd['fiftyTwoWeekLow']  ?? []),
-            'fifty_two_week_high'   => $v($sd['fiftyTwoWeekHigh'] ?? []),
-            'moving_average_200'    => $v($fin['twoHundredDayAverage'] ?? []),
+            'current_price'              => $currentPrice,
+            'fifty_two_week_low'         => $v($sd['fiftyTwoWeekLow']  ?? []),
+            'fifty_two_week_high'        => $v($sd['fiftyTwoWeekHigh'] ?? []),
+            'moving_average_200'         => $v($fin['twoHundredDayAverage'] ?? []),
 
             // Income statement
-            'revenue'               => $v($latestIs['totalRevenue'] ?? []),
-            'gross_profit'          => $v($latestIs['grossProfit']  ?? []),
-            'ebitda'                => $v($fin['ebitda'] ?? []),
-            'revenue_history'       => $revenueHistory,
-            'gross_margin_history'  => $grossMarginHistory,
+            'revenue'                    => $v($latestIs['totalRevenue'] ?? []),
+            'gross_profit'               => $v($latestIs['grossProfit']  ?? []),
+            'ebitda'                     => $v($fin['ebitda'] ?? []),
+            'revenue_history'            => $revenueHistory,
+            'gross_margin_history'       => $grossMarginHistory,
 
             // Balance sheet
-            'total_debt'            => $v($fin['totalDebt']          ?? []),
-            'total_equity'          => $v($latestBs['totalStockholderEquity'] ?? []),
-            'cash'                  => $v($fin['totalCash']           ?? []),
-            'current_assets'        => $v($latestBs['totalCurrentAssets']      ?? []),
-            'current_liabilities'   => $v($latestBs['totalCurrentLiabilities'] ?? []),
+            'total_debt'                 => $v($fin['totalDebt']          ?? []),
+            'total_equity'               => $v($latestBs['totalStockholderEquity'] ?? []),
+            'cash'                       => $v($fin['totalCash']           ?? []),
+            'current_assets'             => $v($latestBs['totalCurrentAssets']      ?? []),
+            'current_liabilities'        => $v($latestBs['totalCurrentLiabilities'] ?? []),
 
             // Cash flow
-            'free_cash_flow'        => $v($fin['freeCashflow'] ?? []),
+            'free_cash_flow'             => $v($fin['freeCashflow'] ?? []),
 
             // Quality ratios
-            'return_on_equity'      => $v($fin['returnOnEquity'] ?? []),
+            'return_on_equity'           => $v($fin['returnOnEquity'] ?? []),
 
-            // Valuation multiples (company)
-            'pe_ratio'              => $v($sd['trailingPE']    ?? []),
-            'ps_ratio'              => $v($ks['priceToSalesTrailing12Months'] ?? []),
-            'ev_ebitda'             => $v($ks['enterpriseToEbitda'] ?? []),
+            // Valuation multiples (company-level)
+            'pe_ratio'                   => $v($sd['trailingPE']    ?? []),
+            'ps_ratio'                   => $v($ks['priceToSalesTrailing12Months'] ?? []),
+            'ev_ebitda'                  => $v($ks['enterpriseToEbitda'] ?? []),
 
-            // Sector medians — Yahoo Finance does not provide these directly.
-            // They need to be fetched separately (e.g. via sector ETF constituents)
-            // or hardcoded per sector for MVP. Pillar (b) falls back to neutral 50
-            // when these are null.
-            'sector_pe_median'      => null,
-            'sector_ps_median'      => null,
-            'sector_ev_ebitda_median' => null,
+            // EV / Sector fields (for SectorBenchmarkPillar)
+            'shares_outstanding'         => $v($ks['sharesOutstanding']         ?? []),
+            'gross_margins'              => $v($fin['grossMargins']              ?? []),
+            'forward_eps'                => $v($ks['forwardEps']                 ?? []),
+            'trailing_eps'               => $v($ks['trailingEps']                ?? []),
+            'revenue_growth'             => $v($fin['revenueGrowth']             ?? []),
+            'earnings_quarterly_growth'  => $v($ks['earningsQuarterlyGrowth']   ?? []),
+
+            // Price history (for MomentumPillar)
+            'monthly_closes'             => $closes,
+            'spy_closes'                 => $spyCloses,
         ];
     }
 }
