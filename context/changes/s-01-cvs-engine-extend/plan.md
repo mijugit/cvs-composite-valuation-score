@@ -628,24 +628,24 @@ Czas odpowiedzi dla 10 tickerów: ~20–25s przy pierwszym zapytaniu (cache cold
 
 #### Automated
 
-- [x] 1.1 `vendor/bin/phpunit --testdox` — testy przechodzą po Phase 1
+- [x] 1.1 `vendor/bin/phpunit --testdox` — testy przechodzą po Phase 1 — 7044a38
 
 #### Manual
 
-- [x] 1.2 Response JSON zawiera `sector: "Technology"` dla AAPL
-- [x] 1.3 Response zawiera `monthly_closes` z ≥ 7 elementami
-- [x] 1.4 Response zawiera `spy_closes` z ≥ 7 elementami
+- [x] 1.2 Response JSON zawiera `sector: "Technology"` dla AAPL — 7044a38
+- [x] 1.3 Response zawiera `monthly_closes` z ≥ 7 elementami — 7044a38
+- [x] 1.4 Response zawiera `spy_closes` z ≥ 7 elementami — 7044a38
 
 ### Phase 2: SectorBenchmarkPillar Rewrite
 
 #### Automated
 
-- [ ] 2.1 `vendor/bin/phpunit --testdox` — testy przechodzą
+- [x] 2.1 `vendor/bin/phpunit --testdox` — testy przechodzą
 
 #### Manual
 
-- [ ] 2.2 `pillar_breakdown.sector` ≠ 50.0 dla AAPL (Technology, FCF > 0)
-- [ ] 2.3 Wariant B działa bez błędu dla spółki bez FCF
+- [x] 2.2 `pillar_breakdown.sector` ≠ 50.0 dla AAPL (Technology, FCF > 0)
+- [x] 2.3 Wariant B działa bez błędu dla spółki bez FCF
 
 ### Phase 3: MomentumPillar
 

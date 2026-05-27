@@ -103,11 +103,12 @@ class CVSModelTest extends TestCase
             // Excellent growth
             'revenue_history'       => [500_000, 700_000, 1_000_000, 1_400_000, 2_000_000],
             'gross_margin_history'  => [0.45, 0.47, 0.49, 0.51, 0.53],
-            // Very cheap vs peers (all three multiples well below sector medians)
-            'pe_ratio'              => 10.0,
-            'sector_pe_median'      => 30.0,
-            'ps_ratio'              =>  0.5,   // sector_ps_median=3.0 from baseFinancials
-            'ev_ebitda'             =>  2.0,   // sector_ev_ebitda_median=12.0 from baseFinancials
+            // Sector: Technology, very cheap on EV/FCF basis
+            'sector'                => 'Technology',
+            'shares_outstanding'    => 1_000_000,
+            'forward_eps'           => 12.0,
+            'trailing_eps'          => 10.0,   // implied EPS growth 20%
+            'gross_margins'         =>  0.55,  // 55% — matches Technology benchmark median
             // Near 52-week low
             'current_price'         => 100.0,
             'fifty_two_week_low'    =>  95.0,

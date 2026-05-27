@@ -35,7 +35,7 @@ class CVSModel
     {
         $this->qualityGate = new QualityGate($config['quality_gate']);
         $this->growth      = new GrowthPillar();
-        $this->sector      = new SectorBenchmarkPillar();
+        $this->sector      = new SectorBenchmarkPillar($config['benchmarks'] ?? []);
         $this->history     = new PriceHistoryPillar();
         $this->quality     = new FundamentalQualityPillar();
     }
