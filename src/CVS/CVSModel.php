@@ -6,7 +6,7 @@ namespace CVS\CVS;
 
 use CVS\CVS\Pillars\GrowthPillar;
 use CVS\CVS\Pillars\SectorBenchmarkPillar;
-use CVS\CVS\Pillars\PriceHistoryPillar;
+use CVS\CVS\Pillars\MomentumPillar;
 use CVS\CVS\Pillars\FundamentalQualityPillar;
 
 /**
@@ -27,7 +27,7 @@ class CVSModel
     private QualityGate              $qualityGate;
     private GrowthPillar             $growth;
     private SectorBenchmarkPillar    $sector;
-    private PriceHistoryPillar       $history;
+    private MomentumPillar           $momentum;
     private FundamentalQualityPillar $quality;
 
     /** @param array<string, mixed> $config  Full contents of config/cvs-weights.php */
@@ -36,7 +36,7 @@ class CVSModel
         $this->qualityGate = new QualityGate($config['quality_gate']);
         $this->growth      = new GrowthPillar();
         $this->sector      = new SectorBenchmarkPillar($config['benchmarks'] ?? []);
-        $this->history     = new PriceHistoryPillar();
+        $this->momentum    = new MomentumPillar($config['momentum']   ?? []);
         $this->quality     = new FundamentalQualityPillar();
     }
 
@@ -64,18 +64,18 @@ class CVSModel
         $w = $this->config['weights'];
 
         $pillarScores = [
-            'growth'  => $this->growth->score($financials),
-            'sector'  => $this->sector->score($financials),
-            'history' => $this->history->score($financials),
-            'quality' => $this->quality->score($financials),
+            'growth'   => $this->growth->score($financials),
+            'sector'   => $this->sector->score($financials),
+            'momentum' => $this->momentum->score($financials),
+            'quality'  => $this->quality->score($financials),
         ];
 
         // Step 3 — Weighted aggregate.
         $cvs = (
-            $pillarScores['growth']  * $w['growth']  +
-            $pillarScores['sector']  * $w['sector']  +
-            $pillarScores['history'] * $w['history'] +
-            $pillarScores['quality'] * $w['quality']
+            $pillarScores['growth']   * $w['growth']   +
+            $pillarScores['sector']   * $w['sector']   +
+            $pillarScores['momentum'] * $w['momentum'] +
+            $pillarScores['quality']  * $w['quality']
         );
 
         $cvs = round(min(100.0, max(0.0, $cvs)), 2);

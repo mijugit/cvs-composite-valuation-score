@@ -109,7 +109,10 @@ class CVSModelTest extends TestCase
             'forward_eps'           => 12.0,
             'trailing_eps'          => 10.0,   // implied EPS growth 20%
             'gross_margins'         =>  0.55,  // 55% — matches Technology benchmark median
-            // Near 52-week low
+            // Strong momentum: stock up 67% in 6M while SPY only +6%
+            'monthly_closes'        => [60.0, 65.0, 70.0, 76.0, 82.0, 90.0, 100.0],
+            'spy_closes'            => [100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0],
+            // Near 52-week low (for 52W component compatibility)
             'current_price'         => 100.0,
             'fifty_two_week_low'    =>  95.0,
             'fifty_two_week_high'   => 200.0,

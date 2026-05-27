@@ -640,23 +640,23 @@ Czas odpowiedzi dla 10 tickerów: ~20–25s przy pierwszym zapytaniu (cache cold
 
 #### Automated
 
-- [x] 2.1 `vendor/bin/phpunit --testdox` — testy przechodzą
+- [x] 2.1 `vendor/bin/phpunit --testdox` — testy przechodzą — e8314cb
 
 #### Manual
 
-- [x] 2.2 `pillar_breakdown.sector` ≠ 50.0 dla AAPL (Technology, FCF > 0)
-- [x] 2.3 Wariant B działa bez błędu dla spółki bez FCF
+- [x] 2.2 `pillar_breakdown.sector` ≠ 50.0 dla AAPL (Technology, FCF > 0) — e8314cb
+- [x] 2.3 Wariant B działa bez błędu dla spółki bez FCF — e8314cb
 
 ### Phase 3: MomentumPillar
 
 #### Automated
 
-- [ ] 3.1 `vendor/bin/phpunit --testdox` — testy przechodzą
-- [ ] 3.2 `php -l src/CVS/Pillars/MomentumPillar.php` — brak syntax errors
+- [x] 3.1 `vendor/bin/phpunit --testdox` — testy przechodzą
+- [x] 3.2 `php -l src/CVS/Pillars/MomentumPillar.php` — brak syntax errors
 
 #### Manual
 
-- [ ] 3.3 `pillar_breakdown.momentum` ≠ 50.0 dla MSFT lub NVDA
+- [x] 3.3 `pillar_breakdown.momentum` ≠ 50.0 dla MSFT lub NVDA
 
 ### Phase 4: Config + Tests + Porządki
 

@@ -15,7 +15,7 @@ return [
     'weights' => [
         'growth'     => 0.30, // (a) Growth rate vs own trajectory
         'sector'     => 0.25, // (b) Sector benchmark comparison
-        'history'    => 0.25, // (c) Price history percentile
+        'momentum'   => 0.25, // (c) Price momentum vs market (ROC 6M+3M vs SPY)
         'quality'    => 0.20, // (d) Fundamental quality
     ],
 
@@ -55,6 +55,13 @@ return [
         'neutral'     => 42, // →  NEUTRALNIE
         'reduce'      => 28, // ⬇  REDUKUJ
         // below 28   → ⬇⬇ UNIKAJ
+    ],
+
+    // --- MomentumPillar parameters ---
+    'momentum' => [
+        'normalization_divisor' => 40.0,  // excess return divisor (matches Python v1.6)
+        'score_min'             =>  5.0,  // floor score
+        'score_max'             => 95.0,  // ceiling score
     ],
 
     // --- Data source ---
