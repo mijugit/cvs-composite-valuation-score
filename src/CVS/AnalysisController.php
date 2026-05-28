@@ -8,6 +8,7 @@ use CVS\Auth\AuthController;
 use CVS\Api\FinancialDataFetcher;
 use CVS\Core\Request;
 use CVS\Core\Response;
+use CVS\History\HistoryRepository;
 use CVS\Watchlist\WatchlistRepository;
 
 /**
@@ -21,13 +22,17 @@ class AnalysisController
     private CVSModel             $model;
     private FinancialDataFetcher $fetcher;
     private WatchlistRepository  $watchlist;
+    private HistoryRepository    $history;
+    private int                  $maxHistory;
 
     public function __construct()
     {
-        $config          = require dirname(__DIR__, 2) . '/config/cvs-weights.php';
-        $this->model     = new CVSModel($config);
-        $this->fetcher   = new FinancialDataFetcher($config['data_source']);
-        $this->watchlist = new WatchlistRepository();
+        $config           = require dirname(__DIR__, 2) . '/config/cvs-weights.php';
+        $this->model      = new CVSModel($config);
+        $this->fetcher    = new FinancialDataFetcher($config['data_source']);
+        $this->watchlist  = new WatchlistRepository();
+        $this->history    = new HistoryRepository();
+        $this->maxHistory = $config['data_source']['max_history'] ?? 20;
     }
 
     // ------------------------------------------------------------------
@@ -39,7 +44,11 @@ class AnalysisController
         AuthController::requireAuth();
         $userId    = (int) $_SESSION['user_id'];
         $watchlist = $this->watchlist->findByUser($userId);
-        Response::view('dashboard', ['watchlist' => $watchlist]);
+        $history   = $this->history->findByUser($userId, $this->maxHistory);
+        Response::view('dashboard', [
+            'watchlist' => $watchlist,
+            'history'   => $history,
+        ]);
     }
 
     // ------------------------------------------------------------------
@@ -73,11 +82,13 @@ class AnalysisController
             return;
         }
 
+        $userId  = (int) $_SESSION['user_id'];
         $results = [];
         foreach ($tickers as $ticker) {
             $financials = $this->fetcher->fetch($ticker);
 
             if ($financials === null) {
+                // No data fetched — nothing meaningful to persist.
                 $results[] = [
                     'ticker' => $ticker,
                     'error'  => 'Nie udało się pobrać danych. Sprawdź symbol.',
@@ -85,7 +96,9 @@ class AnalysisController
                 continue;
             }
 
-            $results[] = $this->model->calculate($ticker, $financials)->toArray();
+            $resultArr = $this->model->calculate($ticker, $financials)->toArray();
+            $this->history->save($userId, $ticker, $resultArr);
+            $results[] = $resultArr;
         }
 
         Response::json(['results' => $results]);
