@@ -380,6 +380,24 @@ class FinancialDataFetcher
         $latestBs = $bs[0] ?? [];
         $latestIs = $is[0] ?? [];
 
+        // --- OpCF fallback for capex-heavy companies (S-05, fixes XOM) ---
+        // If capex absorbs more than 70 % of operating cash flow, the reported FCF
+        // understates the company's underlying earning power. We use OpCF × 0.5
+        // as a conservative midpoint that better reflects normalised earnings.
+        $fcf  = $v($fin['freeCashflow']      ?? []);
+        $opCf = $v($fin['operatingCashflow'] ?? []);
+
+        $fcfAdjusted  = false;
+        $fcfEffective = $fcf;
+
+        if ($fcf !== null && $opCf !== null && $opCf > 0) {
+            $capexRatio = ($opCf - $fcf) / $opCf;  // ≈ capex / opCf
+            if ($capexRatio > 0.70) {
+                $fcfEffective = $opCf * 0.50;
+                $fcfAdjusted  = true;
+            }
+        }
+
         return [
             // Company metadata
             'sector'                     => is_string($ap['sector'] ?? null) ? $ap['sector'] : null,
@@ -404,8 +422,14 @@ class FinancialDataFetcher
             'current_assets'             => $v($latestBs['totalCurrentAssets']      ?? []),
             'current_liabilities'        => $v($latestBs['totalCurrentLiabilities'] ?? []),
 
-            // Cash flow
-            'free_cash_flow'             => $v($fin['freeCashflow'] ?? []),
+            // Cash flow — with capex-heavy company fallback (S-05)
+            // If capex absorbs > 70 % of OpCF, use OpCF × 0.5 as a proxy FCF.
+            // This prevents XOM-style companies from scoring 0 on valuation
+            // when their reported FCF is artificially low due to heavy investment.
+            'free_cash_flow'             => $fcfEffective,
+            'free_cash_flow_raw'         => $fcf,
+            'free_cash_flow_adjusted'    => $fcfAdjusted,
+            'operating_cash_flow'        => $opCf,
 
             // Quality ratios
             'return_on_equity'           => $v($fin['returnOnEquity'] ?? []),
