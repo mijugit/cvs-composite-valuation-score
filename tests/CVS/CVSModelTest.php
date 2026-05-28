@@ -175,8 +175,9 @@ class CVSModelTest extends TestCase
     {
         // baseFinancials includes monthly_closes with 7 entries and visible momentum
         // → MomentumPillar must produce a score different from neutral 50.
-        $pillar = new MomentumPillar($this->config['momentum']);
-        $score  = $pillar->score($this->baseFinancials());
+        $swingMode = $this->config['modes']['swing'];
+        $pillar    = new MomentumPillar($swingMode);
+        $score     = $pillar->score($this->baseFinancials(), $swingMode['roc_weights']);
 
         $this->assertNotEquals(50.0, $score);
         $this->assertGreaterThanOrEqual(0.0, $score);
@@ -186,10 +187,11 @@ class CVSModelTest extends TestCase
     public function test_momentum_pillar_returns_neutral_when_insufficient_history(): void
     {
         // Fewer than 7 monthly closes → cannot compute ROC → neutral 50.
-        $pillar = new MomentumPillar($this->config['momentum']);
-        $score  = $pillar->score($this->baseFinancials([
+        $swingMode = $this->config['modes']['swing'];
+        $pillar    = new MomentumPillar($swingMode);
+        $score     = $pillar->score($this->baseFinancials([
             'monthly_closes' => [140.0, 145.0, 150.0, 148.0, 155.0], // only 5
-        ]));
+        ]), $swingMode['roc_weights']);
 
         $this->assertEquals(50.0, $score);
     }
