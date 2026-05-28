@@ -70,6 +70,12 @@
             $modeFund  = $cfgFile['modes']['fundamental'] ?? [];
             ?>
 
+            <?php if (!empty($financials['monthly_closes'])): ?>
+            <div class="price-chart-section">
+                <canvas id="price-chart"></canvas>
+            </div>
+            <?php endif; ?>
+
             <!-- Dual CVS score header -->
             <div class="card card--result">
                 <?php if ($gs && isset($gsLabels[$gs])): ?>
@@ -257,6 +263,118 @@
             });
             </script>
 
+            <?php if (!empty($financials['monthly_closes'])): ?>
+            <script>
+            window.addEventListener('load', function () {
+                if (typeof Chart === 'undefined') return;
+                var pCtx = document.getElementById('price-chart');
+                if (!pCtx) return;
+
+                var closes  = <?= json_encode(array_values($financials['monthly_closes'])) ?>;
+                var spyData = <?= json_encode(array_values($financials['spy_closes'] ?? [])) ?>;
+                var ticker  = <?= json_encode($ticker) ?>;
+                var n = 12;
+
+                // Take last N points
+                var tickerRaw = closes.slice(-n);
+                var spyRaw    = spyData.slice(-n);
+                var len       = tickerRaw.length;
+                if (len === 0) return;
+
+                // Normalize to base-100 index from first point
+                var tBase = tickerRaw[0] || 1;
+                var sBase = spyRaw[0]    || 1;
+                var tickerNorm = tickerRaw.map(function(v){ return parseFloat((v / tBase * 100).toFixed(2)); });
+                var spyNorm    = spyRaw.length
+                    ? spyRaw.map(function(v){ return parseFloat((v / sBase * 100).toFixed(2)); })
+                    : [];
+
+                // Generate month labels going back 'len' months from today
+                var labels = [];
+                var now = new Date();
+                for (var i = len - 1; i >= 0; i--) {
+                    var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                    labels.push(d.toLocaleDateString('pl-PL', { month: 'short', year: '2-digit' }));
+                }
+
+                var datasets = [
+                    {
+                        label: ticker,
+                        data: tickerNorm,
+                        borderColor: 'rgba(79, 142, 247, 0.9)',
+                        backgroundColor: 'transparent',
+                        borderWidth: 2,
+                        pointRadius: 2,
+                        tension: 0.15,
+                    },
+                ];
+                if (spyNorm.length) {
+                    datasets.push({
+                        label: 'SPY',
+                        data: spyNorm,
+                        borderColor: 'rgba(160, 160, 160, 0.55)',
+                        backgroundColor: 'transparent',
+                        borderWidth: 1.5,
+                        pointRadius: 1,
+                        tension: 0.15,
+                        borderDash: [5, 3],
+                    });
+                }
+
+                new Chart(pCtx.getContext('2d'), {
+                    type: 'line',
+                    data: { labels: labels, datasets: datasets },
+                    options: {
+                        animation: false,
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                                labels: {
+                                    color: 'rgba(255,255,255,0.7)',
+                                    boxWidth: 12,
+                                    font: { size: 11 },
+                                },
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(c) {
+                                        return c.dataset.label + ': ' + c.parsed.y.toFixed(1);
+                                    },
+                                },
+                            },
+                        },
+                        scales: {
+                            x: {
+                                grid: { color: 'rgba(128,128,128,.08)' },
+                                ticks: {
+                                    color: 'rgba(255,255,255,0.45)',
+                                    font: { size: 10 },
+                                    maxRotation: 45,
+                                },
+                            },
+                            y: {
+                                grid: { color: 'rgba(128,128,128,.08)' },
+                                ticks: {
+                                    color: 'rgba(255,255,255,0.45)',
+                                    font: { size: 10 },
+                                    callback: function(v) { return v.toFixed(0); },
+                                },
+                                title: {
+                                    display: true,
+                                    text: 'Indeks (baza = 100)',
+                                    color: 'rgba(255,255,255,0.3)',
+                                    font: { size: 10 },
+                                },
+                            },
+                        },
+                    },
+                });
+            });
+            </script>
+            <?php endif; ?>
+
         <?php endif; ?>
 
     <?php endif; ?>
@@ -324,4 +442,15 @@
 .raw-data { margin-top: 1.5rem; }
 .raw-data summary { cursor: pointer; font-size: .85rem; color: var(--c-muted); margin-bottom: .5rem; }
 .raw-table td:first-child { color: var(--c-muted); font-size: .82rem; width: 55%; }
+
+/* Price chart section */
+.price-chart-section {
+    background: var(--c-card);
+    border: 1px solid var(--c-border);
+    border-radius: 10px;
+    padding: .75rem 1rem 1rem;
+    margin-bottom: 1.25rem;
+    height: 220px;
+    position: relative;
+}
 </style>
