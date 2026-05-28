@@ -211,6 +211,131 @@
                 <?php endif; ?>
             </div>
 
+            <?php
+            // --- Analyst forecast (S-09) ---
+            $forecast  = $financials['forecast'] ?? null;
+            $fcTargets = $forecast['targets'] ?? [];
+            $fcLatest  = $forecast['latest'] ?? null;
+            $fcTrend   = $forecast['trend'] ?? [];
+            $fcMean    = $fcTargets['mean']   ?? null;
+            $fcMedian  = $fcTargets['median'] ?? null;
+            $fcHigh    = $fcTargets['high']   ?? null;
+            $fcLow     = $fcTargets['low']    ?? null;
+            $fcUpside  = $fcTargets['upside'] ?? null;
+            $fcNum     = $forecast['num_analysts']        ?? null;
+            $fcRecMean = $forecast['recommendation_mean'] ?? null;
+            $curPrice  = $financials['current_price'] ?? null;
+
+            $hasTargets   = $fcMean !== null || $fcMedian !== null || $fcHigh !== null || $fcLow !== null;
+            $hasConsensus = $fcLatest !== null || $fcRecMean !== null;
+            $hasTrend     = !empty($fcTrend);
+            $hasFan       = !empty($financials['monthly_closes'])
+                && $fcHigh !== null && $fcMean !== null && $fcLow !== null && $curPrice !== null;
+            $hasForecast  = $hasTargets || $hasConsensus || $hasTrend;
+
+            $consensusLabel = ($fcRecMean !== null)
+                ? \CVS\Forecast\ForecastParser::consensusLabel((float) $fcRecMean, $cfgFile['analyst_consensus'] ?? [])
+                : null;
+
+            $consensusRows = [
+                'strong_buy'  => ['label' => 'Silne Kupuj',    'class' => 'sb'],
+                'buy'         => ['label' => 'Kupuj',          'class' => 'b'],
+                'hold'        => ['label' => 'Trzymaj',        'class' => 'h'],
+                'sell'        => ['label' => 'Sprzedaj',       'class' => 's'],
+                'strong_sell' => ['label' => 'Silna Sprzedaż', 'class' => 'ss'],
+            ];
+            $latestTotal = $fcLatest ? array_sum($fcLatest) : 0;
+            ?>
+
+            <?php if ($hasForecast): ?>
+            <div class="card forecast-card">
+                <h2>Prognoza analityków</h2>
+
+                <?php if ($hasTargets): ?>
+                <div class="forecast-block">
+                    <div class="forecast-block__head">
+                        <h3>Cele cenowe</h3>
+                        <?php if ($fcUpside !== null): ?>
+                            <span class="upside-badge <?= $fcUpside >= 0 ? 'upside-badge--pos' : 'upside-badge--neg' ?>">
+                                <?= ($fcUpside >= 0 ? '+' : '') . number_format($fcUpside * 100, 1) ?>% vs cena
+                            </span>
+                        <?php endif; ?>
+                    </div>
+                    <div class="forecast-targets">
+                        <?php
+                        $targetTiles = [
+                            'Min'     => $fcLow,
+                            'Średnia' => $fcMean,
+                            'Mediana' => $fcMedian,
+                            'Max'     => $fcHigh,
+                        ];
+                        foreach ($targetTiles as $tLabel => $tVal):
+                            if ($tVal === null) continue;
+                        ?>
+                        <div class="forecast-tile">
+                            <div class="forecast-tile__label"><?= htmlspecialchars($tLabel) ?></div>
+                            <div class="forecast-tile__value">$<?= number_format((float) $tVal, 2) ?></div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php if ($fcNum !== null): ?>
+                        <p class="forecast-note">Na podstawie <?= (int) $fcNum ?> ocen analityków<?php if ($curPrice !== null): ?> · cena bieżąca $<?= number_format((float) $curPrice, 2) ?><?php endif; ?>.</p>
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?>
+
+                <?php if ($hasConsensus): ?>
+                <div class="forecast-block">
+                    <div class="forecast-block__head">
+                        <h3>Konsensus rekomendacji</h3>
+                        <?php if ($consensusLabel !== null): ?>
+                            <span class="consensus-label">
+                                <?= htmlspecialchars($consensusLabel) ?>
+                                <?php if ($fcRecMean !== null): ?>
+                                    <small>(śr. <?= number_format((float) $fcRecMean, 2) ?>)</small>
+                                <?php endif; ?>
+                            </span>
+                        <?php endif; ?>
+                    </div>
+                    <?php if ($fcLatest !== null): ?>
+                    <ul class="consensus-bars">
+                        <?php foreach ($consensusRows as $key => $meta):
+                            $count = (int) ($fcLatest[$key] ?? 0);
+                            $pct   = $latestTotal > 0 ? round($count / $latestTotal * 100) : 0;
+                        ?>
+                        <li class="consensus-bar">
+                            <span class="consensus-bar__label"><?= htmlspecialchars($meta['label']) ?></span>
+                            <span class="consensus-bar__track">
+                                <span class="consensus-bar__fill consensus-bar__fill--<?= $meta['class'] ?>" style="width:<?= $pct ?>%"></span>
+                            </span>
+                            <span class="consensus-bar__count"><?= $count ?></span>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?>
+
+                <?php if ($hasTrend): ?>
+                <div class="forecast-block">
+                    <h3>Zmiana rekomendacji w czasie</h3>
+                    <div class="forecast-chart-wrap">
+                        <canvas id="reco-trend-chart"></canvas>
+                    </div>
+                </div>
+                <?php endif; ?>
+
+                <?php if ($hasFan): ?>
+                <div class="forecast-block">
+                    <h3>Prognoza ceny (min / średnia / max)</h3>
+                    <div class="forecast-chart-wrap">
+                        <canvas id="forecast-fan-chart"></canvas>
+                    </div>
+                </div>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+
             <p class="disclaimer-inline"><?= htmlspecialchars($result['disclaimer']) ?></p>
 
             <!-- Radar chart initialisation -->
@@ -375,6 +500,193 @@
             </script>
             <?php endif; ?>
 
+            <?php if ($hasTrend): ?>
+            <script>
+            window.addEventListener('load', function () {
+                if (typeof Chart === 'undefined') return;
+                var ctx = document.getElementById('reco-trend-chart');
+                if (!ctx) return;
+
+                // Yahoo returns periods newest-first; reverse so newest sits on the right.
+                var trend = <?= json_encode(array_values($fcTrend)) ?>.slice().reverse();
+                if (!trend.length) return;
+
+                var labels = trend.map(function (r) {
+                    if (r.period === '0m') return 'Teraz';
+                    var m = parseInt(String(r.period).replace(/[^0-9]/g, ''), 10);
+                    return isNaN(m) ? r.period : (m + ' mc temu');
+                });
+
+                var series = [
+                    { key: 'strong_buy',  label: 'Silne Kupuj',    color: 'rgba(22,163,74,0.85)' },
+                    { key: 'buy',         label: 'Kupuj',          color: 'rgba(74,222,128,0.85)' },
+                    { key: 'hold',        label: 'Trzymaj',        color: 'rgba(234,179,8,0.85)' },
+                    { key: 'sell',        label: 'Sprzedaj',       color: 'rgba(249,115,22,0.85)' },
+                    { key: 'strong_sell', label: 'Silna Sprzedaż', color: 'rgba(239,68,68,0.85)' },
+                ];
+
+                var datasets = series.map(function (s) {
+                    return {
+                        label: s.label,
+                        data: trend.map(function (r) { return r[s.key] || 0; }),
+                        backgroundColor: s.color,
+                        borderWidth: 0,
+                    };
+                });
+
+                new Chart(ctx.getContext('2d'), {
+                    type: 'bar',
+                    data: { labels: labels, datasets: datasets },
+                    options: {
+                        animation: false,
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                                labels: { color: 'rgba(255,255,255,0.7)', boxWidth: 12, font: { size: 11 } },
+                            },
+                        },
+                        scales: {
+                            x: {
+                                stacked: true,
+                                grid: { color: 'rgba(128,128,128,.08)' },
+                                ticks: { color: 'rgba(255,255,255,0.45)', font: { size: 10 } },
+                            },
+                            y: {
+                                stacked: true,
+                                grid: { color: 'rgba(128,128,128,.08)' },
+                                ticks: { color: 'rgba(255,255,255,0.45)', font: { size: 10 }, precision: 0 },
+                            },
+                        },
+                    },
+                });
+            });
+            </script>
+            <?php endif; ?>
+
+            <?php if ($hasFan): ?>
+            <script>
+            window.addEventListener('load', function () {
+                if (typeof Chart === 'undefined') return;
+                var ctx = document.getElementById('forecast-fan-chart');
+                if (!ctx) return;
+
+                var closes = <?= json_encode(array_values($financials['monthly_closes'])) ?>;
+                var cur    = <?= json_encode((float) $curPrice) ?>;
+                var high   = <?= json_encode((float) $fcHigh) ?>;
+                var mean   = <?= json_encode((float) $fcMean) ?>;
+                var low    = <?= json_encode((float) $fcLow) ?>;
+                var n = 12;
+
+                var hist = closes.slice(-n);
+                var len  = hist.length;
+                if (len === 0) return;
+
+                // Labels: 'len' historical months + a +12M projection endpoint.
+                var labels = [];
+                var now = new Date();
+                for (var i = len - 1; i >= 0; i--) {
+                    var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                    labels.push(d.toLocaleDateString('pl-PL', { month: 'short', year: '2-digit' }));
+                }
+                labels.push('+12M');
+
+                // History line: actual closes, null at the projection endpoint.
+                var historyData = hist.slice();
+                historyData.push(null);
+
+                // Projection datasets fan from the current price (now-anchor) to each target.
+                function fan(target) {
+                    var arr = new Array(len + 1).fill(null);
+                    arr[len - 1] = cur;
+                    arr[len]     = target;
+                    return arr;
+                }
+
+                var datasets = [
+                    {
+                        label: <?= json_encode($ticker) ?>,
+                        data: historyData,
+                        borderColor: 'rgba(79, 142, 247, 0.9)',
+                        backgroundColor: 'transparent',
+                        borderWidth: 2,
+                        pointRadius: 2,
+                        spanGaps: false,
+                        tension: 0.15,
+                    },
+                    {
+                        label: 'Max',
+                        data: fan(high),
+                        borderColor: 'rgba(34, 197, 94, 0.9)',
+                        backgroundColor: 'transparent',
+                        borderWidth: 1.5,
+                        pointRadius: 3,
+                        borderDash: [5, 3],
+                        spanGaps: false,
+                    },
+                    {
+                        label: 'Średnia',
+                        data: fan(mean),
+                        borderColor: 'rgba(160, 160, 160, 0.8)',
+                        backgroundColor: 'transparent',
+                        borderWidth: 1.5,
+                        pointRadius: 3,
+                        spanGaps: false,
+                    },
+                    {
+                        label: 'Min',
+                        data: fan(low),
+                        borderColor: 'rgba(239, 68, 68, 0.9)',
+                        backgroundColor: 'transparent',
+                        borderWidth: 1.5,
+                        pointRadius: 3,
+                        borderDash: [5, 3],
+                        spanGaps: false,
+                    },
+                ];
+
+                new Chart(ctx.getContext('2d'), {
+                    type: 'line',
+                    data: { labels: labels, datasets: datasets },
+                    options: {
+                        animation: false,
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                                labels: { color: 'rgba(255,255,255,0.7)', boxWidth: 12, font: { size: 11 } },
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function (c) {
+                                        if (c.parsed.y === null) return null;
+                                        return c.dataset.label + ': $' + c.parsed.y.toFixed(2);
+                                    },
+                                },
+                            },
+                        },
+                        scales: {
+                            x: {
+                                grid: { color: 'rgba(128,128,128,.08)' },
+                                ticks: { color: 'rgba(255,255,255,0.45)', font: { size: 10 }, maxRotation: 45 },
+                            },
+                            y: {
+                                grid: { color: 'rgba(128,128,128,.08)' },
+                                ticks: {
+                                    color: 'rgba(255,255,255,0.45)',
+                                    font: { size: 10 },
+                                    callback: function (v) { return '$' + v.toFixed(0); },
+                                },
+                            },
+                        },
+                    },
+                });
+            });
+            </script>
+            <?php endif; ?>
+
         <?php endif; ?>
 
     <?php endif; ?>
@@ -453,4 +765,71 @@
     height: 220px;
     position: relative;
 }
+
+/* Forecast card (S-09) */
+.forecast-card { border-color: rgba(79, 142, 247, .25); }
+.forecast-block { margin-top: 1.5rem; }
+.forecast-block:first-of-type { margin-top: .5rem; }
+.forecast-block__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: .75rem;
+}
+.forecast-block h3 { margin: 0 0 .75rem; }
+.forecast-block__head h3 { margin: 0; }
+
+.upside-badge {
+    font-size: .85rem;
+    font-weight: 600;
+    padding: .25rem .7rem;
+    border-radius: 99px;
+}
+.upside-badge--pos { background: rgba(52, 199, 123, .15); color: var(--c-success); }
+.upside-badge--neg { background: rgba(224, 85, 85, .15);  color: var(--c-danger); }
+
+.forecast-targets {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: .75rem;
+}
+.forecast-tile {
+    background: var(--c-bg);
+    border: 1px solid var(--c-border);
+    border-radius: 8px;
+    padding: .75rem;
+    text-align: center;
+}
+.forecast-tile__label { font-size: .75rem; color: var(--c-muted); margin-bottom: .3rem; }
+.forecast-tile__value { font-size: 1.35rem; font-weight: 700; }
+.forecast-note { font-size: .8rem; color: var(--c-muted); margin-top: .6rem; }
+
+.consensus-label {
+    font-size: .9rem;
+    font-weight: 600;
+    color: var(--c-primary);
+}
+.consensus-label small { color: var(--c-muted); font-weight: 400; }
+
+.consensus-bars { list-style: none; display: flex; flex-direction: column; gap: .4rem; }
+.consensus-bar { display: flex; align-items: center; gap: .6rem; }
+.consensus-bar__label { flex: 0 0 110px; font-size: .82rem; color: var(--c-muted); }
+.consensus-bar__track {
+    flex: 1;
+    height: 14px;
+    background: var(--c-bg);
+    border-radius: 7px;
+    overflow: hidden;
+}
+.consensus-bar__fill { display: block; height: 100%; border-radius: 7px; }
+.consensus-bar__fill--sb { background: rgba(22,163,74,0.85); }
+.consensus-bar__fill--b  { background: rgba(74,222,128,0.85); }
+.consensus-bar__fill--h  { background: rgba(234,179,8,0.85); }
+.consensus-bar__fill--s  { background: rgba(249,115,22,0.85); }
+.consensus-bar__fill--ss { background: rgba(239,68,68,0.85); }
+.consensus-bar__count { flex: 0 0 28px; text-align: right; font-size: .82rem; font-weight: 600; }
+
+.forecast-chart-wrap { position: relative; height: 240px; }
 </style>
