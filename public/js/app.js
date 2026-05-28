@@ -28,7 +28,9 @@
     let watchedSet = new Set();
 
     function getCsrf() {
-        return document.getElementById('csrf-token')?.value ?? '';
+        return document.querySelector('meta[name="csrf-token"]')?.content
+            ?? document.getElementById('csrf-token')?.value
+            ?? '';
     }
 
     async function watchlistToggle(ticker) {
@@ -422,6 +424,47 @@
         resultsSection.hidden = true;
         resultsGrid.innerHTML = '';
     }
+})();
+
+// ============================================================
+// Detail page watchlist toggle — S-06
+// Handles .watchlist-detail-btn on /analysis/{ticker}.
+// ============================================================
+
+(function () {
+    'use strict';
+
+    const btn = document.querySelector('.watchlist-detail-btn');
+    if (!btn) return; // Not on detail page.
+
+    btn.addEventListener('click', async () => {
+        const ticker = btn.dataset.ticker;
+        if (!ticker) return;
+
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.content
+                  ?? document.getElementById('csrf-token')?.value
+                  ?? '';
+        try {
+            const resp = await fetch('/watchlist/toggle', {
+                method:  'POST',
+                headers: {
+                    'Content-Type':     'application/x-www-form-urlencoded',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-Token':     csrf,
+                },
+                body: new URLSearchParams({ ticker, _csrf: csrf }),
+            });
+
+            if (!resp.ok) return;
+            const data = await resp.json();
+            if (!data.ok) return;
+
+            const isWatched = data.action === 'added';
+            btn.dataset.watched = isWatched ? '1' : '0';
+            btn.classList.toggle('is-watched', isWatched);
+            btn.textContent = isWatched ? '× Usuń z obserwowanych' : '⭐ Obserwuj';
+        } catch (e) { /* network error — silent */ }
+    });
 })();
 
 // ============================================================

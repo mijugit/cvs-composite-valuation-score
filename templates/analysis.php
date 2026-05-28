@@ -1,5 +1,12 @@
 <section class="analysis-detail">
-    <h1>Analiza: <?= htmlspecialchars($ticker) ?></h1>
+    <div class="analysis-detail__heading">
+        <h1>Analiza: <?= htmlspecialchars($ticker) ?></h1>
+        <button class="watchlist-detail-btn<?= ($isWatched ?? false) ? ' is-watched' : '' ?>"
+                data-ticker="<?= htmlspecialchars($ticker) ?>"
+                data-watched="<?= ($isWatched ?? false) ? '1' : '0' ?>">
+            <?= ($isWatched ?? false) ? '× Usuń z obserwowanych' : '⭐ Obserwuj' ?>
+        </button>
+    </div>
 
     <?php if (!empty($error)): ?>
         <p class="alert alert--error"><?= htmlspecialchars($error) ?></p>
@@ -258,6 +265,16 @@
 </section>
 
 <style>
+/* Detail heading with watchlist button */
+.analysis-detail__heading {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: .25rem;
+}
+.analysis-detail__heading h1 { margin-bottom: 0; }
+
 /* Dual CVS tiles */
 .dual-cvs-header {
     display: flex;

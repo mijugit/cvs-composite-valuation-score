@@ -103,23 +103,26 @@ class AnalysisController
         $financials = $this->fetcher->fetch($ticker);
 
         if ($financials === null) {
+            $userId = (int) $_SESSION['user_id'];
             Response::view('analysis', [
                 'ticker'     => $ticker,
                 'result'     => null,
                 'financials' => null,
+                'isWatched'  => $this->watchlist->isWatched($userId, $ticker),
                 'error'      => 'Nie udało się pobrać danych. Sprawdź symbol.',
             ]);
             return;
         }
 
-        $result = $this->model->calculate($ticker, $financials);
+        $result    = $this->model->calculate($ticker, $financials);
+        $userId    = (int) $_SESSION['user_id'];
+        $isWatched = $this->watchlist->isWatched($userId, $ticker);
 
         Response::view('analysis', [
             'ticker'     => $ticker,
             'result'     => $result->toArray(),
-
             'financials' => $financials,   // S-03: raw data for detail panel
-
+            'isWatched'  => $isWatched,    // S-06: watchlist toggle button state
             'error'      => null,
         ]);
     }
