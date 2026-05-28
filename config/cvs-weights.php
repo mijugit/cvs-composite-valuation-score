@@ -11,12 +11,34 @@ declare(strict_types=1);
  */
 return [
 
-    // --- Pillar weights (must sum to 1.0) ---
-    'weights' => [
-        'growth'     => 0.30, // (a) Growth rate vs own trajectory
-        'sector'     => 0.25, // (b) Sector benchmark comparison
-        'momentum'   => 0.25, // (c) Price momentum vs market (ROC 6M+3M vs SPY)
-        'quality'    => 0.20, // (d) Fundamental quality
+    // --- Dual-mode scoring profiles (S-05) ---
+    // Each mode defines pillar weights and ROC composite weights for MomentumPillar.
+    // Pillar raw scores (Valuation, Quality) are identical in both modes.
+    // Only MomentumPillar uses roc_weights — it returns different composites per mode.
+    // FR-010: weights must never be hardcoded in business logic; always read from here.
+    'modes' => [
+        'swing' => [
+            'label'            => 'Swing (1–4 mies.)',
+            'valuation_weight' => 0.40,
+            'momentum_weight'  => 0.45,
+            'quality_weight'   => 0.15,
+            'roc_weights'      => ['1m' => 0.50, '3m' => 0.30, '6m' => 0.20],
+            'sigmoid_k'        => 3.0,
+            'momentum_cap_min' => 5.0,
+            'momentum_cap_max' => 95.0,
+            'momentum_divisor' => 40.0,
+        ],
+        'fundamental' => [
+            'label'            => 'Fundamentalny (6–12 mies.)',
+            'valuation_weight' => 0.65,
+            'momentum_weight'  => 0.15,
+            'quality_weight'   => 0.20,
+            'roc_weights'      => ['3m' => 0.30, '6m' => 0.40, '12m' => 0.30],
+            'sigmoid_k'        => 3.0,
+            'momentum_cap_min' => 5.0,
+            'momentum_cap_max' => 95.0,
+            'momentum_divisor' => 40.0,
+        ],
     ],
 
     // --- Sector benchmark medians (hardcoded from Python cvs_analyze.py v1.6 BENCHMARKS dict) ---
@@ -55,13 +77,6 @@ return [
         'neutral'     => 42, // →  NEUTRALNIE
         'reduce'      => 28, // ⬇  REDUKUJ
         // below 28   → ⬇⬇ UNIKAJ
-    ],
-
-    // --- MomentumPillar parameters ---
-    'momentum' => [
-        'normalization_divisor' => 40.0,  // excess return divisor (matches Python v1.6)
-        'score_min'             =>  5.0,  // floor score
-        'score_max'             => 95.0,  // ceiling score
     ],
 
     // --- Data source ---
