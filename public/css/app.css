@@ -366,6 +366,47 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
 
 .watchlist-chip__remove:hover { color: var(--c-danger); }
 
+/* --- Analysis history (S-08) ------------------------------ */
+.history-section {
+    margin-bottom: 1rem;
+}
+
+.history-section h3 {
+    font-size: .85rem;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--c-muted);
+    margin-bottom: .5rem;
+}
+
+.history-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .85rem;
+}
+
+.history-table th {
+    text-align: left;
+    font-weight: 600;
+    color: var(--c-muted);
+    padding: .35rem .5rem;
+    border-bottom: 1px solid var(--c-border);
+}
+
+.history-table td {
+    padding: .4rem .5rem;
+    border-bottom: 1px solid var(--c-border);
+}
+
+.history-table a {
+    color: var(--c-primary);
+    text-decoration: none;
+}
+
+.history-table a:hover { text-decoration: underline; }
+
+.history-table .gate-fail { color: var(--c-muted); }
+
 /* toggle button on result cards */
 .watchlist-toggle-btn {
     background: transparent;
