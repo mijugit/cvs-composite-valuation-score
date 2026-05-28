@@ -36,10 +36,15 @@ class QualityGate
         }
 
         // (2) Gross margin ≥ min_gross_margin
-        $grossMargin = $this->safeDiv(
-            ($financials['gross_profit'] ?? null),
-            ($financials['revenue']     ?? null)
-        );
+        // Prefer financialData.grossMargins (most reliable Yahoo Finance field).
+        // Fall back to gross_profit / revenue from the income statement —
+        // Yahoo's incomeStatementHistory.grossProfit occasionally returns 0
+        // as a data artefact even for high-margin companies (e.g. AAPL).
+        $grossMargin = ($financials['gross_margins'] ?? null)
+            ?? $this->safeDiv(
+                ($financials['gross_profit'] ?? null),
+                ($financials['revenue']     ?? null)
+            );
         if ($grossMargin !== null && $grossMargin < $this->thresholds['min_gross_margin']) {
             $failures[] = sprintf(
                 'Marża brutto %.1f%% < minimalnej %.1f%%',
