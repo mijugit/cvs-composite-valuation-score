@@ -112,7 +112,9 @@ class AnalysisController
         Response::view('analysis', [
             'ticker'     => $ticker,
             'result'     => $result->toArray(),
+
             'financials' => $financials,   // S-03: raw data for detail panel
+
             'error'      => null,
         ]);
     }
