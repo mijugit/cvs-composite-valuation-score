@@ -11,9 +11,11 @@ declare(strict_types=1);
 
 use CVS\Auth\AuthController;
 use CVS\CVS\AnalysisController;
+use CVS\Watchlist\WatchlistController;
 
-$auth     = new AuthController();
-$analysis = new AnalysisController();
+$auth      = new AuthController();
+$analysis  = new AnalysisController();
+$watchlist = new WatchlistController();
 
 // ------------------------------------------------------------------
 // Public routes
@@ -33,3 +35,9 @@ $router->get('/logout',    fn($req) => $auth->logout($req));
 $router->get('/dashboard',              fn($req) => $analysis->dashboard($req));
 $router->post('/analysis',             fn($req) => $analysis->analyse($req));
 $router->get('/analysis/{ticker}',     fn($req) => $analysis->show($req));
+
+// ------------------------------------------------------------------
+// Watchlist (S-06)
+// ------------------------------------------------------------------
+
+$router->post('/watchlist/toggle',     fn($req) => $watchlist->toggle($req));

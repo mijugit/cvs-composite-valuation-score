@@ -439,8 +439,8 @@ cd /home/amjsystem/sites/cvs.timeflow.fun && \
 
 #### Automated
 
-- [x] 1.1 vendor/bin/phpunit tests/Watchlist/ — wszystkie testy zielone
-- [x] 1.2 vendor/bin/phpunit — 0 regresji w istniejących testach
+- [x] 1.1 vendor/bin/phpunit tests/Watchlist/ — wszystkie testy zielone — e9eae87
+- [x] 1.2 vendor/bin/phpunit — 0 regresji w istniejących testach — e9eae87
 
 #### Manual
 
@@ -450,7 +450,7 @@ cd /home/amjsystem/sites/cvs.timeflow.fun && \
 
 #### Automated
 
-- [ ] 2.1 vendor/bin/phpunit — 0 regresji
+- [x] 2.1 vendor/bin/phpunit — 0 regresji
 
 #### Manual
 
