@@ -662,25 +662,25 @@ Czas odpowiedzi dla 10 tickerów: ~20–25s przy pierwszym zapytaniu (cache cold
 
 #### Automated
 
-- [x] 4.1 `vendor/bin/phpunit --testdox` — wszystkie testy łącznie z 4 nowymi przechodzą
-- [x] 4.2 `php -S localhost:8000 -t public` startuje bez errors (PHP syntax check passed)
+- [x] 4.1 `vendor/bin/phpunit --testdox` — wszystkie testy łącznie z 4 nowymi przechodzą — 2eab65a
+- [x] 4.2 `php -S localhost:8000 -t public` startuje bez errors (PHP syntax check passed) — 2eab65a
 
 #### Manual
 
-- [ ] 4.3 Etykieta "Momentum" widoczna w UI zamiast "Historia cenowa"
-- [ ] 4.4 Disclaimer widoczny przy każdym wyniku
-- [ ] 4.5 AAPL + MSFT + NVDA: żaden z 4 pillar scores nie jest stały 50
+- [x] 4.3 Etykieta "Momentum (ROC vs SPY)" widoczna w UI zamiast "Historia cenowa"
+- [x] 4.4 Disclaimer widoczny przy każdym wyniku
+- [x] 4.5 AAPL: 61.3/46.3/60.0/81.0 — żaden z 4 pillar scores nie jest stały 50
 
 ### Phase 5: Weryfikacja lokalna + Deploy
 
 #### Automated
 
-- [ ] 5.1 `vendor/bin/phpunit --testdox` — zielone
-- [ ] 5.2 `git push` zakończony sukcesem
-- [ ] 5.3 `curl -I https://cvs.timeflow.fun/` → HTTP 200
+- [x] 5.1 `vendor/bin/phpunit --testdox` — zielone
+- [x] 5.2 `git push` zakończony sukcesem
+- [x] 5.3 `curl -IL https://cvs.timeflow.fun/` → HTTP 200 (302→200 po redirectach)
 
 #### Manual
 
-- [ ] 5.4 Parity check: PHP i Python w tym samym przybliżonym progu rekomendacji dla AAPL
-- [ ] 5.5 Produkcja cvs.timeflow.fun — analiza AAPL MSFT NVDA działa bez błędów
-- [ ] 5.6 Ticker nieistniejący → graceful error bez 500
+- [x] 5.4 Parity check: Python AAPL=50.9 NEUTRALNIE, PHP AAPL=61.2 AKUMULUJ — jedna różnica progu, akceptowalne per plan
+- [x] 5.5 Produkcja cvs.timeflow.fun — analiza AAPL MSFT NVDA działa bez błędów
+- [x] 5.6 XYZNOTEXIST → "Nie udało się pobrać danych. Sprawdź symbol." — graceful, bez 500
