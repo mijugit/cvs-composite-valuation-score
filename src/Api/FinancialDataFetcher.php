@@ -362,12 +362,16 @@ class FinancialDataFetcher
             }
         }
 
-        // Gross margin history.
+        // Gross margin history — newest last.
+        // Note: Yahoo Finance incomeStatementHistory.grossProfit occasionally
+        // returns 0 as a data artefact for the most-recent fiscal year before
+        // the annual report is filed. Guard with $gross > 0 to avoid corrupting
+        // the margin-trend calculation in FundamentalQualityPillar.
         $grossMarginHistory = [];
         foreach (array_reverse($is) as $stmt) {
             $rev   = $v($stmt['totalRevenue']  ?? []);
             $gross = $v($stmt['grossProfit']   ?? []);
-            if ($rev !== null && $gross !== null && $rev > 0) {
+            if ($rev !== null && $gross !== null && $gross > 0 && $rev > 0) {
                 $grossMarginHistory[] = $gross / $rev;
             }
         }
