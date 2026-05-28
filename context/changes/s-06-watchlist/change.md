@@ -1,10 +1,11 @@
 ---
 id: s-06-watchlist
 title: "Watchlist — zapisywanie ulubionych tickerów + autocomplete"
-status: planned
+status: implemented
 roadmap_ref: S-06
 created: 2026-05-28
 updated: 2026-05-28
+implemented: 2026-05-28
 ---
 
 ## Summary
