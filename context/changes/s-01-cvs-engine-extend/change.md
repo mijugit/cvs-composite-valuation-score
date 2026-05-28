@@ -1,11 +1,12 @@
 ---
 id: s-01-cvs-engine-extend
 title: "CVS Engine — napraw Sektor (EV/FCF) + dodaj Momentum (ROC vs SPY)"
-status: implementing
+status: done
 roadmap_ref: S-01
 created: 2026-05-27
-updated: 2026-05-27
+updated: 2026-05-28
 implementing_started: 2026-05-27
+done_at: 2026-05-28
 ---
 
 ## Summary
