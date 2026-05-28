@@ -450,7 +450,7 @@ cd /home/amjsystem/sites/cvs.timeflow.fun && \
 
 #### Automated
 
-- [x] 2.1 vendor/bin/phpunit — 0 regresji
+- [x] 2.1 vendor/bin/phpunit — 0 regresji — bbe22a9
 
 #### Manual
 
@@ -462,7 +462,7 @@ cd /home/amjsystem/sites/cvs.timeflow.fun && \
 
 #### Automated
 
-- [ ] 3.1 vendor/bin/phpunit — 0 regresji
+- [x] 3.1 vendor/bin/phpunit — 0 regresji
 
 #### Manual
 

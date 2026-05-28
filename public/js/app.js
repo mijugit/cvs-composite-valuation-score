@@ -273,3 +273,230 @@
         resultsGrid.innerHTML = '';
     }
 })();
+
+// ============================================================
+// Autocomplete — S-06
+// Targets: #tickers textarea on the dashboard.
+// Loads public/data/tickers.json once, filters in memory.
+// ============================================================
+
+(function () {
+    'use strict';
+
+    const TICKERS_URL = '/data/tickers.json';
+    const MAX_SUGGESTIONS = 8;
+
+    let tickerList  = []; // [{symbol, name}, ...]
+    let activeIndex = -1; // keyboard selection index
+
+    // ------------------------------------------------------------------
+    // Boot — fetch dict once, then attach to textarea
+    // ------------------------------------------------------------------
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const textarea = document.getElementById('tickers');
+        if (!textarea) return;
+
+        // Wrap textarea in a relative-positioned container so the dropdown
+        // can be positioned absolutely without disrupting layout.
+        const wrapper = document.createElement('div');
+        wrapper.className = 'ac-wrapper';
+        textarea.parentNode.insertBefore(wrapper, textarea);
+        wrapper.appendChild(textarea);
+
+        const dropdown = document.createElement('div');
+        dropdown.className = 'ac-dropdown';
+        dropdown.hidden = true;
+        wrapper.appendChild(dropdown);
+
+        fetch(TICKERS_URL)
+            .then(r => r.json())
+            .then(data => {
+                tickerList = data;
+                attachListeners(textarea, dropdown);
+            })
+            .catch(() => { /* autocomplete unavailable — degrade silently */ });
+    });
+
+    // ------------------------------------------------------------------
+    // Event listeners
+    // ------------------------------------------------------------------
+
+    function attachListeners(textarea, dropdown) {
+
+        textarea.addEventListener('input', () => {
+            const token = lastToken(textarea.value);
+            if (token.length === 0) { hideDropdown(dropdown); return; }
+
+            const matches = filterTickers(token);
+            if (matches.length === 0) { hideDropdown(dropdown); return; }
+
+            renderDropdown(dropdown, matches, textarea);
+        });
+
+        // Keyboard navigation (ArrowDown/Up/Enter/Escape)
+        textarea.addEventListener('keydown', (e) => {
+            if (dropdown.hidden) return;
+
+            const items = dropdown.querySelectorAll('.ac-item');
+            if (items.length === 0) return;
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                activeIndex = Math.min(activeIndex + 1, items.length - 1);
+                items[activeIndex].focus();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (activeIndex <= 0) {
+                    activeIndex = -1;
+                    textarea.focus();
+                } else {
+                    activeIndex = activeIndex - 1;
+                    items[activeIndex].focus();
+                }
+            } else if (e.key === 'Escape') {
+                hideDropdown(dropdown);
+                textarea.focus();
+            }
+        });
+
+        // Arrow-up on first item returns focus to textarea
+        dropdown.addEventListener('keydown', (e) => {
+            const items = dropdown.querySelectorAll('.ac-item');
+            if (e.key === 'Escape') {
+                hideDropdown(dropdown);
+                textarea.focus();
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                activeIndex = Math.min(activeIndex + 1, items.length - 1);
+                items[activeIndex].focus();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                activeIndex = Math.max(0, activeIndex - 1);
+                if (activeIndex === 0 && document.activeElement === items[0]) {
+                    activeIndex = -1;
+                    textarea.focus();
+                } else {
+                    items[activeIndex].focus();
+                }
+            }
+        });
+
+        // Hide when focus leaves the wrapper entirely
+        document.addEventListener('click', (e) => {
+            if (!dropdown.closest('.ac-wrapper')?.contains(e.target)) {
+                hideDropdown(dropdown);
+            }
+        });
+    }
+
+    // ------------------------------------------------------------------
+    // Render
+    // ------------------------------------------------------------------
+
+    function renderDropdown(dropdown, matches, textarea) {
+        activeIndex = -1;
+        dropdown.innerHTML = '';
+
+        matches.forEach(m => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'ac-item';
+            btn.dataset.symbol = m.symbol;
+            btn.textContent = m.symbol + ' — ' + m.name;
+
+            btn.addEventListener('mousedown', (e) => {
+                // mousedown fires before blur; prevent textarea losing focus
+                e.preventDefault();
+                selectSuggestion(textarea, dropdown, m.symbol);
+            });
+
+            btn.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    selectSuggestion(textarea, dropdown, m.symbol);
+                }
+            });
+
+            dropdown.appendChild(btn);
+        });
+
+        dropdown.hidden = false;
+    }
+
+    function hideDropdown(dropdown) {
+        dropdown.hidden = true;
+        dropdown.innerHTML = '';
+        activeIndex = -1;
+    }
+
+    // ------------------------------------------------------------------
+    // Selection — replace last token, append separator
+    // ------------------------------------------------------------------
+
+    function selectSuggestion(textarea, dropdown, symbol) {
+        const val   = textarea.value;
+        const parts = splitTokens(val);
+
+        // Replace last non-empty token or append
+        if (parts.length > 0) {
+            parts[parts.length - 1] = symbol;
+        } else {
+            parts.push(symbol);
+        }
+
+        textarea.value = parts.join(', ') + ', ';
+        // Move cursor to end
+        textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
+        textarea.focus();
+
+        hideDropdown(dropdown);
+
+        // Trigger input for any listeners that depend on textarea value
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    // ------------------------------------------------------------------
+    // Token helpers
+    // ------------------------------------------------------------------
+
+    /**
+     * Return the last token the user is currently typing.
+     * Split on comma or whitespace sequences.
+     */
+    function lastToken(val) {
+        // If val ends with a separator, user started a new (empty) token
+        if (/[,\s]$/.test(val)) return '';
+        const parts = val.split(/[,\s]+/);
+        return parts[parts.length - 1] ?? '';
+    }
+
+    /**
+     * Split value into non-empty token list (for rebuilding after selection).
+     */
+    function splitTokens(val) {
+        return val.split(/[,\s]+/).filter(t => t.length > 0);
+    }
+
+    // ------------------------------------------------------------------
+    // Filtering — prefix on symbol (priority) + substring on name
+    // ------------------------------------------------------------------
+
+    function filterTickers(token) {
+        const q = token.toUpperCase();
+        const prefix = [];
+        const substr = [];
+
+        for (const t of tickerList) {
+            if (t.symbol.startsWith(q)) {
+                prefix.push(t);
+            } else if (t.name.toUpperCase().includes(q)) {
+                substr.push(t);
+            }
+            if (prefix.length + substr.length >= MAX_SUGGESTIONS * 2) break;
+        }
+
+        return [...prefix, ...substr].slice(0, MAX_SUGGESTIONS);
+    }
+
+})();

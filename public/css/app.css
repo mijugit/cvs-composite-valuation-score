@@ -279,6 +279,127 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
 }
 .result-card__radar canvas { max-width: 100%; }
 
+/* --- Autocomplete (S-06) ---------------------------------- */
+.ac-wrapper {
+    position: relative;
+    display: block;
+}
+
+.ac-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    margin-top: 2px;
+}
+
+.ac-item {
+    display: block;
+    width: 100%;
+    padding: .45rem .75rem;
+    background: transparent;
+    border: none;
+    color: var(--c-text);
+    font-size: .875rem;
+    text-align: left;
+    cursor: pointer;
+    transition: background .12s;
+}
+
+.ac-item:hover,
+.ac-item:focus {
+    background: var(--c-border);
+    outline: none;
+}
+
+/* --- Watchlist chips (S-06) ------------------------------- */
+.watchlist-section {
+    margin-bottom: 1rem;
+}
+
+.watchlist-section h3 {
+    font-size: .85rem;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--c-muted);
+    margin-bottom: .5rem;
+}
+
+.watchlist-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+}
+
+.watchlist-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .2rem;
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: 99px;
+    padding: .2rem .55rem .2rem .65rem;
+    font-size: .8rem;
+    cursor: pointer;
+    transition: border-color .15s;
+    user-select: none;
+}
+
+.watchlist-chip:hover { border-color: var(--c-primary); }
+
+.watchlist-chip__remove {
+    background: transparent;
+    border: none;
+    color: var(--c-muted);
+    font-size: .9rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 .1rem;
+    transition: color .12s;
+}
+
+.watchlist-chip__remove:hover { color: var(--c-danger); }
+
+/* toggle button on result cards */
+.watchlist-toggle-btn {
+    background: transparent;
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius);
+    color: var(--c-muted);
+    font-size: .75rem;
+    padding: .15rem .45rem;
+    cursor: pointer;
+    line-height: 1.4;
+    transition: border-color .12s, color .12s;
+    white-space: nowrap;
+}
+
+.watchlist-toggle-btn:hover { border-color: var(--c-primary); color: var(--c-primary); }
+.watchlist-toggle-btn.is-watched { border-color: var(--c-warn); color: var(--c-warn); }
+
+/* toggle button on detail page */
+.watchlist-detail-btn {
+    display: inline-block;
+    margin: .5rem 0 1rem;
+    padding: .35rem .9rem;
+    background: transparent;
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius);
+    color: var(--c-text);
+    font-size: .875rem;
+    cursor: pointer;
+    transition: border-color .15s, color .15s;
+}
+
+.watchlist-detail-btn:hover { border-color: var(--c-primary); color: var(--c-primary); }
+.watchlist-detail-btn.is-watched { border-color: var(--c-warn); color: var(--c-warn); }
+
 /* --- Responsive ------------------------------------------- */
 @media (max-width: 600px) {
     .cvs-number { font-size: 1.75rem; }
