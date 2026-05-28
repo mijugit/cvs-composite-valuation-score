@@ -1,279 +1,300 @@
-<?php
-/**
- * Detail view — GET /analysis/{ticker}
- *
- * Injected by AnalysisController::show():
- *   $ticker     — string
- *   $result     — array|null  CVSResult::toArray()
- *   $financials — array|null  FinancialDataFetcher output  (S-03)
- *   $error      — string|null
- */
-?>
 <section class="analysis-detail">
-
-    <p class="back-link"><a href="/dashboard">&larr; Powr&oacute;t do panelu</a></p>
-
-    <h1><?= htmlspecialchars($ticker) ?></h1>
-    <?php if (!empty($financials['sector'])): ?>
-        <p class="ticker-meta"><?= htmlspecialchars($financials['sector']) ?></p>
-    <?php endif; ?>
+    <h1>Analiza: <?= htmlspecialchars($ticker) ?></h1>
 
     <?php if (!empty($error)): ?>
         <p class="alert alert--error"><?= htmlspecialchars($error) ?></p>
-
     <?php elseif ($result !== null): ?>
 
         <?php if (!$result['quality_gate']): ?>
-            <!-- Quality Gate rejection -->
             <div class="card card--fail">
-                <h2>Quality Gate: ODRZUCONO</h2>
-                <p>Sp&oacute;&lstrok;ka nie spe&lstrok;nia minimalnych wymaga&nacute; jako&sacute;ciowych. CVS nie zosta&lstrok;o wyliczone.</p>
+                <h2>Odrzucono przez Quality Gate</h2>
+                <p>Spółka nie spełnia minimalnych wymagań jakościowych. CVS nie zostało wyliczone.</p>
                 <ul class="failure-list">
                     <?php foreach ($result['gate_failures'] as $fail): ?>
                         <li><?= htmlspecialchars($fail) ?></li>
                     <?php endforeach; ?>
                 </ul>
-                <p class="disclaimer-inline"><?= htmlspecialchars($result['disclaimer']) ?></p>
             </div>
-
         <?php else: ?>
 
-            <!-- ── CVS Score + Radar (S-02) ─────────────────────── -->
+            <?php
+            // Helper: recommendation → CSS class
+            $swing = $result['swing'] ?? [];
+            $fund  = $result['fundamental'] ?? [];
+            $ps    = $result['pillar_scores'] ?? [];
+            $gs    = $result['golden_signal'] ?? null;
+
+            $gsLabels = [
+                'strong'    => ['stars' => '⭐⭐', 'label' => 'Silny sygnał — wartość i momentum'],
+                'watchlist' => ['stars' => '⭐',   'label' => 'Setup — czekaj na momentum'],
+                'momentum'  => ['stars' => '',     'label' => 'Momentum — nie value'],
+            ];
+
+            $swingWeights = [
+                'Wycena'   => '40%',
+                'Momentum' => '45%',
+                'Jakość'   => '15%',
+            ];
+            $fundWeights = [
+                'Wycena'   => '65%',
+                'Momentum' => '15%',
+                'Jakość'   => '20%',
+            ];
+
+            $cfgFile   = require dirname(__DIR__) . '/config/cvs-weights.php';
+            $modeSwing = $cfgFile['modes']['swing']       ?? [];
+            $modeFund  = $cfgFile['modes']['fundamental'] ?? [];
+            ?>
+
+            <!-- Dual CVS score header -->
             <div class="card card--result">
-                <div class="cvs-score-header">
-                    <span class="cvs-badge"><?= htmlspecialchars($result['recommendation']) ?></span>
-                    <span class="cvs-number"><?= number_format((float) $result['cvs'], 1) ?> / 100</span>
+                <?php if ($gs && isset($gsLabels[$gs])): ?>
+                    <div class="golden-signal golden-signal--<?= htmlspecialchars($gs) ?>">
+                        <?= $gsLabels[$gs]['stars'] ? htmlspecialchars($gsLabels[$gs]['stars']) . ' ' : '' ?>
+                        <?= htmlspecialchars($gsLabels[$gs]['label']) ?>
+                    </div>
+                <?php endif; ?>
+
+                <div class="dual-cvs-header">
+                    <!-- Swing score -->
+                    <div class="cvs-mode-tile cvs-mode-tile--swing">
+                        <div class="cvs-mode-tile__label"><?= htmlspecialchars($modeSwing['label'] ?? 'Swing') ?></div>
+                        <div class="cvs-mode-tile__score"><?= number_format((float)($swing['cvs'] ?? 0), 1) ?></div>
+                        <div class="cvs-mode-tile__reco">
+                            <span class="cvs-badge"><?= htmlspecialchars($swing['recommendation'] ?? '') ?></span>
+                        </div>
+                    </div>
+
+                    <!-- Fundamental score -->
+                    <div class="cvs-mode-tile cvs-mode-tile--fund">
+                        <div class="cvs-mode-tile__label"><?= htmlspecialchars($modeFund['label'] ?? 'Fundamentalny') ?></div>
+                        <div class="cvs-mode-tile__score"><?= number_format((float)($fund['cvs'] ?? 0), 1) ?></div>
+                        <div class="cvs-mode-tile__reco">
+                            <span class="cvs-badge cvs-badge--fund"><?= htmlspecialchars($fund['recommendation'] ?? '') ?></span>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- S-02: radar chart canvas -->
-                <div class="radar-wrapper">
-                    <canvas id="pillarRadar" aria-label="Wykres radarowy filarów CVS" role="img"></canvas>
+                <!-- Radar chart with two lines -->
+                <div class="detail-radar-wrapper">
+                    <canvas id="detail-radar" width="300" height="300"></canvas>
+                    <div class="detail-radar-legend">
+                        <span class="legend-dot legend-dot--swing"></span> Swing &nbsp;
+                        <span class="legend-dot legend-dot--fund"></span> Fundamentalny
+                    </div>
                 </div>
 
-                <h3>Sk&lstrok;adowe filary</h3>
+                <!-- Pillar table with weights -->
+                <h3>Składowe filary</h3>
                 <table class="pillar-table">
                     <thead>
                         <tr>
                             <th>Filar</th>
-                            <th>Wynik (0&ndash;100)</th>
-                            <th>Waga</th>
+                            <th>Wynik (0–100)</th>
+                            <th>Waga Swing</th>
+                            <th>Waga Fund</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php
-                        $pillarMeta = [
-                            'growth'   => ['label' => 'Wzrost vs własna trajektoria',  'weight' => '30%'],
-                            'sector'   => ['label' => 'Benchmark sektorowy (EV/FCF)',   'weight' => '25%'],
-                            'momentum' => ['label' => 'Momentum ceny (ROC vs SPY)',     'weight' => '25%'],
-                            'quality'  => ['label' => 'Jakość fundamentalna',           'weight' => '20%'],
+                        $pillarRows = [
+                            ['key' => 'valuation',      'label' => 'Wycena (EV/FCF)',     'sw' => '40%', 'fn' => '65%'],
+                            ['key' => 'momentum_swing', 'label' => 'Momentum (Swing)',     'sw' => '45%', 'fn' => '—'],
+                            ['key' => 'momentum_fund',  'label' => 'Momentum (Fund)',      'sw' => '—',   'fn' => '15%'],
+                            ['key' => 'quality',        'label' => 'Jakość fundamentalna', 'sw' => '15%', 'fn' => '20%'],
                         ];
-                        foreach ($result['pillar_scores'] as $key => $score):
-                            $meta = $pillarMeta[$key] ?? ['label' => $key, 'weight' => '—'];
+                        foreach ($pillarRows as $row):
+                            $score = $ps[$row['key']] ?? null;
                         ?>
                         <tr>
-                            <td><?= htmlspecialchars($meta['label']) ?></td>
+                            <td><?= htmlspecialchars($row['label']) ?></td>
                             <td>
+                                <?php if ($score !== null): ?>
                                 <div class="pillar-bar">
-                                    <div class="pillar-bar__fill" style="width:<?= round((float) $score) ?>%"></div>
-                                    <span><?= number_format((float) $score, 1) ?></span>
+                                    <div class="pillar-bar__fill" style="width:<?= min(100, round((float)$score)) ?>%"></div>
+                                    <span><?= number_format((float)$score, 1) ?></span>
                                 </div>
+                                <?php else: ?>—<?php endif; ?>
                             </td>
-                            <td class="pillar-weight"><?= htmlspecialchars($meta['weight']) ?></td>
+                            <td><?= htmlspecialchars($row['sw']) ?></td>
+                            <td><?= htmlspecialchars($row['fn']) ?></td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
+                    <tfoot>
+                        <tr>
+                            <th colspan="1">CVS Swing</th>
+                            <td colspan="3">
+                                <strong><?= number_format((float)($swing['cvs'] ?? 0), 1) ?></strong>
+                                — <?= htmlspecialchars($swing['recommendation'] ?? '') ?>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th colspan="1">CVS Fund</th>
+                            <td colspan="3">
+                                <strong><?= number_format((float)($fund['cvs'] ?? 0), 1) ?></strong>
+                                — <?= htmlspecialchars($fund['recommendation'] ?? '') ?>
+                            </td>
+                        </tr>
+                    </tfoot>
                 </table>
 
-                <p class="disclaimer-inline"><?= htmlspecialchars($result['disclaimer']) ?></p>
+                <!-- Raw financial data -->
+                <?php if (!empty($financials)): ?>
+                <details class="raw-data">
+                    <summary>Dane źródłowe (surowe)</summary>
+                    <table class="pillar-table raw-table">
+                        <tbody>
+                            <?php
+                            $rawFields = [
+                                'current_price'       => 'Cena bieżąca ($)',
+                                'shares_outstanding'  => 'Liczba akcji',
+                                'revenue'             => 'Przychody ($)',
+                                'ebitda'              => 'EBITDA ($)',
+                                'free_cash_flow'      => 'FCF efektywny ($)',
+                                'free_cash_flow_raw'  => 'FCF raportowany ($)',
+                                'operating_cash_flow' => 'OpCF ($)',
+                                'free_cash_flow_adjusted' => 'FCF adjusted (OpCF fallback)',
+                                'total_debt'          => 'Dług całkowity ($)',
+                                'cash'                => 'Gotówka ($)',
+                                'gross_margins'       => 'Marża brutto',
+                                'revenue_growth'      => 'Wzrost przychodów',
+                                'return_on_equity'    => 'ROE',
+                                'forward_eps'         => 'EPS forward',
+                                'trailing_eps'        => 'EPS trailing',
+                                'sector'              => 'Sektor',
+                            ];
+                            foreach ($rawFields as $key => $label):
+                                $val = $financials[$key] ?? null;
+                                if ($val === null) continue;
+                            ?>
+                            <tr>
+                                <td><?= htmlspecialchars($label) ?></td>
+                                <td>
+                                    <?php if (is_bool($val)): ?>
+                                        <?= $val ? 'tak' : 'nie' ?>
+                                    <?php elseif (is_float($val) || is_int($val)): ?>
+                                        <?= number_format((float)$val, is_float($val) && $val < 100 ? 4 : 0) ?>
+                                    <?php else: ?>
+                                        <?= htmlspecialchars((string)$val) ?>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </details>
+                <?php endif; ?>
             </div>
 
-            <?php if ($financials !== null): ?>
-            <?php
-            /* ── Derived metrics for S-03 raw data table ─────────────────── */
-            $price   = isset($financials['current_price'])      ? (float) $financials['current_price']      : null;
-            $shares  = isset($financials['shares_outstanding'])  ? (float) $financials['shares_outstanding'] : null;
-            $debt    = (float) ($financials['total_debt']  ?? 0);
-            $cash    = (float) ($financials['cash']        ?? 0);
-            $ebitda  = isset($financials['ebitda'])              ? (float) $financials['ebitda']             : null;
-            $fcf     = isset($financials['free_cash_flow'])      ? (float) $financials['free_cash_flow']     : null;
-            $revenue = isset($financials['revenue'])             ? (float) $financials['revenue']            : null;
-            $gm      = isset($financials['gross_margins'])       ? (float) $financials['gross_margins']      : null;
+            <p class="disclaimer-inline"><?= htmlspecialchars($result['disclaimer']) ?></p>
 
-            $ev      = ($price !== null && $shares !== null && $shares > 0)
-                       ? $price * $shares + $debt - $cash : null;
-            $netDebt = $debt - $cash;
-            $lever   = ($ebitda !== null && $ebitda > 0) ? $netDebt / $ebitda : null;
-            $evFcf   = ($ev !== null && $fcf !== null && $fcf > 0) ? $ev / $fcf : null;
-            $variant = ($fcf !== null && $fcf > 0) ? 'A (EV/FCF)' : 'B (EV/Sales)';
+            <!-- Radar chart initialisation -->
+            <script>
+            (function () {
+                if (typeof Chart === 'undefined') return;
+                const ctx = document.getElementById('detail-radar');
+                if (!ctx) return;
+                const ps = <?= json_encode($ps) ?>;
+                new Chart(ctx.getContext('2d'), {
+                    type: 'radar',
+                    data: {
+                        labels: ['Wycena', 'Momentum', 'Jakość'],
+                        datasets: [
+                            {
+                                label: 'Swing',
+                                data: [ps.valuation ?? 0, ps.momentum_swing ?? 0, ps.quality ?? 0],
+                                borderColor:     'rgba(79, 142, 247, 0.9)',
+                                backgroundColor: 'rgba(79, 142, 247, 0.08)',
+                                pointRadius: 3,
+                                borderWidth: 2,
+                            },
+                            {
+                                label: 'Fundamentalny',
+                                data: [ps.valuation ?? 0, ps.momentum_fund ?? 0, ps.quality ?? 0],
+                                borderColor:     'rgba(234, 179, 8, 0.9)',
+                                backgroundColor: 'rgba(234, 179, 8, 0.08)',
+                                pointRadius: 3,
+                                borderWidth: 2,
+                            },
+                        ],
+                    },
+                    options: {
+                        animation: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            r: {
+                                min: 0,
+                                max: 100,
+                                ticks: { display: false, stepSize: 25 },
+                                pointLabels: {
+                                    font: { size: 11 },
+                                    color: getComputedStyle(document.documentElement)
+                                           .getPropertyValue('--c-muted').trim() || '#7a7f99',
+                                },
+                                grid: { color: 'rgba(128,128,128,.15)' },
+                            },
+                        },
+                    },
+                });
+            })();
+            </script>
 
-            $closes  = $financials['monthly_closes'] ?? [];
-            $n       = count($closes);
-            $roc6m   = null;
-            $roc3m   = null;
-            if ($n >= 7) {
-                $now = $closes[$n - 1];
-                $p6  = $closes[max(0, $n - 7)];
-                $p3  = $closes[max(0, $n - 4)];
-                if ($p6 > 0) { $roc6m = ($now / $p6 - 1.0) * 100.0; }
-                if ($p3 > 0) { $roc3m = ($now / $p3 - 1.0) * 100.0; }
-            }
-            $pMin = $n > 0 ? min($closes) : null;
-            $pMax = $n > 0 ? max($closes) : null;
+        <?php endif; ?>
 
-            // Formatting helpers.
-            $fmt = static function (?float $v, string $sfx = ''): string {
-                if ($v === null) { return 'N/A'; }
-                $a = abs($v);
-                if ($a >= 1e12) { return number_format($v / 1e12, 2) . 'T' . ($sfx !== '' ? ' ' . $sfx : ''); }
-                if ($a >= 1e9)  { return number_format($v / 1e9,  2) . 'B' . ($sfx !== '' ? ' ' . $sfx : ''); }
-                if ($a >= 1e6)  { return number_format($v / 1e6,  2) . 'M' . ($sfx !== '' ? ' ' . $sfx : ''); }
-                return number_format($v, 2) . ($sfx !== '' ? ' ' . $sfx : '');
-            };
-            $pct = static fn (?float $v): string =>
-                $v === null ? 'N/A' : number_format($v * 100, 1) . '%';
-            $mul = static fn (?float $v, int $d = 2): string =>
-                $v === null ? 'N/A' : number_format($v, $d) . 'x';
-            ?>
+    <?php endif; ?>
 
-            <!-- ── S-03: Raw financial data panel ──────────────────────── -->
-            <div class="card card--data">
-                <h3>Dane wejściowe modelu</h3>
-                <table class="data-table">
-                    <tbody>
-
-                        <tr class="data-table__section"><td colspan="2">Wycena</td></tr>
-                        <tr><td>Enterprise Value</td>     <td><?= $fmt($ev, 'USD') ?></td></tr>
-                        <tr><td>Free Cash Flow</td>       <td><?= $fmt($fcf, 'USD') ?></td></tr>
-                        <tr><td>EV / FCF</td>             <td><?= $mul($evFcf) ?></td></tr>
-                        <tr><td>Revenue</td>              <td><?= $fmt($revenue, 'USD') ?></td></tr>
-                        <tr><td>Wariant modelu</td>       <td><?= htmlspecialchars($variant) ?></td></tr>
-
-                        <tr class="data-table__section"><td colspan="2">Jakość fundamentalna</td></tr>
-                        <tr><td>Gross Margin</td>         <td><?= $pct($gm) ?></td></tr>
-                        <tr>
-                            <td>Dźwignia (NetDebt / EBITDA)</td>
-                            <td><?php
-                                if ($lever !== null)                        { echo number_format($lever, 2) . 'x'; }
-                                elseif ($ebitda !== null && $ebitda <= 0)  { echo 'ujemne EBITDA'; }
-                                else                                        { echo 'N/A'; }
-                            ?></td>
-                        </tr>
-                        <tr>
-                            <td>Wzrost przychodów (YoY)</td>
-                            <td><?= isset($financials['revenue_growth'])
-                                    ? number_format((float) $financials['revenue_growth'] * 100, 1) . '%'
-                                    : 'N/A' ?></td>
-                        </tr>
-                        <tr>
-                            <td>Forward EPS</td>
-                            <td><?= isset($financials['forward_eps'])
-                                    ? number_format((float) $financials['forward_eps'], 2)
-                                    : 'N/A' ?></td>
-                        </tr>
-                        <tr>
-                            <td>Trailing EPS</td>
-                            <td><?= isset($financials['trailing_eps'])
-                                    ? number_format((float) $financials['trailing_eps'], 2)
-                                    : 'N/A' ?></td>
-                        </tr>
-
-                        <tr class="data-table__section"><td colspan="2">Momentum ceny</td></tr>
-                        <tr>
-                            <td>Cena bieżąca</td>
-                            <td><?= $price !== null ? '$' . number_format($price, 2) : 'N/A' ?></td>
-                        </tr>
-                        <tr>
-                            <td>ROC 6M</td>
-                            <td><?= $roc6m !== null ? number_format($roc6m, 1) . '%' : 'N/A' ?></td>
-                        </tr>
-                        <tr>
-                            <td>ROC 3M</td>
-                            <td><?= $roc3m !== null ? number_format($roc3m, 1) . '%' : 'N/A' ?></td>
-                        </tr>
-                        <tr>
-                            <td>Zakres cen (hist. miesięczna)</td>
-                            <td><?= ($pMin !== null && $pMax !== null)
-                                    ? '$' . number_format($pMin, 2) . ' &ndash; $' . number_format($pMax, 2)
-                                    : 'N/A' ?></td>
-                        </tr>
-                        <tr>
-                            <td>Miesięcznych danych</td>
-                            <td><?= $n > 0 ? $n . ' mies.' : 'N/A' ?></td>
-                        </tr>
-
-                        <tr class="data-table__section"><td colspan="2">Benchmark sektorowy</td></tr>
-                        <tr>
-                            <td>Sektor</td>
-                            <td><?= htmlspecialchars($financials['sector'] ?? 'N/A') ?></td>
-                        </tr>
-                        <tr>
-                            <td>Benchmark referencyjny</td>
-                            <td><?= htmlspecialchars($financials['sector'] ?? 'DEFAULT') ?></td>
-                        </tr>
-
-                    </tbody>
-                </table>
-                <p class="disclaimer-inline"><?= htmlspecialchars($result['disclaimer']) ?></p>
-            </div>
-            <?php endif; // $financials !== null ?>
-
-        <?php endif; // quality_gate ?>
-    <?php endif; // $result !== null ?>
-
-    <p class="back-link"><a href="/dashboard">&larr; Powr&oacute;t do panelu</a></p>
+    <p><a href="/dashboard">&larr; Powrót do panelu</a></p>
 </section>
 
-<?php if (!empty($result['quality_gate']) && !empty($result['pillar_scores'])): ?>
-<script>
-// S-02: Initialise radar chart.
-// Wrapped in window.load so it runs after the Chart.js CDN script
-// (which is appended at the bottom of layout.php, AFTER this template content).
-window.addEventListener('load', function () {
-    var ctx = document.getElementById('pillarRadar');
-    if (!ctx || typeof Chart === 'undefined') { return; }
+<style>
+/* Dual CVS tiles */
+.dual-cvs-header {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+.cvs-mode-tile {
+    flex: 1;
+    min-width: 140px;
+    background: var(--c-bg);
+    border: 1px solid var(--c-border);
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+}
+.cvs-mode-tile--swing  { border-color: rgba(79, 142, 247, .4); }
+.cvs-mode-tile--fund   { border-color: rgba(234, 179, 8, .4); }
+.cvs-mode-tile__label  { font-size: .8rem; color: var(--c-muted); margin-bottom: .35rem; }
+.cvs-mode-tile__score  { font-size: 2.2rem; font-weight: 700; }
+.cvs-mode-tile--swing .cvs-mode-tile__score { color: var(--c-primary); }
+.cvs-mode-tile--fund  .cvs-mode-tile__score { color: #eab308; }
+.cvs-mode-tile__reco   { margin-top: .35rem; }
 
-    new Chart(ctx, {
-        type: 'radar',
-        data: {
-            labels: ['Wzrost', 'Benchmark sektorowy', 'Momentum', 'Jakość'],
-            datasets: [{
-                label: <?= json_encode($ticker, JSON_THROW_ON_ERROR) ?>,
-                data:  <?= json_encode(array_values($result['pillar_scores']), JSON_THROW_ON_ERROR) ?>,
-                backgroundColor:      'rgba(79, 142, 247, 0.15)',
-                borderColor:          'rgba(79, 142, 247, 0.9)',
-                borderWidth:          2,
-                pointBackgroundColor: 'rgba(79, 142, 247, 1)',
-                pointRadius:          4,
-                pointHoverRadius:     6,
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            scales: {
-                r: {
-                    min: 0, max: 100,
-                    ticks: {
-                        stepSize: 25,
-                        color: '#7a7f99',
-                        backdropColor: 'transparent',
-                        font: { size: 11 },
-                    },
-                    grid:        { color: 'rgba(42, 45, 58, 0.9)' },
-                    angleLines:  { color: 'rgba(42, 45, 58, 0.9)' },
-                    pointLabels: { color: '#dde1f0', font: { size: 12 } },
-                }
-            },
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    callbacks: {
-                        label: function (c) { return c.dataset.label + ': ' + Number(c.raw).toFixed(1); }
-                    }
-                }
-            }
-        }
-    });
-});
-</script>
-<?php endif; ?>
+.cvs-badge--fund { background: rgba(234, 179, 8, .2); color: #eab308; }
+
+/* Golden signal banner */
+.golden-signal {
+    font-size: .9rem;
+    padding: .4rem 1rem;
+    border-radius: 99px;
+    display: inline-block;
+    margin-bottom: 1rem;
+}
+.golden-signal--strong    { background: rgba(34,197,94,.12);  color: #22c55e; }
+.golden-signal--watchlist { background: rgba(234,179,8,.12);  color: #eab308; }
+.golden-signal--momentum  { background: rgba(79,142,247,.12); color: var(--c-primary); }
+
+/* Radar */
+.detail-radar-wrapper { display: flex; flex-direction: column; align-items: center; margin: 1.5rem 0; }
+.detail-radar-legend  { font-size: .8rem; color: var(--c-muted); margin-top: .5rem; }
+.legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+.legend-dot--swing { background: #4f8ef7; }
+.legend-dot--fund  { background: #eab308; }
+
+/* Raw data */
+.raw-data { margin-top: 1.5rem; }
+.raw-data summary { cursor: pointer; font-size: .85rem; color: var(--c-muted); margin-bottom: .5rem; }
+.raw-table td:first-child { color: var(--c-muted); font-size: .82rem; width: 55%; }
+</style>
