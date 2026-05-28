@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CVS\Api;
 
+use CVS\Forecast\ForecastParser;
+
 /**
  * Yahoo Finance data fetcher — free public API (no API key required).
  *
@@ -46,6 +48,7 @@ class FinancialDataFetcher
         'incomeStatementHistory',
         'balanceSheetHistory',
         'cashflowStatementHistory',
+        'recommendationTrend',
     ];
 
     /** @param array<string, mixed> $config  The 'data_source' section from cvs-weights.php */
@@ -450,6 +453,9 @@ class FinancialDataFetcher
             // Price history (for MomentumPillar)
             'monthly_closes'             => $closes,
             'spy_closes'                 => $spyCloses,
+
+            // Analyst forecast (S-09) — price targets + recommendation breakdown/trend.
+            'forecast'                   => ForecastParser::parse($raw, $currentPrice),
         ];
     }
 }

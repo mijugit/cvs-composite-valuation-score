@@ -79,6 +79,17 @@ return [
         // below 28   → ⬇⬇ UNIKAJ
     ],
 
+    // --- Analyst consensus label thresholds (S-09) ---
+    // Maps Yahoo Finance recommendationMean (1 = Strong Buy … 5 = Strong Sell) to a
+    // Polish label. Inclusive upper bounds; mean > 'sell' → "Silna Sprzedaż".
+    // FR-010: thresholds live in config, never hardcoded in business logic.
+    'analyst_consensus' => [
+        'strong_buy' => 1.5, // mean ≤ 1.5 → Silne Kupuj
+        'buy'        => 2.5, // mean ≤ 2.5 → Kupuj
+        'hold'       => 3.5, // mean ≤ 3.5 → Trzymaj
+        'sell'       => 4.5, // mean ≤ 4.5 → Sprzedaj
+    ],
+
     // --- Data source ---
     'data_source' => [
         'provider'        => 'yahoo_finance',
