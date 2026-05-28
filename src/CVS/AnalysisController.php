@@ -17,7 +17,7 @@ use CVS\Core\Response;
  */
 class AnalysisController
 {
-    private CVSModel            $model;
+    private CVSModel             $model;
     private FinancialDataFetcher $fetcher;
 
     public function __construct()
@@ -87,7 +87,7 @@ class AnalysisController
     }
 
     // ------------------------------------------------------------------
-    // GET /analysis/{ticker} — single-ticker detail view
+    // GET /analysis/{ticker} — single-ticker detail view  (S-03)
     // ------------------------------------------------------------------
 
     public function show(Request $req): void
@@ -99,9 +99,10 @@ class AnalysisController
 
         if ($financials === null) {
             Response::view('analysis', [
-                'ticker' => $ticker,
-                'result' => null,
-                'error'  => 'Nie udało się pobrać danych. Sprawdź symbol.',
+                'ticker'     => $ticker,
+                'result'     => null,
+                'financials' => null,
+                'error'      => 'Nie udało się pobrać danych. Sprawdź symbol.',
             ]);
             return;
         }
@@ -109,9 +110,10 @@ class AnalysisController
         $result = $this->model->calculate($ticker, $financials);
 
         Response::view('analysis', [
-            'ticker' => $ticker,
-            'result' => $result->toArray(),
-            'error'  => null,
+            'ticker'     => $ticker,
+            'result'     => $result->toArray(),
+            'financials' => $financials,   // S-03: raw data for detail panel
+            'error'      => null,
         ]);
     }
 
