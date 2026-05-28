@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CVS &mdash; Composite Valuation Score</title>
+    <title>CVS — Composite Valuation Score</title>
     <link rel="stylesheet" href="/css/app.css">
 </head>
 <body>
@@ -35,8 +35,7 @@
     </div>
 </footer>
 
-<!-- S-02: Chart.js for radar charts -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 <script src="/js/app.js"></script>
 </body>
 </html>
