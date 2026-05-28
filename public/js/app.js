@@ -202,7 +202,7 @@
                             },
                             pointLabels: {
                                 font: { size: 9 },
-                                color: 'var(--c-muted, #888)',
+                                color: 'rgba(255,255,255,0.65)',
                             },
                             grid: {
                                 color: 'rgba(128, 128, 128, 0.15)',

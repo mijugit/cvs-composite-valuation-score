@@ -18,6 +18,23 @@
         <?php else: ?>
 
             <?php
+            // Helper: format raw financial values (B/M/K + ratio %)
+            $ratioKeys = ['gross_margins', 'revenue_growth', 'return_on_equity'];
+            $fmtRaw = static function (string $key, $val) use ($ratioKeys): string {
+                if (is_bool($val)) return $val ? 'tak' : 'nie';
+                if (!is_numeric($val)) return htmlspecialchars((string)$val);
+                $f = (float) $val;
+                if (in_array($key, $ratioKeys, true)) {
+                    return number_format($f * 100, 1) . '%';
+                }
+                $abs = abs($f);
+                if ($abs >= 1_000_000_000) return number_format($f / 1_000_000_000, 2) . ' B';
+                if ($abs >= 1_000_000)     return number_format($f / 1_000_000, 1) . ' M';
+                if ($abs >= 1_000)         return number_format($f / 1_000, 1) . ' K';
+                if ($abs < 100)            return number_format($f, 2);
+                return number_format($f, 0);
+            };
+
             // Helper: recommendation → CSS class
             $swing = $result['swing'] ?? [];
             $fund  = $result['fundamental'] ?? [];
@@ -171,13 +188,7 @@
                             <tr>
                                 <td><?= htmlspecialchars($label) ?></td>
                                 <td>
-                                    <?php if (is_bool($val)): ?>
-                                        <?= $val ? 'tak' : 'nie' ?>
-                                    <?php elseif (is_float($val) || is_int($val)): ?>
-                                        <?= number_format((float)$val, is_float($val) && $val < 100 ? 4 : 0) ?>
-                                    <?php else: ?>
-                                        <?= htmlspecialchars((string)$val) ?>
-                                    <?php endif; ?>
+                                    <?= $fmtRaw($key, $val) ?>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
@@ -191,7 +202,7 @@
 
             <!-- Radar chart initialisation -->
             <script>
-            (function () {
+            window.addEventListener('load', function () {
                 if (typeof Chart === 'undefined') return;
                 const ctx = document.getElementById('detail-radar');
                 if (!ctx) return;
@@ -229,15 +240,14 @@
                                 ticks: { display: false, stepSize: 25 },
                                 pointLabels: {
                                     font: { size: 11 },
-                                    color: getComputedStyle(document.documentElement)
-                                           .getPropertyValue('--c-muted').trim() || '#7a7f99',
+                                    color: 'rgba(255,255,255,0.75)',
                                 },
                                 grid: { color: 'rgba(128,128,128,.15)' },
                             },
                         },
                     },
                 });
-            })();
+            });
             </script>
 
         <?php endif; ?>
