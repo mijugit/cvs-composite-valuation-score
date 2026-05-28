@@ -38,7 +38,7 @@
 
         <?php else: ?>
 
-            <!-- ── CVS Score + Radar (S-02) ───────────────────────────── -->
+            <!-- ── CVS Score + Radar (S-02) ─────────────────────── -->
             <div class="card card--result">
                 <div class="cvs-score-header">
                     <span class="cvs-badge"><?= htmlspecialchars($result['recommendation']) ?></span>
@@ -89,7 +89,7 @@
 
             <?php if ($financials !== null): ?>
             <?php
-            /* ── Derived metrics for S-03 raw data table ──────────────────── */
+            /* ── Derived metrics for S-03 raw data table ─────────────────── */
             $price   = isset($financials['current_price'])      ? (float) $financials['current_price']      : null;
             $shares  = isset($financials['shares_outstanding'])  ? (float) $financials['shares_outstanding'] : null;
             $debt    = (float) ($financials['total_debt']  ?? 0);
@@ -135,7 +135,7 @@
                 $v === null ? 'N/A' : number_format($v, $d) . 'x';
             ?>
 
-            <!-- ── S-03: Raw financial data panel ────────────────────────── -->
+            <!-- ── S-03: Raw financial data panel ──────────────────────── -->
             <div class="card card--data">
                 <h3>Dane wejściowe modelu</h3>
                 <table class="data-table">
@@ -225,8 +225,10 @@
 
 <?php if (!empty($result['quality_gate']) && !empty($result['pillar_scores'])): ?>
 <script>
-(function () {
-    'use strict';
+// S-02: Initialise radar chart.
+// Wrapped in window.load so it runs after the Chart.js CDN script
+// (which is appended at the bottom of layout.php, AFTER this template content).
+window.addEventListener('load', function () {
     var ctx = document.getElementById('pillarRadar');
     if (!ctx || typeof Chart === 'undefined') { return; }
 
@@ -272,6 +274,6 @@
             }
         }
     });
-}());
+});
 </script>
 <?php endif; ?>
