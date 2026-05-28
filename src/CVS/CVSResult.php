@@ -7,50 +7,92 @@ namespace CVS\CVS;
 /**
  * Value object returned by CVSModel::calculate().
  *
- * Carries both the final CVS score and the intermediate pillar scores
- * so the UI can render a breakdown chart.
+ * S-05 dual-mode: carries Swing CVS and Fundamental CVS simultaneously,
+ * plus a golden signal indicating the best setup type.
+ *
+ * Backward compatibility: cvs() method returns swingCvs.
  */
-readonly class CVSResult
+class CVSResult
 {
+    public readonly bool    $qualityGatePassed;
+    public readonly string  $ticker;
+    /** @var string[]  Non-empty when gate failed */
+    public readonly array   $gateFailures;
+
+    // Dual scores (null when quality gate failed)
+    public readonly ?float  $swingCvs;
+    public readonly ?float  $fundamentalCvs;
+    public readonly ?string $swingRecommendation;
+    public readonly ?string $fundamentalRecommendation;
+    /** 'strong' | 'watchlist' | 'momentum' | null */
+    public readonly ?string $goldenSignal;
+    /** @var array<string, float>  valuation, momentum_swing, momentum_fund, quality */
+    public readonly array   $pillarScores;
+
     /**
-     * @param bool          $qualityGatePassed
-     * @param string        $ticker
-     * @param float|null    $cvs              null when quality gate failed
-     * @param array<string, float> $pillarScores  empty when gate failed
-     * @param string|null   $recommendation   null when gate failed
-     * @param string[]      $gateFailures     non-empty when gate failed
+     * @param bool                 $qualityGatePassed
+     * @param string               $ticker
+     * @param string[]             $gateFailures
+     * @param float|null           $swingCvs
+     * @param float|null           $fundamentalCvs
+     * @param string|null          $swingRecommendation
+     * @param string|null          $fundamentalRecommendation
+     * @param string|null          $goldenSignal
+     * @param array<string, float> $pillarScores
      */
     private function __construct(
-        public bool    $qualityGatePassed,
-        public string  $ticker,
-        public ?float  $cvs,
-        public array   $pillarScores,
-        public ?string $recommendation,
-        public array   $gateFailures
-    ) {}
+        bool    $qualityGatePassed,
+        string  $ticker,
+        array   $gateFailures,
+        ?float  $swingCvs,
+        ?float  $fundamentalCvs,
+        ?string $swingRecommendation,
+        ?string $fundamentalRecommendation,
+        ?string $goldenSignal,
+        array   $pillarScores
+    ) {
+        $this->qualityGatePassed          = $qualityGatePassed;
+        $this->ticker                     = $ticker;
+        $this->gateFailures               = $gateFailures;
+        $this->swingCvs                   = $swingCvs;
+        $this->fundamentalCvs             = $fundamentalCvs;
+        $this->swingRecommendation        = $swingRecommendation;
+        $this->fundamentalRecommendation  = $fundamentalRecommendation;
+        $this->goldenSignal               = $goldenSignal;
+        $this->pillarScores               = $pillarScores;
+    }
 
     // ------------------------------------------------------------------
     // Named constructors
     // ------------------------------------------------------------------
 
     /**
-     * Company passed the Quality Gate — CVS was calculated.
+     * Company passed the Quality Gate — dual CVS was calculated.
      *
-     * @param array<string, float> $pillarScores
+     * @param array<string, float> $pillarScores  valuation, momentum_swing, momentum_fund, quality
+     * @param array<string, mixed> $config         Full cvs-weights.php config (for threshold reading)
      */
     public static function passed(
         string $ticker,
-        float  $cvs,
+        float  $swingCvs,
+        float  $fundamentalCvs,
         array  $pillarScores,
-        string $recommendation
+        string $swingRecommendation,
+        string $fundamentalRecommendation,
+        array  $config = []
     ): self {
+        $goldenSignal = self::computeGoldenSignal($swingCvs, $fundamentalCvs, $config);
+
         return new self(
-            qualityGatePassed: true,
-            ticker:            $ticker,
-            cvs:               $cvs,
-            pillarScores:      $pillarScores,
-            recommendation:    $recommendation,
-            gateFailures:      []
+            qualityGatePassed:         true,
+            ticker:                    $ticker,
+            gateFailures:              [],
+            swingCvs:                  $swingCvs,
+            fundamentalCvs:            $fundamentalCvs,
+            swingRecommendation:       $swingRecommendation,
+            fundamentalRecommendation: $fundamentalRecommendation,
+            goldenSignal:              $goldenSignal,
+            pillarScores:              $pillarScores
         );
     }
 
@@ -62,31 +104,104 @@ readonly class CVSResult
     public static function failed(string $ticker, array $failures): self
     {
         return new self(
-            qualityGatePassed: false,
-            ticker:            $ticker,
-            cvs:               null,
-            pillarScores:      [],
-            recommendation:    null,
-            gateFailures:      $failures
+            qualityGatePassed:         false,
+            ticker:                    $ticker,
+            gateFailures:              $failures,
+            swingCvs:                  null,
+            fundamentalCvs:            null,
+            swingRecommendation:       null,
+            fundamentalRecommendation: null,
+            goldenSignal:              null,
+            pillarScores:              []
         );
     }
 
     // ------------------------------------------------------------------
-    // Helpers
+    // Accessors
     // ------------------------------------------------------------------
 
-    /** Serialise to an array for JSON responses or template rendering. */
+    /**
+     * Backward-compatible CVS accessor — returns swing CVS.
+     * Use swingCvs / fundamentalCvs for new code.
+     */
+    public function cvs(): ?float
+    {
+        return $this->swingCvs;
+    }
+
+    /**
+     * Backward-compatible recommendation accessor — returns swing recommendation.
+     */
+    public function recommendation(): ?string
+    {
+        return $this->swingRecommendation;
+    }
+
+    // ------------------------------------------------------------------
+    // Serialisation
+    // ------------------------------------------------------------------
+
+    /**
+     * Serialise to an array for JSON responses or template rendering.
+     *
+     * New structure (S-05):
+     *   swing.cvs, swing.recommendation
+     *   fundamental.cvs, fundamental.recommendation
+     *   golden_signal, pillar_scores, disclaimer
+     */
     public function toArray(): array
     {
         return [
-            'ticker'             => $this->ticker,
-            'quality_gate'       => $this->qualityGatePassed,
-            'gate_failures'      => $this->gateFailures,
-            'cvs'                => $this->cvs,
-            'pillar_scores'      => $this->pillarScores,
-            'recommendation'     => $this->recommendation,
+            'ticker'       => $this->ticker,
+            'quality_gate' => $this->qualityGatePassed,
+            'gate_failures'=> $this->gateFailures,
+            'swing'        => [
+                'cvs'            => $this->swingCvs,
+                'recommendation' => $this->swingRecommendation,
+            ],
+            'fundamental'  => [
+                'cvs'            => $this->fundamentalCvs,
+                'recommendation' => $this->fundamentalRecommendation,
+            ],
+            'golden_signal'  => $this->goldenSignal,
+            'pillar_scores'  => $this->pillarScores,
             // Legal disclaimer — must accompany every CVS result (PRD FR-009).
-            'disclaimer'         => 'Wyniki CVS to hipoteza modelu analitycznego, nie rekomendacja inwestycyjna. Inwestuj świadomie.',
+            'disclaimer'     => 'Wyniki CVS to hipoteza modelu analitycznego, nie rekomendacja inwestycyjna. Inwestuj świadomie.',
         ];
+    }
+
+    // ------------------------------------------------------------------
+    // Internal helpers
+    // ------------------------------------------------------------------
+
+    /**
+     * Determine the golden signal based on swing and fundamental CVS thresholds.
+     *
+     * | Swing | Fund  | Signal     | Label                        |
+     * |-------|-------|------------|------------------------------|
+     * | ≥ thr | ≥ thr | strong     | ⭐⭐ Silny sygnał            |
+     * | < thr | ≥ thr | watchlist  | ⭐  Setup — czekaj na momentum |
+     * | ≥ thr | < thr | momentum   | Momentum — nie value         |
+     * | < thr | < thr | null       | brak                         |
+     *
+     * Threshold read from config['thresholds']['accumulate'] (default 58).
+     *
+     * @param array<string, mixed> $config
+     */
+    private static function computeGoldenSignal(float $swing, float $fund, array $config): ?string
+    {
+        $thr = (float) ($config['thresholds']['accumulate'] ?? 58.0);
+
+        if ($swing >= $thr && $fund >= $thr) {
+            return 'strong';
+        }
+        if ($fund >= $thr && $swing < $thr) {
+            return 'watchlist';
+        }
+        if ($swing >= $thr && $fund < $thr) {
+            return 'momentum';
+        }
+
+        return null;
     }
 }

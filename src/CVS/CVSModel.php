@@ -4,40 +4,44 @@ declare(strict_types=1);
 
 namespace CVS\CVS;
 
-use CVS\CVS\Pillars\GrowthPillar;
 use CVS\CVS\Pillars\SectorBenchmarkPillar;
 use CVS\CVS\Pillars\MomentumPillar;
-use CVS\CVS\Pillars\FundamentalQualityPillar;
+use CVS\CVS\Pillars\QualityPillar;
 
 /**
- * CVS model orchestrator.
+ * CVS model orchestrator — S-05 dual-mode rebuild.
  *
- * Applies the Quality Gate, then aggregates the four pillar scores
- * into a single CVS score (0–100) and maps it to a recommendation label.
+ * Three pillars, two weight profiles (Swing + Fundamental), computed simultaneously.
  *
- * Determinism guarantee (from PRD):
- *   Given the same financials input, the same CVS score and recommendation
- *   will always be produced — no randomness, no date-sensitive branching.
+ * Architecture:
+ *   Valuation  — SectorBenchmarkPillar (EV/FCF vs sector medians)
+ *   Momentum   — MomentumPillar with mode-specific roc_weights
+ *   Quality    — QualityPillar (GM, leverage, growth)
  *
- * Configuration is injected via config/cvs-weights.php so weights and
- * thresholds can be changed without touching this file (FR-010).
+ * The raw pillar scores are identical for both modes.
+ * Only the MomentumPillar composite differs (different roc_weights per mode).
+ * The final CVS differs by weighting.
+ *
+ * Determinism guarantee (PRD):
+ *   Same $financials input → identical CVS scores and recommendations.
+ *   No randomness, no date/time calls inside scoring logic.
+ *
+ * FR-010: all weights and thresholds are injected from config/cvs-weights.php.
  */
 class CVSModel
 {
-    private QualityGate              $qualityGate;
-    private GrowthPillar             $growth;
-    private SectorBenchmarkPillar    $sector;
-    private MomentumPillar           $momentum;
-    private FundamentalQualityPillar $quality;
+    private QualityGate           $qualityGate;
+    private SectorBenchmarkPillar $valuation;
+    private MomentumPillar        $momentum;
 
     /** @param array<string, mixed> $config  Full contents of config/cvs-weights.php */
     public function __construct(private readonly array $config)
     {
         $this->qualityGate = new QualityGate($config['quality_gate']);
-        $this->growth      = new GrowthPillar();
-        $this->sector      = new SectorBenchmarkPillar($config['benchmarks'] ?? []);
-        $this->momentum    = new MomentumPillar($config['momentum']   ?? []);
-        $this->quality     = new FundamentalQualityPillar();
+        // Valuation pillar needs all benchmarks (resolves sector internally).
+        $this->valuation   = new SectorBenchmarkPillar($config['benchmarks'] ?? []);
+        // Momentum pillar is constructed with swing config (cap/divisor are shared).
+        $this->momentum    = new MomentumPillar($config['modes']['swing'] ?? []);
     }
 
     // ------------------------------------------------------------------
@@ -45,7 +49,7 @@ class CVSModel
     // ------------------------------------------------------------------
 
     /**
-     * Calculate CVS for a single ticker.
+     * Calculate dual-mode CVS for a single ticker.
      *
      * @param string               $ticker      NYSE/NASDAQ symbol
      * @param array<string, mixed> $financials  Normalised data from FinancialDataFetcher
@@ -60,34 +64,59 @@ class CVSModel
             return CVSResult::failed($ticker, $gateResult->failures);
         }
 
-        // Step 2 — Pillar scores (each 0–100).
-        $w = $this->config['weights'];
+        $sw = $this->config['modes']['swing'];
+        $fn = $this->config['modes']['fundamental'];
 
-        $pillarScores = [
-            'growth'   => $this->growth->score($financials),
-            'sector'   => $this->sector->score($financials),
-            'momentum' => $this->momentum->score($financials),
-            'quality'  => $this->quality->score($financials),
-        ];
+        // Step 2 — Pillar raw scores (identical for both modes).
+        $sector    = $financials['sector'] ?? 'DEFAULT';
+        $bm        = $this->config['benchmarks'][$sector]
+                  ?? $this->config['benchmarks']['DEFAULT']
+                  ?? [];
 
-        // Step 3 — Weighted aggregate.
-        $cvs = (
-            $pillarScores['growth']   * $w['growth']   +
-            $pillarScores['sector']   * $w['sector']   +
-            $pillarScores['momentum'] * $w['momentum'] +
-            $pillarScores['quality']  * $w['quality']
+        $valScore  = $this->valuation->score($financials);
+
+        // Momentum is computed separately per mode using mode-specific roc_weights.
+        $momSwing = $this->momentum->score($financials, $sw['roc_weights']);
+        $momFund  = $this->momentum->score($financials, $fn['roc_weights']);
+
+        $qualScore = (new QualityPillar($bm))->score($financials);
+
+        // Step 3 — Weighted aggregate per mode.
+        $swingCvs = round(
+            $sw['valuation_weight'] * $valScore +
+            $sw['momentum_weight']  * $momSwing +
+            $sw['quality_weight']   * $qualScore,
+            1
         );
 
-        $cvs = round(min(100.0, max(0.0, $cvs)), 2);
+        $fundCvs = round(
+            $fn['valuation_weight'] * $valScore +
+            $fn['momentum_weight']  * $momFund  +
+            $fn['quality_weight']   * $qualScore,
+            1
+        );
 
-        // Step 4 — Map to recommendation label.
-        $recommendation = $this->mapToLabel((int) round($cvs));
+        // Clamp to [0, 100].
+        $swingCvs = (float) min(100.0, max(0.0, $swingCvs));
+        $fundCvs  = (float) min(100.0, max(0.0, $fundCvs));
+
+        // Step 4 — Map to recommendation labels.
+        $swingReco = $this->mapToLabel((int) round($swingCvs));
+        $fundReco  = $this->mapToLabel((int) round($fundCvs));
 
         return CVSResult::passed(
-            ticker:         $ticker,
-            cvs:            $cvs,
-            pillarScores:   $pillarScores,
-            recommendation: $recommendation
+            ticker:                    $ticker,
+            swingCvs:                  $swingCvs,
+            fundamentalCvs:            $fundCvs,
+            pillarScores:              [
+                'valuation'      => $valScore,
+                'momentum_swing' => $momSwing,
+                'momentum_fund'  => $momFund,
+                'quality'        => $qualScore,
+            ],
+            swingRecommendation:       $swingReco,
+            fundamentalRecommendation: $fundReco,
+            config:                    $this->config
         );
     }
 
@@ -99,7 +128,7 @@ class CVSModel
     {
         $t = $this->config['thresholds'];
 
-        return match(true) {
+        return match (true) {
             $cvs >= $t['strong_buy'] => '⬆⬆ SILNE KUPUJ',
             $cvs >= $t['accumulate'] => '⬆ AKUMULUJ',
             $cvs >= $t['neutral']    => '→ NEUTRALNIE',
