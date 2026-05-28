@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace CVS\CVS;
 
-use CVS\CVS\Pillars\SectorBenchmarkPillar;
+use CVS\CVS\Pillars\ValuationPillar;
 use CVS\CVS\Pillars\MomentumPillar;
 use CVS\CVS\Pillars\QualityPillar;
 
@@ -30,16 +30,16 @@ use CVS\CVS\Pillars\QualityPillar;
  */
 class CVSModel
 {
-    private QualityGate           $qualityGate;
-    private SectorBenchmarkPillar $valuation;
-    private MomentumPillar        $momentum;
+    private QualityGate    $qualityGate;
+    private ValuationPillar $valuation;
+    private MomentumPillar  $momentum;
 
     /** @param array<string, mixed> $config  Full contents of config/cvs-weights.php */
     public function __construct(private readonly array $config)
     {
         $this->qualityGate = new QualityGate($config['quality_gate']);
         // Valuation pillar needs all benchmarks (resolves sector internally).
-        $this->valuation   = new SectorBenchmarkPillar($config['benchmarks'] ?? []);
+        $this->valuation   = new ValuationPillar($config['benchmarks'] ?? []);
         // Momentum pillar is constructed with swing config (cap/divisor are shared).
         $this->momentum    = new MomentumPillar($config['modes']['swing'] ?? []);
     }

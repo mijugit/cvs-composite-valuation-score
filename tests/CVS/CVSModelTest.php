@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace CVS\Tests\CVS;
 
 use CVS\CVS\CVSModel;
-use CVS\CVS\Pillars\SectorBenchmarkPillar;
+use CVS\CVS\Pillars\ValuationPillar;
 use CVS\CVS\Pillars\MomentumPillar;
 use PHPUnit\Framework\TestCase;
 
@@ -260,7 +260,7 @@ class CVSModelTest extends TestCase
 
     public function test_sector_pillar_returns_non_neutral_score(): void
     {
-        $pillar = new SectorBenchmarkPillar($this->config['benchmarks']);
+        $pillar = new ValuationPillar($this->config['benchmarks']);
         $score  = $pillar->score($this->baseFinancials());
 
         $this->assertNotEquals(50.0, $score);
@@ -270,7 +270,7 @@ class CVSModelTest extends TestCase
 
     public function test_sector_pillar_returns_neutral_when_no_growth_data(): void
     {
-        $pillar = new SectorBenchmarkPillar($this->config['benchmarks']);
+        $pillar = new ValuationPillar($this->config['benchmarks']);
         $score  = $pillar->score($this->baseFinancials([
             'forward_eps'                => null,
             'trailing_eps'               => null,

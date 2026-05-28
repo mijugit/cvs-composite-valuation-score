@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace CVS\CVS\Pillars;
 
 /**
- * Pillar (b) — Sector benchmark comparison (EV/FCF vs. hardcoded sector medians).
+ * Pillar — Valuation (EV/FCF vs sector medians). Replaces SectorBenchmarkPillar (S-05).
  *
  * Score 0–100.
  *
@@ -16,9 +16,9 @@ namespace CVS\CVS\Pillars;
  *
  * Benchmarks are hardcoded per sector and injected via config/cvs-weights.php.
  *
- * Weight in CVS model: 0.25 (configured in config/cvs-weights.php).
+ * Weight in CVS model: from config[modes][swing|fundamental][valuation_weight].
  */
-class SectorBenchmarkPillar
+class ValuationPillar
 {
     /**
      * @param array<string, array<string, float|int>> $benchmarks  Sector benchmark data from config

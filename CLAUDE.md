@@ -9,7 +9,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Never hardcode weights or thresholds.** Always read from `config/cvs-weights.php` — this is FR-010. The config is injected into `CVSModel::__construct(array $config)`.
 - **Quality Gate is binary.** A company that fails returns `CVSResult::failed($ticker, $failures)` — not a CVS score of 0. Do not assign any numerical score when the gate rejects.
 - **CVS must be deterministic.** Same `$financials` input → identical CVS and recommendation. No randomness, no `date()`/`time()` calls inside scoring logic.
-- **SectorBenchmarkPillar uses hardcoded sector benchmarks** (EV/FCF medians from `config/cvs-weights.php → benchmarks`). Returns neutral 50 only when growth data is unavailable or `shares_outstanding` is null. `Financial Services` and `Real Estate` sectors work but have lower model accuracy (known limitation).
+- **S-05 dual-mode architecture (3 pillars):**
+  - `ValuationPillar` (EV/FCF vs sector medians from `config/cvs-weights.php → benchmarks`). Returns neutral 50 only when growth data is unavailable or `shares_outstanding` is null.
+  - `MomentumPillar` — computed twice with different `roc_weights` per mode (swing vs fundamental).
+  - `QualityPillar` — GM vs sector median, leverage (net debt/EBITDA), forward growth.
+  - **Swing (1–4M):** valuation 40% / momentum 45% / quality 15%
+  - **Fundamental (6–12M):** valuation 65% / momentum 15% / quality 20%
+  - Both scores displayed simultaneously; `CVSResult::cvs()` returns swing for backward compat.
+  - Golden signals: `strong` (both ≥58), `watchlist` (fund≥58 + swing<58), `momentum`, null.
+  - `Financial Services` and `Real Estate` sectors work but have lower model accuracy (known limitation).
 
 ### Disclaimer — mandatory on every result
 
@@ -73,7 +81,7 @@ composer audit
 CVS\Core\       — Router, Request, Response, Database (PDO singleton)
 CVS\Auth\       — AuthController, UserRepository
 CVS\CVS\        — CVSModel, QualityGate, CVSResult, QualityGateResult, AnalysisController
-CVS\CVS\Pillars\ — four pillar classes (one per scoring dimension)
+CVS\CVS\Pillars\ — three pillar classes: ValuationPillar, MomentumPillar, QualityPillar
 CVS\Api\        — FinancialDataFetcher (Yahoo Finance via cURL)
 ```
 
