@@ -20,6 +20,150 @@
 
     if (!form) return; // Not on dashboard — nothing to do.
 
+    // ----------------------------------------------------------------
+    // Watchlist state — S-06
+    // ----------------------------------------------------------------
+
+    /** Set of tickers currently on the user's watchlist (client-side mirror). */
+    let watchedSet = new Set();
+
+    function getCsrf() {
+        return document.getElementById('csrf-token')?.value ?? '';
+    }
+
+    async function watchlistToggle(ticker) {
+        const csrf = getCsrf();
+        try {
+            const resp = await fetch('/watchlist/toggle', {
+                method:  'POST',
+                headers: {
+                    'Content-Type':     'application/x-www-form-urlencoded',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-Token':     csrf,
+                },
+                body: new URLSearchParams({ ticker, _csrf: csrf }),
+            });
+            if (!resp.ok) return null;
+            return resp.json();
+        } catch (e) {
+            return null;
+        }
+    }
+
+    // ------ Chip helpers -------------------------------------------
+
+    function addWatchlistChip(ticker) {
+        const section = document.querySelector('.watchlist-section');
+        const chips   = document.querySelector('.watchlist-chips');
+        if (!section || !chips) return;
+
+        // Avoid duplicates
+        if (chips.querySelector(`[data-ticker="${CSS.escape(ticker)}"]`)) return;
+
+        const span = document.createElement('span');
+        span.className       = 'watchlist-chip';
+        span.dataset.ticker  = ticker;
+        span.innerHTML = esc(ticker) +
+            `<button class="watchlist-chip__remove" data-ticker="${esc(ticker)}"` +
+            ` aria-label="Usuń ${esc(ticker)}">&times;</button>`;
+        chips.appendChild(span);
+        section.hidden = false;
+    }
+
+    function removeWatchlistChip(ticker) {
+        const chip  = document.querySelector(`.watchlist-chips .watchlist-chip[data-ticker="${CSS.escape(ticker)}"]`);
+        if (chip) chip.remove();
+
+        const chips = document.querySelector('.watchlist-chips');
+        if (chips && chips.children.length === 0) {
+            const section = document.querySelector('.watchlist-section');
+            if (section) section.hidden = true;
+        }
+    }
+
+    // ------ Card toggle buttons ------------------------------------
+
+    function updateCardToggleBtns(ticker, isWatched) {
+        document.querySelectorAll(`.watchlist-toggle-btn[data-ticker="${CSS.escape(ticker)}"]`)
+            .forEach(btn => {
+                btn.classList.toggle('is-watched', isWatched);
+                btn.textContent = isWatched ? '×' : '⭐';
+            });
+    }
+
+    // Delegated listener on results grid
+    if (resultsGrid) {
+        resultsGrid.addEventListener('click', async (e) => {
+            const btn = e.target.closest('.watchlist-toggle-btn');
+            if (!btn) return;
+
+            const ticker = btn.dataset.ticker;
+            if (!ticker) return;
+
+            const data = await watchlistToggle(ticker);
+            if (!data?.ok) return;
+
+            if (data.action === 'added') {
+                watchedSet.add(ticker);
+                updateCardToggleBtns(ticker, true);
+                addWatchlistChip(ticker);
+            } else {
+                watchedSet.delete(ticker);
+                updateCardToggleBtns(ticker, false);
+                removeWatchlistChip(ticker);
+            }
+        });
+    }
+
+    // ------ Init watchlist section on page load --------------------
+
+    function initWatchlistSection() {
+        const section = document.querySelector('.watchlist-section');
+        if (!section) return;
+
+        try {
+            const list = JSON.parse(section.dataset.watchlist ?? '[]');
+            watchedSet = new Set(list);
+        } catch (e) {}
+
+        const chips = section.querySelector('.watchlist-chips');
+        if (!chips) return;
+
+        // Chip body click → append to textarea; × click → AJAX remove
+        chips.addEventListener('click', async (e) => {
+            const chip = e.target.closest('.watchlist-chip');
+            if (!chip) return;
+
+            const ticker = chip.dataset.ticker;
+
+            if (e.target.closest('.watchlist-chip__remove')) {
+                const data = await watchlistToggle(ticker);
+                if (!data?.ok) return;
+                if (data.action === 'removed') {
+                    chip.remove();
+                    watchedSet.delete(ticker);
+                    if (chips.children.length === 0) section.hidden = true;
+                    updateCardToggleBtns(ticker, false);
+                }
+                return;
+            }
+
+            // Chip body → append ticker to textarea
+            appendTickerToTextarea(ticker);
+        });
+    }
+
+    function appendTickerToTextarea(ticker) {
+        const ta = document.getElementById('tickers');
+        if (!ta) return;
+        const tokens = ta.value.split(/[,\s]+/).filter(t => t.length > 0);
+        if (!tokens.includes(ticker)) tokens.push(ticker);
+        ta.value = tokens.join(', ');
+        ta.focus();
+    }
+
+    initWatchlistSection();
+
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         clearUI();
@@ -97,9 +241,12 @@
         }
 
         if (!r.quality_gate) {
+            const isWatchedFail = watchedSet.has(r.ticker);
             el.innerHTML = `
                 <div class="result-card__header">
                     <div class="result-card__ticker">${esc(r.ticker)}</div>
+                    <button class="watchlist-toggle-btn${isWatchedFail ? ' is-watched' : ''}"
+                            data-ticker="${esc(r.ticker)}">${isWatchedFail ? '×' : '⭐'}</button>
                 </div>
                 <div class="result-card__fail-label">Quality Gate: ODRZUCONO</div>
                 <ul class="failure-list">
@@ -111,6 +258,7 @@
         const signal     = goldenSignal(r);
         const swingClass = scoreClass(r.swing?.cvs ?? 0);
         const fundClass  = scoreClass(r.fundamental?.cvs ?? 0);
+        const isWatched  = watchedSet.has(r.ticker);
 
         el.innerHTML = `
             <div class="result-card__header">
@@ -118,6 +266,8 @@
                 ${signal ? `<div class="result-card__signal result-card__signal--${esc(r.golden_signal)}">
                     ${signal.stars ? signal.stars + ' ' : ''}${esc(signal.label)}
                 </div>` : ''}
+                <button class="watchlist-toggle-btn${isWatched ? ' is-watched' : ''}"
+                        data-ticker="${esc(r.ticker)}">${isWatched ? '×' : '⭐'}</button>
             </div>
             <div class="result-card__scores">
                 <div class="score-badge score-badge--swing ${swingClass}">

@@ -1,6 +1,23 @@
 <section class="dashboard">
     <h1>Panel analizy CVS</h1>
 
+    <?php /* Watchlist section — always rendered; hidden when empty so JS can reveal it */ ?>
+    <div class="watchlist-section card"
+         data-watchlist='<?= json_encode($watchlist ?? []) ?>'
+         <?= empty($watchlist) ? 'hidden' : '' ?>>
+        <h3>Obserwowane</h3>
+        <div class="watchlist-chips">
+            <?php foreach ($watchlist ?? [] as $t): ?>
+            <span class="watchlist-chip" data-ticker="<?= htmlspecialchars($t) ?>">
+                <?= htmlspecialchars($t) ?>
+                <button class="watchlist-chip__remove"
+                        data-ticker="<?= htmlspecialchars($t) ?>"
+                        aria-label="Usuń <?= htmlspecialchars($t) ?>">&times;</button>
+            </span>
+            <?php endforeach; ?>
+        </div>
+    </div>
+
     <div class="analysis-form-wrapper card">
         <h2>Wprowadź symbole spółek</h2>
         <p class="hint">Wpisz do 10 tickerów (NYSE / NASDAQ), oddzielonych przecinkami lub spacjami.<br>

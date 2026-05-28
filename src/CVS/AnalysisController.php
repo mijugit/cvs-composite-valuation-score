@@ -8,6 +8,7 @@ use CVS\Auth\AuthController;
 use CVS\Api\FinancialDataFetcher;
 use CVS\Core\Request;
 use CVS\Core\Response;
+use CVS\Watchlist\WatchlistRepository;
 
 /**
  * Handles the dashboard and CVS analysis flow.
@@ -19,12 +20,14 @@ class AnalysisController
 {
     private CVSModel             $model;
     private FinancialDataFetcher $fetcher;
+    private WatchlistRepository  $watchlist;
 
     public function __construct()
     {
-        $config        = require dirname(__DIR__, 2) . '/config/cvs-weights.php';
-        $this->model   = new CVSModel($config);
-        $this->fetcher = new FinancialDataFetcher($config['data_source']);
+        $config          = require dirname(__DIR__, 2) . '/config/cvs-weights.php';
+        $this->model     = new CVSModel($config);
+        $this->fetcher   = new FinancialDataFetcher($config['data_source']);
+        $this->watchlist = new WatchlistRepository();
     }
 
     // ------------------------------------------------------------------
@@ -34,7 +37,9 @@ class AnalysisController
     public function dashboard(Request $req): void
     {
         AuthController::requireAuth();
-        Response::view('dashboard', []);
+        $userId    = (int) $_SESSION['user_id'];
+        $watchlist = $this->watchlist->findByUser($userId);
+        Response::view('dashboard', ['watchlist' => $watchlist]);
     }
 
     // ------------------------------------------------------------------
