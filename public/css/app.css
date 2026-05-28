@@ -70,9 +70,8 @@ a:hover { text-decoration: underline; }
     box-shadow: var(--shadow);
     margin-bottom: 1.5rem;
 }
-.card--fail   { border-color: var(--c-danger); }
+.card--fail  { border-color: var(--c-danger); }
 .card--result { border-color: var(--c-primary); }
-.card--data   { border-color: var(--c-border); }
 
 /* --- Forms ------------------------------------------------ */
 .form { display: flex; flex-direction: column; gap: 1rem; }
@@ -159,13 +158,6 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
 .result-card__cvs    { font-size: 2rem; font-weight: 700; }
 .result-card__link   { display: block; margin-top: .75rem; font-size: .875rem; }
 
-/* S-02: mini-radar in result card */
-.result-card__radar {
-    margin: .75rem 0 .25rem;
-    display: flex;
-    justify-content: center;
-}
-
 /* --- Spinner ---------------------------------------------- */
 .spinner {
     text-align: center;
@@ -196,13 +188,6 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
 .pillar-table td { padding: .6rem .5rem; text-align: left; border-bottom: 1px solid var(--c-border); }
 .pillar-table th { font-size: .8rem; color: var(--c-muted); text-transform: uppercase; }
 
-/* Pillar weight column */
-.pillar-weight {
-    color: var(--c-muted);
-    font-size: .8rem;
-    white-space: nowrap;
-}
-
 .pillar-bar {
     display: flex;
     align-items: center;
@@ -225,52 +210,83 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
     font-style: italic;
 }
 
-/* S-02: full radar wrapper on detail page */
-.radar-wrapper {
-    max-width: 380px;
-    margin: 1rem auto 1.75rem;
+/* --- S-05 Dual-mode card styles --------------------------- */
+
+/* Card header: ticker + golden signal pill side-by-side */
+.result-card__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    margin-bottom: .4rem;
 }
 
-/* S-03: raw data table */
-.data-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: .875rem;
+/* Score badge container */
+.result-card__scores {
+    display: flex;
+    gap: .5rem;
+    margin: .6rem 0;
 }
-.data-table td {
-    padding: .45rem .5rem;
-    border-bottom: 1px solid var(--c-border);
-    vertical-align: top;
-}
-.data-table td:first-child {
-    color: var(--c-muted);
-    width: 52%;
-}
-.data-table__section td {
+
+/* Individual badge (Swing or Fund) */
+.score-badge {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: .4rem .3rem;
+    border-radius: 6px;
+    border: 1px solid var(--c-border);
     background: var(--c-bg);
-    color: var(--c-primary);
-    font-weight: 600;
     font-size: .75rem;
-    text-transform: uppercase;
-    letter-spacing: .05em;
-    padding: .85rem .5rem .3rem;
-    border-bottom: 1px solid var(--c-border);
+    gap: 1px;
 }
+.score-badge__mode  { color: var(--c-muted); font-size: .65rem; text-transform: uppercase; letter-spacing: .04em; }
+.score-badge__value { font-size: 1.1rem; font-weight: 700; color: var(--c-text); }
+.score-badge__reco  { color: var(--c-muted); font-size: .65rem; text-align: center; }
 
-/* Back link + ticker subtitle */
-.back-link {
-    margin-bottom: .75rem;
-    font-size: .875rem;
+/* Swing badge: primary blue accent */
+.score-badge--swing .score-badge__value { color: var(--c-primary); }
+
+/* Fund badge: gold accent */
+.score-badge--fund  .score-badge__value { color: #eab308; }
+
+/* Per-score-level border tint on the badge */
+.score-badge.score-badge--strong { border-color: rgba(52, 199, 123, .35); }
+.score-badge.score-badge--neutral { border-color: var(--c-border); }
+.score-badge.score-badge--weak  { border-color: rgba(224, 85, 85, .25); }
+
+/* Golden signal pill */
+.result-card__signal {
+    font-size: .72rem;
+    padding: .15rem .5rem;
+    border-radius: 99px;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
-.ticker-meta {
-    color: var(--c-muted);
-    font-size: .875rem;
-    margin: -.25rem 0 1.25rem;
+.result-card__signal--strong    { background: rgba(34, 197, 94, .15);  color: #22c55e; }
+.result-card__signal--watchlist { background: rgba(234, 179, 8, .15);  color: #eab308; }
+.result-card__signal--momentum  { background: rgba(79, 142, 247, .15); color: var(--c-primary); }
+
+/* Fail label inside gate-rejected card */
+.result-card__fail-label { font-size: .85rem; color: var(--c-danger); margin: .25rem 0; }
+
+/* Mini radar area */
+.result-card__radar {
+    display: flex;
+    justify-content: center;
+    margin: .5rem 0 .25rem;
 }
+.result-card__radar canvas { max-width: 100%; }
 
 /* --- Responsive ------------------------------------------- */
 @media (max-width: 600px) {
     .cvs-number { font-size: 1.75rem; }
     .results-grid { grid-template-columns: 1fr; }
-    .radar-wrapper { max-width: 100%; }
+}
+
+@media (max-width: 375px) {
+    .result-card__scores { gap: .25rem; }
+    .score-badge { padding: .3rem .2rem; }
+    .score-badge__value { font-size: .95rem; }
 }
