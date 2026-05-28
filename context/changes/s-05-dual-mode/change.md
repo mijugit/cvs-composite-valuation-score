@@ -1,7 +1,7 @@
 ---
 id: s-05-dual-mode
 title: "CVS Dual Mode — Swing (1–4M) + Fundamentalny (6–12M)"
-status: ready
+status: implemented
 roadmap_ref: S-05
 created: 2026-05-28
 updated: 2026-05-28
