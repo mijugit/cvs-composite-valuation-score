@@ -12,8 +12,10 @@ namespace CVS\Core;
  */
 class Request
 {
+    /**
+     * @param array<string, string> $routeParams Named route parameters extracted by the Router.
+     */
     public function __construct(
-        /** Named route parameters extracted by the Router. */
         private readonly array $routeParams = []
     ) {}
 

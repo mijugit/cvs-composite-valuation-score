@@ -79,7 +79,7 @@ class FinancialDataFetcher
         // Session-level cache check.
         if (isset($_SESSION[$cacheKey], $_SESSION[$cacheKey . '_ts'])) {
             if (time() - $_SESSION[$cacheKey . '_ts'] < $ttl) {
-                return $_SESSION[$cacheKey]; // @phpstan-ignore-line
+                return $_SESSION[$cacheKey];
             }
         }
 
@@ -124,13 +124,13 @@ class FinancialDataFetcher
 
         if (isset($_SESSION[$cacheKey], $_SESSION[$cacheKey . '_ts'])) {
             if (time() - $_SESSION[$cacheKey . '_ts'] < $ttl) {
-                return $_SESSION[$cacheKey]; // @phpstan-ignore-line
+                return $_SESSION[$cacheKey];
             }
         }
 
         // Step 1: visit consent URL to receive the A3 cookie.
         $consentResult = $this->curlGetWithHeaders(self::CONSENT_URL, '', []);
-        $cookie        = $consentResult['cookie'] ?? '';
+        $cookie        = $consentResult['cookie'];
 
         if ($cookie === '') {
             return ['crumb' => '', 'cookie' => ''];
@@ -249,7 +249,7 @@ class FinancialDataFetcher
 
         if (isset($_SESSION[$spyCacheKey], $_SESSION[$spyCacheKey . '_ts'])) {
             if (time() - $_SESSION[$spyCacheKey . '_ts'] < $ttl) {
-                return $_SESSION[$spyCacheKey]; // @phpstan-ignore-line
+                return $_SESSION[$spyCacheKey];
             }
         }
 
