@@ -52,7 +52,7 @@ Add new routes only in `src/Core/routes.php`. Named URL parameters use `{name}` 
 These rules govern the new phase-2 components (AI analysis, screener, alerts, mailer, scheduler). They exist to protect the phase-2 guardrails — AI failure must not break the page, external-API cost control, CVS determinism — so apply them from the first line of new code.
 
 ### Static analysis
-- Run PHPStan (level 6) on `src/` before committing new code: `vendor/bin/phpstan analyse src --level=6`. (PHPStan is not yet a dependency — add it with `composer require --dev phpstan/phpstan`.)
+- Run PHPStan (level 6) before committing new code: `composer stan` (config in `phpstan.neon`, paths `src/`). Keep it green — the suite currently reports no errors.
 - Keep `declare(strict_types=1)` and explicit type hints on all function boundaries (existing rule). PHPStan enforces it; do not weaken types to silence errors — fix the type.
 
 ### Claude API

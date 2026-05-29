@@ -53,7 +53,7 @@ New phase-2 work adds these sub-namespaces under `CVS\` (mirror dirs in `src/`):
 - **Claude API** — all LLM calls through one client in `src/Ai/` (timeout < 30s, errors → typed failure so the page never breaks, key from `.env`, prompt caching for cost). Build with the `/claude-api` skill.
 - **Email** — PHPMailer via Composer, single service in `src/Mail/`, SMTP from `.env`, transactional only, graceful failure (log + return false).
 - **Scheduled work** — CLI entrypoint in `bin/` run by cron (type "Ścieżka" with explicit PHP 8.2 path), idempotent; optional lazy-trigger fallback. Never couple to an HTTP request.
-- **Static analysis** — run PHPStan (level 6) on `src/` before committing new code (`composer require --dev phpstan/phpstan` first).
+- **Static analysis** — run `composer stan` (PHPStan level 6, config `phpstan.neon`) before committing new code; keep it green.
 
 Full rules and rationale: see `@CLAUDE.md` → "Phase 2 conventions".
 
