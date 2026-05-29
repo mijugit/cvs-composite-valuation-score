@@ -46,6 +46,17 @@ Namespace root: `CVS\` → `src/` (PSR-4). See `@composer.json`.
 
 PHPUnit 11, config at `@phpunit.xml`. Tests are fully offline — `FinancialDataFetcher` is not exercised. Use `CVSModelTest::baseFinancials()` as the canonical fixture shape for financial data arrays.
 
+## Phase 2 conventions (new components)
+
+New phase-2 work adds these sub-namespaces under `CVS\` (mirror dirs in `src/`): `Ai\` (Claude API client + analysis), `Mail\` (PHPMailer/SMTP), `Alerts\`, `Screener\`, `TrackRecord\`. New tables go in `database/migrations/` as numbered `NNN_*.sql`, additive only.
+
+- **Claude API** — all LLM calls through one client in `src/Ai/` (timeout < 30s, errors → typed failure so the page never breaks, key from `.env`, prompt caching for cost). Build with the `/claude-api` skill.
+- **Email** — PHPMailer via Composer, single service in `src/Mail/`, SMTP from `.env`, transactional only, graceful failure (log + return false).
+- **Scheduled work** — CLI entrypoint in `bin/` run by cron (type "Ścieżka" with explicit PHP 8.2 path), idempotent; optional lazy-trigger fallback. Never couple to an HTTP request.
+- **Static analysis** — run PHPStan (level 6) on `src/` before committing new code (`composer require --dev phpstan/phpstan` first).
+
+Full rules and rationale: see `@CLAUDE.md` → "Phase 2 conventions".
+
 ## Architecture & depth
 
 See `@CLAUDE.md` for the full CVS calculation flow, template rendering mechanic, caching strategy, and database setup.

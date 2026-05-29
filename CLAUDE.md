@@ -47,6 +47,34 @@ It is baked into `CVSResult::toArray()` under key `disclaimer`. Never omit it fr
 
 Add new routes only in `src/Core/routes.php`. Named URL parameters use `{name}` syntax (e.g. `/analysis/{ticker}`); the Router extracts them into `Request::param()`.
 
+## Phase 2 conventions (new components)
+
+These rules govern the new phase-2 components (AI analysis, screener, alerts, mailer, scheduler). They exist to protect the phase-2 guardrails — AI failure must not break the page, external-API cost control, CVS determinism — so apply them from the first line of new code.
+
+### Static analysis
+- Run PHPStan (level 6) on `src/` before committing new code: `vendor/bin/phpstan analyse src --level=6`. (PHPStan is not yet a dependency — add it with `composer require --dev phpstan/phpstan`.)
+- Keep `declare(strict_types=1)` and explicit type hints on all function boundaries (existing rule). PHPStan enforces it; do not weaken types to silence errors — fix the type.
+
+### Claude API
+- Provider is Claude API (Anthropic). All language-model calls go through a single client in `src/Ai/` — never scatter cURL calls across controllers. Reuse the proven pattern from another project's `claude-client.php` (Messages API, headers `x-api-key` + `anthropic-version`).
+- The client MUST set a request timeout (< 30s, to keep user-perceived total within the NFR) and retry with backoff on transient failures. On error/timeout/quota, return a typed failure (not an exception that bubbles to the page) so the detail page and CVS result still render.
+- API key comes from `.env` (`$_ENV`), never hard-coded. Use prompt caching (stable system prompt) to control cost — pairs with the shared analysis cache.
+- The AI narrative is grounded in model-computed CVS/analyst data passed into the prompt; the AI layer never modifies a CVS score (determinism guardrail). Build it with the `/claude-api` skill.
+
+### Transactional email
+- Use PHPMailer via Composer (`composer require phpmailer/phpmailer`). All outbound mail goes through one service in `src/Mail/` — transactional only (alerts, PRO-code contact). No bulk/marketing.
+- SMTP config (host/port/user/password/encryption/from) comes from `.env`, not hard-coded constants. Mirror the proven deliverability touches: domain-based Message-ID, suppressed X-Mailer, HTML + plain-text AltBody, List-Unsubscribe header.
+- Graceful failure: if SMTP unconfigured or send throws, `error_log` and return false — never let a mail failure break the request flow. Keep volume low; never loop-send.
+
+### Background / scheduled work
+- Scheduled re-scoring runs from a standalone CLI entrypoint in `bin/` (e.g. `bin/rescore.php`), invoked by Cyber_Folks cron — type "Ścieżka" with an explicit PHP 8.2 binary path (CF CLI defaults to PHP 7.4; hard-code the 8.2 path). Prefer the path/CLI type over URL: no `max_execution_time` limit for a multi-ticker batch.
+- The job MUST be idempotent (safe to run twice/day), guarded by a "last run" timestamp. A lazy-trigger by the first authenticated request of the day is an optional fallback, not the primary mechanism.
+- Never couple scheduled work to an HTTP request lifecycle beyond the lazy-trigger guard.
+
+### New namespaces & migrations
+- New sub-namespaces under `CVS\`: `Ai\` (LLM client + analysis), `Mail\` (mailer), `Alerts\`, `Screener\`, `TrackRecord\`. Mirror directories under `src/` (PSR-4).
+- New tables (shared AI analyses, CVS snapshots, PRO codes/usage, alert prefs) go in `database/migrations/` as numbered SQL files (`NNN_*.sql`), additive only — never break existing tables.
+
 ## Commands
 
 ```bash
