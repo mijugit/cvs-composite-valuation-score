@@ -39,7 +39,7 @@ class MomentumPillar
      * @param array<string, float|array<string,float>> $config  A mode config entry (swing or fundamental)
      *                                                           from config/cvs-weights.php → modes.
      *                                                           Reads: momentum_divisor, momentum_cap_min,
-     *                                                           momentum_cap_max.
+     *                                                           momentum_cap_max, sigmoid_k.
      */
     public function __construct(private readonly array $config = []) {}
 
@@ -120,11 +120,12 @@ class MomentumPillar
         $divisor   = (float) ($this->config['momentum_divisor'] ?? $this->config['normalization_divisor'] ?? 40.0);
         $minS      = (float) ($this->config['momentum_cap_min'] ?? $this->config['score_min']             ??  5.0);
         $maxS      = (float) ($this->config['momentum_cap_max'] ?? $this->config['score_max']             ?? 95.0);
+        $kSigmoid  = (float) ($this->config['sigmoid_k']        ?? 3.0); // FR-010: never hardcode
 
         $excess    = $composite - $spyCalib;
         $normRatio = 1.0 - ($excess / $divisor);
 
-        $raw   = 100.0 / (1.0 + exp(3.0 * ($normRatio - 1.0)));
+        $raw   = 100.0 / (1.0 + exp($kSigmoid * ($normRatio - 1.0)));
         $score = max($minS, min($maxS, $raw));
 
         return round($score, 2);
