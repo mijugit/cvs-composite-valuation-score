@@ -48,7 +48,7 @@ final class ClaudeClient
         $url        = (string) ($this->config['base_url'] ?? 'https://api.anthropic.com/v1/messages');
         $model      = (string) ($this->config['model'] ?? '');
         $version    = (string) ($this->config['anthropic_version'] ?? '2023-06-01');
-        $maxTokens  = (int) ($options['max_tokens'] ?? $this->config['max_tokens'] ?? 2048);
+        $maxTokens  = max(1, (int) ($options['max_tokens'] ?? $this->config['max_tokens'] ?? 2048));
         $timeout    = (int) ($this->config['timeout'] ?? 20);
         $maxRetries = (int) ($this->config['max_retries'] ?? 2);
         $budget     = (float) ($this->config['total_timeout'] ?? 25);
