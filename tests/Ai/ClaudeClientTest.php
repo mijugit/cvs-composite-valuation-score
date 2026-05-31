@@ -206,4 +206,15 @@ class ClaudeClientTest extends TestCase
             @unlink($logFile);
         }
     }
+
+    public function test_max_tokens_is_clamped_to_at_least_one(): void
+    {
+        $transport = new FakeTransport([['status' => 200, 'body' => $this->okBody(), 'error' => null]]);
+        $client    = new ClaudeClient($this->config(), $transport);
+
+        // A caller passing 0 would otherwise send max_tokens:0, which the API rejects.
+        $client->sendMessage($this->messages(), null, ['max_tokens' => 0]);
+
+        $this->assertStringContainsString('"max_tokens":1', $transport->requests[0]['body']);
+    }
 }
