@@ -111,6 +111,9 @@ CVS\Auth\       — AuthController, UserRepository
 CVS\CVS\        — CVSModel, QualityGate, CVSResult, QualityGateResult, AnalysisController
 CVS\CVS\Pillars\ — three pillar classes: ValuationPillar, MomentumPillar, QualityPillar
 CVS\Api\        — FinancialDataFetcher (Yahoo Finance via cURL)
+CVS\Ai\         — Claude API client (Messages API): ClaudeClient + CurlTransport/HttpTransport seam,
+                  AiResult/AiUsage/AiFailureKind (typed result), CacheableSystem, ClaudeClientFactory.
+                  Never throws — returns typed AiResult; config from config/ai.php (+ .env).
 ```
 
 **CVS calculation flow:**

@@ -6,6 +6,8 @@ namespace CVS\Tests\Ai;
 
 use CVS\Ai\ClaudeClient;
 use CVS\Ai\AiFailureKind;
+use CVS\Ai\CacheableSystem;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -105,5 +107,103 @@ class ClaudeClientTest extends TestCase
         $this->assertFalse($result->ok);
         $this->assertSame(AiFailureKind::Auth, $result->failureKind);
         $this->assertCount(0, $transport->requests, 'must not hit transport without a key');
+    }
+
+    // ------------------------------------------------------------------
+    // Failure taxonomy (single attempt — max_retries 0)
+    // ------------------------------------------------------------------
+
+    /**
+     * @return iterable<string, array{0: array{status: int, body: string, error: string|null}, 1: AiFailureKind}>
+     */
+    public static function failureCases(): iterable
+    {
+        yield 'timeout' => [['status' => 0, 'body' => '', 'error' => 'Operation timed out after 5000 ms'], AiFailureKind::Timeout];
+        yield 'network' => [['status' => 0, 'body' => '', 'error' => 'Could not resolve host: api.anthropic.com'], AiFailureKind::Network];
+        yield 'auth 401' => [['status' => 401, 'body' => '{"error":{"type":"authentication_error"}}', 'error' => null], AiFailureKind::Auth];
+        yield 'quota' => [['status' => 400, 'body' => '{"error":{"type":"invalid_request_error","message":"Your credit balance is too low"}}', 'error' => null], AiFailureKind::Quota];
+        yield 'bad json 2xx' => [['status' => 200, 'body' => 'not-json', 'error' => null], AiFailureKind::BadResponse];
+        yield 'empty content' => [['status' => 200, 'body' => '{"content":[],"usage":{}}', 'error' => null], AiFailureKind::BadResponse];
+    }
+
+    /**
+     * @param array{status: int, body: string, error: string|null} $response
+     */
+    #[DataProvider('failureCases')]
+    public function test_failure_taxonomy(array $response, AiFailureKind $expected): void
+    {
+        $transport = new FakeTransport([$response]);
+        $client    = new ClaudeClient($this->config(['max_retries' => 0]), $transport);
+
+        $result = $client->sendMessage($this->messages());
+
+        $this->assertFalse($result->ok);
+        $this->assertSame($expected, $result->failureKind);
+        $this->assertNotNull($result->failureMessage);
+    }
+
+    // ------------------------------------------------------------------
+    // Prompt caching surface
+    // ------------------------------------------------------------------
+
+    public function test_cache_control_5m_sets_block_without_beta_header(): void
+    {
+        $transport = new FakeTransport([['status' => 200, 'body' => $this->okBody(), 'error' => null]]);
+        $client    = new ClaudeClient($this->config(), $transport);
+
+        $client->sendMessage($this->messages(), new CacheableSystem('SYSTEM PROMPT', CacheableSystem::TTL_5M));
+
+        $body    = $transport->requests[0]['body'];
+        $headers = implode("\n", $transport->requests[0]['headers']);
+
+        $this->assertStringContainsString('cache_control', $body);
+        $this->assertStringContainsString('"ttl":"5m"', $body);
+        $this->assertStringNotContainsString('anthropic-beta', $headers, '5m caching is GA — no beta header');
+    }
+
+    public function test_cache_control_1h_sets_extended_ttl_beta_header(): void
+    {
+        $transport = new FakeTransport([['status' => 200, 'body' => $this->okBody(), 'error' => null]]);
+        $client    = new ClaudeClient($this->config(), $transport);
+
+        $client->sendMessage($this->messages(), new CacheableSystem('SYSTEM PROMPT', CacheableSystem::TTL_1H));
+
+        $body    = $transport->requests[0]['body'];
+        $headers = implode("\n", $transport->requests[0]['headers']);
+
+        $this->assertStringContainsString('"ttl":"1h"', $body);
+        $this->assertStringContainsString('anthropic-beta: extended-cache-ttl-2025-04-11', $headers);
+    }
+
+    // ------------------------------------------------------------------
+    // Secret redaction guardrail
+    // ------------------------------------------------------------------
+
+    public function test_api_key_never_leaks_to_logs_or_result_or_body(): void
+    {
+        $key     = 'sk-ant-secret-do-not-log';
+        $logFile = (string) tempnam(sys_get_temp_dir(), 'ai_log_');
+        $old     = ini_get('error_log');
+        ini_set('error_log', $logFile);
+
+        try {
+            // 500 is retryable; with max_retries 0 it logs once and fails.
+            $transport = new FakeTransport([['status' => 500, 'body' => '{"error":{"type":"api_error"}}', 'error' => null]]);
+            $client    = new ClaudeClient($this->config(['api_key' => $key, 'max_retries' => 0]), $transport);
+
+            $result = $client->sendMessage($this->messages());
+
+            $logged = (string) file_get_contents($logFile);
+
+            $this->assertFalse($result->ok);
+            $this->assertStringNotContainsString($key, $logged, 'API key must never be logged');
+            $this->assertStringNotContainsString($key, (string) json_encode($result->toArray()), 'API key must never be on the result');
+            $this->assertStringNotContainsString($key, $transport->requests[0]['body'], 'API key must not be in the request body');
+            // Sanity: the key DID travel — only ever in the x-api-key header.
+            $this->assertStringContainsString($key, implode("\n", $transport->requests[0]['headers']));
+        } finally {
+            ini_set('error_log', $old === false ? '' : $old);
+            @unlink($logFile);
+        }
     }
 }
