@@ -30,6 +30,12 @@ return [
     // Per-attempt timeout (seconds). Retry logic keeps total wall-time < ~25s.
     'timeout'           => (int) ($_ENV['AI_TIMEOUT'] ?? 20),
 
-    // Retries on transient failures (429 / 529 / timeout / network), budget-capped.
+    // Retries on transient failures (429 / 529 / 5xx / timeout / network), budget-capped.
     'max_retries'       => (int) ($_ENV['AI_MAX_RETRIES'] ?? 2),
+
+    // Total wall-clock budget (seconds) across attempts+backoff — keeps total < NFR 30s.
+    'total_timeout'     => (int) ($_ENV['AI_TOTAL_TIMEOUT'] ?? 25),
+
+    // Exponential backoff base (ms): delay = base * 2^attempt. Set 0 in tests.
+    'retry_base_delay_ms' => (int) ($_ENV['AI_RETRY_BASE_DELAY_MS'] ?? 500),
 ];
