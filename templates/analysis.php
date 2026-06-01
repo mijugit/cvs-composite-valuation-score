@@ -356,6 +356,10 @@
                                     data-ticker="<?= htmlspecialchars($ticker) ?>">
                                 Generuj analizę AI
                             </button>
+                        <?php elseif (empty($canGenerateAi) && empty($cachedAi)): ?>
+                            <button id="btn-enter-pro" class="btn btn--secondary btn--sm">
+                                Wprowadź kod PRO
+                            </button>
                         <?php endif; ?>
                         <?php if (!empty($aiCanRefresh)): ?>
                             <button id="btn-refresh-ai" class="btn btn--ghost btn--sm"
@@ -392,6 +396,25 @@
                     Analiza AI to hipoteza modelu — nie rekomendacja inwestycyjna.
                     Uziemiona w danych CVS i prognozach analityków z Yahoo Finance.
                 </p>
+            </div>
+
+            <!-- PRO code activation modal -->
+            <div id="pro-modal" class="ai-modal" hidden>
+                <div class="ai-modal__inner" style="max-width:360px;">
+                    <h3 style="margin-bottom:1rem;font-size:var(--text-base);">Wprowadź kod PRO</h3>
+                    <p style="color:var(--c-muted);font-size:var(--text-sm);margin-bottom:1rem;">
+                        Kod PRO wydaje admin. Wpisz go raz — zostanie zapamiętany w tej sesji.
+                    </p>
+                    <div class="form-group" style="margin-bottom:1rem;">
+                        <input id="pro-code-input" type="text" placeholder="np. CVS-BETA-2026"
+                               style="font-family:monospace;text-transform:uppercase;" autocomplete="off">
+                    </div>
+                    <div id="pro-modal-error" class="alert alert--error" style="display:none;margin-bottom:.75rem;"></div>
+                    <div style="display:flex;gap:.5rem;justify-content:center;">
+                        <button id="btn-pro-submit" class="btn btn--primary btn--sm">Aktywuj</button>
+                        <button id="btn-pro-cancel" class="btn btn--ghost btn--sm">Anuluj</button>
+                    </div>
+                </div>
             </div>
 
             <!-- AI generation modal -->
@@ -501,6 +524,64 @@
                         if (resultEl) resultEl.parentNode.insertBefore(errEl, resultEl);
                     });
                 }
+
+                // PRO code activation modal
+                var proModal   = document.getElementById('pro-modal');
+                var proInput   = document.getElementById('pro-code-input');
+                var proErrEl   = document.getElementById('pro-modal-error');
+                var btnEnterPro = document.getElementById('btn-enter-pro');
+
+                if (btnEnterPro) {
+                    btnEnterPro.addEventListener('click', function () {
+                        if (proErrEl) { proErrEl.style.display = 'none'; proErrEl.textContent = ''; }
+                        if (proInput) proInput.value = '';
+                        proModal.hidden = false;
+                        setTimeout(function () { if (proInput) proInput.focus(); }, 50);
+                    });
+                }
+
+                document.getElementById('btn-pro-cancel')?.addEventListener('click', function () {
+                    proModal.hidden = true;
+                });
+
+                document.getElementById('btn-pro-submit')?.addEventListener('click', function () {
+                    var code = (proInput?.value ?? '').trim();
+                    if (!code) return;
+
+                    fetch('/pro/activate', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type':     'application/x-www-form-urlencoded',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-Token':     csrf,
+                        },
+                        body: new URLSearchParams({ _csrf: csrf, code: code }),
+                    })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        if (data.ok) {
+                            proModal.hidden = true;
+                            // Reload page so $canGenerateAi = true
+                            window.location.reload();
+                        } else {
+                            if (proErrEl) {
+                                proErrEl.textContent = data.message ?? 'Nieprawidłowy kod PRO.';
+                                proErrEl.style.display = 'block';
+                            }
+                        }
+                    })
+                    .catch(function () {
+                        if (proErrEl) {
+                            proErrEl.textContent = 'Błąd sieci. Spróbuj ponownie.';
+                            proErrEl.style.display = 'block';
+                        }
+                    });
+                });
+
+                // Allow Enter key in code input
+                proInput?.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') document.getElementById('btn-pro-submit')?.click();
+                });
 
                 var btnGen = document.getElementById('btn-generate-ai');
                 if (btnGen) {
