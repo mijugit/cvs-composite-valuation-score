@@ -484,6 +484,73 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
 
 .forecast-chart-wrap { position: relative; height: 240px; }
 
+/* --- AI Analysis section (S-01) --------------------------- */
+.ai-analysis-card { border-color: rgba(64, 144, 224, .2); }
+
+.ai-analysis-card__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+.ai-analysis-card__header h2 { margin: 0; }
+.ai-analysis-card__actions { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.ai-analysis-card__date { font-size: var(--text-sm); color: var(--c-muted); }
+
+.ai-narrative { line-height: var(--leading-normal); font-size: var(--text-sm); }
+.ai-narrative h3,
+.ai-narrative__section {
+    font-size: var(--text-base);
+    font-weight: 700;
+    color: var(--c-primary);
+    margin: 1.25rem 0 .4rem;
+    padding-bottom: .3rem;
+    border-bottom: 1px solid var(--c-border);
+}
+.ai-narrative p { margin-bottom: .75rem; }
+
+/* --- AI generation modal ---------------------------------- */
+.ai-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(7, 16, 30, .75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+}
+.ai-modal[hidden] { display: none; }
+
+.ai-modal__inner {
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-lg);
+    padding: 2rem 2.5rem;
+    text-align: center;
+    max-width: 320px;
+    box-shadow: var(--shadow-lg);
+}
+
+.ai-modal__spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--c-border);
+    border-top-color: var(--c-primary);
+    border-radius: 50%;
+    animation: ai-spin .8s linear infinite;
+    margin: 0 auto 1rem;
+}
+@keyframes ai-spin { to { transform: rotate(360deg); } }
+
+.ai-modal__status {
+    color: var(--c-text);
+    font-size: var(--text-sm);
+    min-height: 1.5rem;
+    transition: opacity .3s;
+}
+
 /* --- Responsive ------------------------------------------- */
 @media (max-width: 600px) {
     .cvs-number { font-size: 1.75rem; }

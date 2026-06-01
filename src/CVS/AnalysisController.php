@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CVS\CVS;
 
+use CVS\Ai\AiAnalysisRepository;
 use CVS\Auth\AuthController;
 use CVS\Api\FinancialDataFetcher;
 use CVS\Core\Request;
@@ -134,8 +135,15 @@ class AnalysisController
         $userId    = (int) $_SESSION['user_id'];
         $isWatched = $this->watchlist->isWatched($userId, $ticker);
 
-        $aiConfig = require dirname(__DIR__, 2) . '/config/ai.php';
-        $gate     = new ProGate(new ProRepository(), new AiUsageRepository(), $aiConfig);
+        $aiConfig    = require dirname(__DIR__, 2) . '/config/ai.php';
+        $gate        = new ProGate(new ProRepository(), new AiUsageRepository(), $aiConfig);
+        $aiRepo      = new AiAnalysisRepository();
+        $freshDays   = (int) ($aiConfig['pro']['cache_fresh_days']  ?? 7);
+        $minHours    = (int) ($aiConfig['pro']['refresh_min_hours'] ?? 24);
+        $cachedAi    = $aiRepo->isFresh($ticker, $freshDays) ? $aiRepo->findByTicker($ticker) : null;
+        $aiCanRefresh = $gate->canGenerate($userId)
+            && $aiRepo->findByTicker($ticker) !== null
+            && $aiRepo->needsRefresh($ticker, $minHours);
 
         Response::view('analysis', [
             'ticker'          => $ticker,
@@ -144,6 +152,8 @@ class AnalysisController
             'isWatched'       => $isWatched,          // S-06: watchlist toggle button state
             'canGenerateAi'   => $gate->canGenerate($userId),  // F-05: PRO gate for S-01
             'aiUsage'         => $gate->getUsage($userId),     // F-05: usage counts for S-01
+            'cachedAi'        => $cachedAi,           // S-01: cached analysis (all logged users)
+            'aiCanRefresh'    => $aiCanRefresh,        // S-01: PRO can force refresh after minHours
             'error'           => null,
         ]);
     }

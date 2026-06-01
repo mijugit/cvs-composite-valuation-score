@@ -9,6 +9,7 @@ declare(strict_types=1);
  * @var \CVS\Core\Router $router
  */
 
+use CVS\Ai\AiAnalysisController;
 use CVS\Auth\AuthController;
 use CVS\CVS\AnalysisController;
 use CVS\Watchlist\WatchlistController;
@@ -18,6 +19,8 @@ $auth      = new AuthController();
 $analysis  = new AnalysisController();
 $watchlist = new WatchlistController();
 $pro       = new ProController();
+$aiConfig   = require dirname(__DIR__, 2) . '/config/ai.php';
+$aiAnalysis = new AiAnalysisController($aiConfig);
 
 // ------------------------------------------------------------------
 // Public routes
@@ -62,3 +65,9 @@ $router->post('/admin/pro',               fn($req) => $pro->store($req));
 $router->post('/admin/pro/revoke',        fn($req) => $pro->revoke($req));
 $router->post('/admin/pro/activate-code', fn($req) => $pro->activateCode($req));
 $router->post('/pro/activate',            fn($req) => $pro->activate($req));
+
+// ------------------------------------------------------------------
+// AI Analysis (S-01)
+// ------------------------------------------------------------------
+
+$router->post('/analysis/{ticker}/generate-ai', fn($req) => $aiAnalysis->generate($req));

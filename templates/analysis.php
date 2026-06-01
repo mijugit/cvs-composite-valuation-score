@@ -339,6 +339,190 @@
             </div>
             <?php endif; ?>
 
+            <!-- ===================================================== -->
+            <!-- S-01: AI Divergence Analysis section                  -->
+            <!-- ===================================================== -->
+            <div class="card ai-analysis-card" id="ai-section">
+                <div class="ai-analysis-card__header">
+                    <h2>Analiza AI — rozjazd CVS vs analitycy</h2>
+                    <div class="ai-analysis-card__actions">
+                        <?php if (!empty($cachedAi)): ?>
+                            <span class="ai-analysis-card__date">
+                                Analiza z <?= htmlspecialchars(substr((string) $cachedAi['generated_at'], 0, 10)) ?>
+                            </span>
+                        <?php endif; ?>
+                        <?php if (!empty($canGenerateAi) && empty($cachedAi)): ?>
+                            <button id="btn-generate-ai" class="btn btn--primary btn--sm"
+                                    data-ticker="<?= htmlspecialchars($ticker) ?>">
+                                Generuj analizę AI
+                            </button>
+                        <?php endif; ?>
+                        <?php if (!empty($aiCanRefresh)): ?>
+                            <button id="btn-refresh-ai" class="btn btn--ghost btn--sm"
+                                    data-ticker="<?= htmlspecialchars($ticker) ?>"
+                                    data-force="1">
+                                Odśwież analizę
+                            </button>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
+                <?php if (!empty($cachedAi)): ?>
+                <div class="ai-narrative" id="ai-result">
+                    <?= nl2br(htmlspecialchars((string) $cachedAi['content'])) ?>
+                </div>
+                <?php elseif (empty($canGenerateAi)): ?>
+                <p style="color:var(--c-muted);font-size:var(--text-sm);">
+                    Brak analizy AI dla tej spółki.
+                    <?php if (empty($_SESSION['pro_code'] ?? null)): ?>
+                        Aktywuj kod PRO aby generować analizy.
+                    <?php else: ?>
+                        Dzienny lub miesięczny limit analiz został osiągnięty.
+                    <?php endif; ?>
+                </p>
+                <?php else: ?>
+                <p style="color:var(--c-muted);font-size:var(--text-sm);" id="ai-placeholder">
+                    Kliknij „Generuj analizę AI" aby otrzymać wyjaśnienie rozjazdu
+                    między modelem CVS a oceną analityków Wall Street.
+                </p>
+                <div id="ai-result" hidden></div>
+                <?php endif; ?>
+
+                <p class="disclaimer-inline" style="margin-top:.75rem;">
+                    Analiza AI to hipoteza modelu — nie rekomendacja inwestycyjna.
+                    Uziemiona w danych CVS i prognozach analityków z Yahoo Finance.
+                </p>
+            </div>
+
+            <!-- AI generation modal -->
+            <div id="ai-modal" class="ai-modal" hidden>
+                <div class="ai-modal__inner">
+                    <div class="ai-modal__spinner"></div>
+                    <p id="ai-modal-status" class="ai-modal__status">Przygotowuję dane…</p>
+                    <button id="btn-ai-cancel" class="btn btn--ghost btn--sm" style="margin-top:1rem;">
+                        Anuluj
+                    </button>
+                </div>
+            </div>
+
+            <script>
+            (function () {
+                'use strict';
+
+                var stages   = [
+                    'Przygotowuję dane…',
+                    'Analizuję CVS vs analitycy…',
+                    'Piszę raport…',
+                    'Kończę analizę…'
+                ];
+                var stageIdx  = 0;
+                var stageTimer = null;
+                var modal     = document.getElementById('ai-modal');
+                var statusEl  = document.getElementById('ai-modal-status');
+                var resultEl  = document.getElementById('ai-result');
+                var placeholder = document.getElementById('ai-placeholder');
+                var csrf      = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+
+                function showModal() {
+                    stageIdx = 0;
+                    if (statusEl) statusEl.textContent = stages[0];
+                    modal.hidden = false;
+                    stageTimer = setInterval(function () {
+                        stageIdx = (stageIdx + 1) % stages.length;
+                        if (statusEl) statusEl.textContent = stages[stageIdx];
+                    }, 7000);
+                }
+
+                function hideModal() {
+                    clearInterval(stageTimer);
+                    modal.hidden = true;
+                }
+
+                function renderAnalysis(content, generatedAt) {
+                    if (!resultEl) return;
+                    // Convert plain newlines to line breaks (server sends plain text)
+                    var html = content
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;')
+                        .replace(/## (\d+\. .+)/g, '<h3 class="ai-narrative__section">$1</h3>')
+                        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                        .replace(/\n\n/g, '</p><p>')
+                        .replace(/\n/g, '<br>');
+                    resultEl.innerHTML = '<p>' + html + '</p>';
+                    resultEl.hidden = false;
+                    if (placeholder) placeholder.hidden = true;
+
+                    // Show generated date and hide generate button
+                    var dateEl = document.querySelector('.ai-analysis-card__date');
+                    if (!dateEl && generatedAt) {
+                        var hdr = document.querySelector('.ai-analysis-card__actions');
+                        if (hdr) {
+                            var span = document.createElement('span');
+                            span.className = 'ai-analysis-card__date';
+                            span.textContent = 'Analiza z ' + generatedAt.substring(0, 10);
+                            hdr.prepend(span);
+                        }
+                    }
+                    var btnGen = document.getElementById('btn-generate-ai');
+                    if (btnGen) btnGen.hidden = true;
+                }
+
+                function doGenerate(ticker, force) {
+                    showModal();
+                    fetch('/analysis/' + encodeURIComponent(ticker) + '/generate-ai', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type':     'application/x-www-form-urlencoded',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-Token':     csrf,
+                        },
+                        body: new URLSearchParams({ _csrf: csrf, force: force ? '1' : '0' }),
+                    })
+                    .then(function (resp) { return resp.json(); })
+                    .then(function (data) {
+                        hideModal();
+                        if (data.ok) {
+                            renderAnalysis(data.content, data.generated_at);
+                        } else {
+                            var errEl = document.createElement('div');
+                            errEl.className = 'alert alert--error';
+                            errEl.style.marginTop = '1rem';
+                            errEl.textContent = data.message ?? 'Analiza AI niedostępna — spróbuj ponownie za chwilę.';
+                            if (resultEl) resultEl.parentNode.insertBefore(errEl, resultEl);
+                        }
+                    })
+                    .catch(function () {
+                        hideModal();
+                        var errEl = document.createElement('div');
+                        errEl.className = 'alert alert--error';
+                        errEl.style.marginTop = '1rem';
+                        errEl.textContent = 'Błąd sieci. Sprawdź połączenie i spróbuj ponownie.';
+                        if (resultEl) resultEl.parentNode.insertBefore(errEl, resultEl);
+                    });
+                }
+
+                var btnGen = document.getElementById('btn-generate-ai');
+                if (btnGen) {
+                    btnGen.addEventListener('click', function () {
+                        doGenerate(btnGen.dataset.ticker, false);
+                    });
+                }
+
+                var btnRef = document.getElementById('btn-refresh-ai');
+                if (btnRef) {
+                    btnRef.addEventListener('click', function () {
+                        doGenerate(btnRef.dataset.ticker, true);
+                    });
+                }
+
+                var btnCancel = document.getElementById('btn-ai-cancel');
+                if (btnCancel) {
+                    btnCancel.addEventListener('click', hideModal);
+                }
+            })();
+            </script>
+
             <p class="disclaimer-inline"><?= htmlspecialchars($result['disclaimer']) ?></p>
 
             <!-- Radar chart initialisation -->
