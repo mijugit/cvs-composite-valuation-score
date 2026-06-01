@@ -41,3 +41,12 @@ $router->get('/analysis/{ticker}',     fn($req) => $analysis->show($req));
 // ------------------------------------------------------------------
 
 $router->post('/watchlist/toggle',     fn($req) => $watchlist->toggle($req));
+
+// ------------------------------------------------------------------
+// Styleguide (F-01)
+// ------------------------------------------------------------------
+
+$router->get('/styleguide', function ($req) {
+    AuthController::requireAuth();
+    \CVS\Core\Response::view('styleguide');
+});
