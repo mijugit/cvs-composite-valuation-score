@@ -22,14 +22,29 @@ class UserRepository
 {
     private PDO $db;
 
-    public function __construct()
+    public function __construct(?PDO $db = null)
     {
-        $this->db = Database::connection();
+        $this->db = $db ?? Database::connection();
     }
 
     // ------------------------------------------------------------------
     // Reads
     // ------------------------------------------------------------------
+
+    /**
+     * All registered users — used by the daily-rescore CLI to iterate watchlists.
+     *
+     * @return array<int, array{id: int, email: string}>
+     */
+    public function findAll(): array
+    {
+        $stmt = $this->db->query('SELECT id, email FROM users ORDER BY id ASC');
+        if ($stmt === false) {
+            return [];
+        }
+        /** @var array<int, array{id: int, email: string}> */
+        return $stmt->fetchAll() ?: [];
+    }
 
     /** @return array<string, mixed>|null */
     public function findByEmail(string $email): ?array

@@ -209,4 +209,38 @@ class WatchlistRepositoryTest extends TestCase
         $repo->remove(1, 'AAPL');
         $this->assertSame(1, $repo->countByUser(1));
     }
+
+    // ------------------------------------------------------------------
+    // findAllDistinctTickers()
+    // ------------------------------------------------------------------
+
+    public function test_find_all_distinct_returns_empty_when_no_watchlist(): void
+    {
+        $repo = $this->makeRepo();
+        $this->assertSame([], $repo->findAllDistinctTickers());
+    }
+
+    public function test_find_all_distinct_deduplicates_across_users(): void
+    {
+        $repo = $this->makeRepo();
+        $repo->add(1, 'AAPL');
+        $repo->add(2, 'AAPL'); // same ticker, different user
+        $repo->add(2, 'MSFT');
+
+        $tickers = $repo->findAllDistinctTickers();
+        $this->assertCount(2, $tickers);
+        $this->assertContains('AAPL', $tickers);
+        $this->assertContains('MSFT', $tickers);
+    }
+
+    public function test_find_all_distinct_returns_sorted(): void
+    {
+        $repo = $this->makeRepo();
+        $repo->add(1, 'MSFT');
+        $repo->add(1, 'AAPL');
+        $repo->add(1, 'NVDA');
+
+        $tickers = $repo->findAllDistinctTickers();
+        $this->assertSame(['AAPL', 'MSFT', 'NVDA'], $tickers);
+    }
 }

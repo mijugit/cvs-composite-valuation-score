@@ -42,6 +42,20 @@ class WatchlistRepository
         return $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
     }
 
+    /**
+     * Union of all users' watchlists — the rescore batch input.
+     *
+     * @return string[]
+     */
+    public function findAllDistinctTickers(): array
+    {
+        $stmt = $this->db->query('SELECT DISTINCT ticker FROM watchlist ORDER BY ticker ASC');
+        if ($stmt === false) {
+            return [];
+        }
+        return $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    }
+
     public function isWatched(int $userId, string $ticker): bool
     {
         $stmt = $this->db->prepare(
