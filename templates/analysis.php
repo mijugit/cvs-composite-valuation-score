@@ -8,11 +8,9 @@
             <?php endif; ?>
         </h1>
         <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
-            <?php if (!empty($financials['long_description'])): ?>
             <button id="btn-company-info" class="btn btn--ghost btn--sm">
                 Informacje o spółce
             </button>
-            <?php endif; ?>
             <button class="watchlist-detail-btn<?= ($isWatched ?? false) ? ' is-watched' : '' ?>"
                     data-ticker="<?= htmlspecialchars($ticker) ?>"
                     data-watched="<?= ($isWatched ?? false) ? '1' : '0' ?>">
@@ -21,7 +19,6 @@
         </div>
     </div>
 
-    <?php if (!empty($financials['long_description'])): ?>
     <!-- Company info modal -->
     <div id="company-modal" class="ai-modal" hidden>
         <div class="ai-modal__inner company-modal__inner">
@@ -41,7 +38,11 @@
             </div>
 
             <p class="company-modal__desc">
-                <?= htmlspecialchars((string) $financials['long_description']) ?>
+                <?php if (!empty($financials['long_description'])): ?>
+                    <?= htmlspecialchars((string) $financials['long_description']) ?>
+                <?php else: ?>
+                    <em style="color:var(--c-muted);">Opis spółki zostanie załadowany przy następnym odświeżeniu danych (cache wygaśnie po 1h).</em>
+                <?php endif; ?>
             </p>
 
             <div class="company-modal__meta">
