@@ -1,12 +1,78 @@
 <section class="analysis-detail">
     <div class="analysis-detail__heading">
-        <h1>Analiza: <?= htmlspecialchars($ticker) ?></h1>
-        <button class="watchlist-detail-btn<?= ($isWatched ?? false) ? ' is-watched' : '' ?>"
-                data-ticker="<?= htmlspecialchars($ticker) ?>"
-                data-watched="<?= ($isWatched ?? false) ? '1' : '0' ?>">
-            <?= ($isWatched ?? false) ? '× Usuń z obserwowanych' : '⭐ Obserwuj' ?>
-        </button>
+        <h1>Analiza: <?= htmlspecialchars($ticker) ?>
+            <?php if (!empty($financials['long_name'])): ?>
+                <span style="font-size:var(--text-base);font-weight:400;color:var(--c-muted);margin-left:.5rem;">
+                    <?= htmlspecialchars((string) $financials['long_name']) ?>
+                </span>
+            <?php endif; ?>
+        </h1>
+        <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+            <?php if (!empty($financials['long_description'])): ?>
+            <button id="btn-company-info" class="btn btn--ghost btn--sm">
+                Informacje o spółce
+            </button>
+            <?php endif; ?>
+            <button class="watchlist-detail-btn<?= ($isWatched ?? false) ? ' is-watched' : '' ?>"
+                    data-ticker="<?= htmlspecialchars($ticker) ?>"
+                    data-watched="<?= ($isWatched ?? false) ? '1' : '0' ?>">
+                <?= ($isWatched ?? false) ? '× Usuń z obserwowanych' : '⭐ Obserwuj' ?>
+            </button>
+        </div>
     </div>
+
+    <?php if (!empty($financials['long_description'])): ?>
+    <!-- Company info modal -->
+    <div id="company-modal" class="ai-modal" hidden>
+        <div class="ai-modal__inner company-modal__inner">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;margin-bottom:1rem;">
+                <div>
+                    <h3 style="font-size:var(--text-lg);margin:0;">
+                        <?= htmlspecialchars((string) ($financials['long_name'] ?? $ticker)) ?>
+                    </h3>
+                    <p style="color:var(--c-muted);font-size:var(--text-sm);margin:.25rem 0 0;">
+                        <?= htmlspecialchars($ticker) ?>
+                        <?php if (!empty($financials['sector'])): ?> · <?= htmlspecialchars((string) $financials['sector']) ?><?php endif; ?>
+                        <?php if (!empty($financials['industry'])): ?> · <?= htmlspecialchars((string) $financials['industry']) ?><?php endif; ?>
+                        <?php if (!empty($financials['country'])): ?> · <?= htmlspecialchars((string) $financials['country']) ?><?php endif; ?>
+                    </p>
+                </div>
+                <button id="btn-company-close" class="btn btn--ghost btn--sm" style="flex-shrink:0;">✕</button>
+            </div>
+
+            <p class="company-modal__desc">
+                <?= htmlspecialchars((string) $financials['long_description']) ?>
+            </p>
+
+            <div class="company-modal__meta">
+                <?php if (!empty($financials['employees'])): ?>
+                <span>👥 <?= number_format((int) $financials['employees']) ?> pracowników</span>
+                <?php endif; ?>
+                <?php if (!empty($financials['website'])): ?>
+                <a href="<?= htmlspecialchars((string) $financials['website']) ?>"
+                   target="_blank" rel="noopener noreferrer" style="color:var(--c-primary);">
+                    🌐 <?= htmlspecialchars((string) $financials['website']) ?>
+                </a>
+                <?php endif; ?>
+            </div>
+
+            <p class="disclaimer-inline" style="margin-top:1rem;">
+                Dane: Yahoo Finance. Treść w języku angielskim pochodzi bezpośrednio ze źródła.
+            </p>
+        </div>
+    </div>
+    <script>
+    document.getElementById('btn-company-info')?.addEventListener('click', function () {
+        document.getElementById('company-modal').hidden = false;
+    });
+    document.getElementById('btn-company-close')?.addEventListener('click', function () {
+        document.getElementById('company-modal').hidden = true;
+    });
+    document.getElementById('company-modal')?.addEventListener('click', function (e) {
+        if (e.target === this) this.hidden = true;
+    });
+    </script>
+    <?php endif; ?>
 
     <?php if (!empty($error)): ?>
         <p class="alert alert--error"><?= htmlspecialchars($error) ?></p>

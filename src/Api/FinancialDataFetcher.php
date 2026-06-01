@@ -405,6 +405,14 @@ class FinancialDataFetcher
             // Company metadata
             'sector'                     => is_string($ap['sector'] ?? null) ? $ap['sector'] : null,
 
+            // Company profile (assetProfile — already fetched, zero extra cost)
+            'long_name'        => is_string($ap['longName']             ?? null) ? $ap['longName']             : null,
+            'industry'         => is_string($ap['industry']             ?? null) ? $ap['industry']             : null,
+            'country'          => is_string($ap['country']              ?? null) ? $ap['country']              : null,
+            'website'          => is_string($ap['website']              ?? null) ? $ap['website']              : null,
+            'employees'        => isset($ap['fullTimeEmployees']) ? (int) $ap['fullTimeEmployees'] : null,
+            'long_description' => is_string($ap['longBusinessSummary']  ?? null) ? $ap['longBusinessSummary']  : null,
+
             // Pricing
             'current_price'              => $currentPrice,
             'fifty_two_week_low'         => $v($sd['fiftyTwoWeekLow']  ?? []),
