@@ -99,6 +99,6 @@ class Router
     private function notFound(): void
     {
         http_response_code(404);
-        require dirname(__DIR__, 2) . '/templates/404.php';
+        Response::view('404');
     }
 }

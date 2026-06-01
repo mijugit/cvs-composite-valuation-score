@@ -199,7 +199,7 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
 
 /* --- S-05 Dual-mode card styles --------------------------- */
 
-/* Card header: ticker + golden signal pill side-by-side */
+/* Card header: ticker + signal pill side-by-side */
 .result-card__header {
     display: flex;
     align-items: center;
@@ -208,52 +208,14 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
     margin-bottom: .4rem;
 }
 
-/* Score badge container */
+/* Score tiles container */
 .result-card__scores {
     display: flex;
     gap: .5rem;
     margin: .6rem 0;
 }
 
-/* Individual badge (Swing or Fund) */
-.score-badge {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: .4rem .3rem;
-    border-radius: 6px;
-    border: 1px solid var(--c-border);
-    background: var(--c-bg);
-    font-size: .75rem;
-    gap: 1px;
-}
-.score-badge__mode  { color: var(--c-muted); font-size: .65rem; text-transform: uppercase; letter-spacing: .04em; }
-.score-badge__value { font-size: 1.1rem; font-weight: 700; color: var(--c-text); }
-.score-badge__reco  { color: var(--c-muted); font-size: .65rem; text-align: center; }
-
-/* Swing badge: primary blue accent */
-.score-badge--swing .score-badge__value { color: var(--c-primary); }
-
-/* Fund badge: yellow accent */
-.score-badge--fund  .score-badge__value { color: var(--c-fund); }
-
-/* Per-score-level border tint on the badge */
-.score-badge.score-badge--strong { border-color: rgba(52, 199, 123, .35); }
-.score-badge.score-badge--neutral { border-color: var(--c-border); }
-.score-badge.score-badge--weak  { border-color: rgba(224, 85, 85, .25); }
-
-/* Golden signal pill */
-.result-card__signal {
-    font-size: .72rem;
-    padding: .15rem .5rem;
-    border-radius: 99px;
-    white-space: nowrap;
-    flex-shrink: 0;
-}
-.result-card__signal--strong    { background: rgba(34, 197, 94, .15);  color: #22c55e; }
-.result-card__signal--watchlist { background: rgba(250, 204, 21, .15);  color: var(--c-fund); }
-.result-card__signal--momentum  { background: rgba(79, 142, 247, .15); color: var(--c-primary); }
+/* score-tile / signal-pill are canonical — defined in components.css */
 
 /* Fail label inside gate-rejected card */
 .result-card__fail-label { font-size: .85rem; color: var(--c-danger); margin: .25rem 0; }
@@ -427,6 +389,100 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
 
 .watchlist-detail-btn:hover { border-color: var(--c-primary); color: var(--c-primary); }
 .watchlist-detail-btn.is-watched { border-color: var(--c-warn); color: var(--c-warn); }
+
+/* --- Analysis detail (view-specific, moved from inline) --- */
+.analysis-detail__heading {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: .25rem;
+}
+.analysis-detail__heading h1 { margin-bottom: 0; }
+
+.dual-cvs-header {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+.dual-cvs-header .score-tile { flex: 1; min-width: 140px; text-align: center; }
+
+.detail-radar-wrapper { display: flex; flex-direction: column; align-items: center; margin: 1.5rem 0; }
+.detail-radar-legend  { font-size: var(--text-xs); color: var(--c-muted); margin-top: .5rem; }
+.legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+.legend-dot--swing { background: var(--c-primary); }
+.legend-dot--fund  { background: var(--c-fund); }
+
+.raw-data { margin-top: 1.5rem; }
+.raw-data summary { cursor: pointer; font-size: var(--text-sm); color: var(--c-muted); margin-bottom: .5rem; }
+.raw-table td:first-child { color: var(--c-muted); font-size: .82rem; width: 55%; }
+
+.price-chart-section {
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-lg);
+    padding: .75rem 1rem 1rem;
+    margin-bottom: 1.25rem;
+    height: 220px;
+    position: relative;
+}
+
+.forecast-card { border-color: rgba(64, 144, 224, .25); }
+.forecast-block { margin-top: 1.5rem; }
+.forecast-block:first-of-type { margin-top: .5rem; }
+.forecast-block__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: .75rem;
+}
+.forecast-block h3 { margin: 0 0 .75rem; }
+.forecast-block__head h3 { margin: 0; }
+
+.upside-badge {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    padding: .25rem .7rem;
+    border-radius: var(--radius-pill);
+}
+.upside-badge--pos { background: rgba(34, 197, 94, .15); color: var(--c-success); }
+.upside-badge--neg { background: rgba(239, 68, 68, .15); color: var(--c-danger); }
+
+.forecast-targets {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: .75rem;
+}
+.forecast-tile {
+    background: var(--c-bg);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius);
+    padding: .75rem;
+    text-align: center;
+}
+.forecast-tile__label { font-size: var(--text-xs); color: var(--c-muted); margin-bottom: .3rem; }
+.forecast-tile__value { font-size: var(--text-xl); font-weight: 700; }
+.forecast-note { font-size: var(--text-xs); color: var(--c-muted); margin-top: .6rem; }
+
+.consensus-label { font-size: var(--text-sm); font-weight: 600; color: var(--c-primary); }
+.consensus-label small { color: var(--c-muted); font-weight: 400; }
+
+.consensus-bars { list-style: none; display: flex; flex-direction: column; gap: .4rem; }
+.consensus-bar { display: flex; align-items: center; gap: .6rem; }
+.consensus-bar__label { flex: 0 0 110px; font-size: .82rem; color: var(--c-muted); }
+.consensus-bar__track { flex: 1; height: 14px; background: var(--c-bg); border-radius: 7px; overflow: hidden; }
+.consensus-bar__fill { display: block; height: 100%; border-radius: 7px; }
+.consensus-bar__fill--sb { background: rgba(22, 163, 74, .85); }
+.consensus-bar__fill--b  { background: rgba(74, 222, 128, .85); }
+.consensus-bar__fill--h  { background: rgba(250, 204, 21, .85); }
+.consensus-bar__fill--s  { background: rgba(249, 115, 22, .85); }
+.consensus-bar__fill--ss { background: rgba(239, 68, 68, .85); }
+.consensus-bar__count { flex: 0 0 28px; text-align: right; font-size: .82rem; font-weight: 600; }
+
+.forecast-chart-wrap { position: relative; height: 240px; }
 
 /* --- Responsive ------------------------------------------- */
 @media (max-width: 600px) {

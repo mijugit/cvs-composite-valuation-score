@@ -265,22 +265,22 @@
         el.innerHTML = `
             <div class="result-card__header">
                 <div class="result-card__ticker">${esc(r.ticker)}</div>
-                ${signal ? `<div class="result-card__signal result-card__signal--${esc(r.golden_signal)}">
+                ${signal ? `<span class="signal-pill signal-pill--${esc(r.golden_signal)}">
                     ${signal.stars ? signal.stars + ' ' : ''}${esc(signal.label)}
-                </div>` : ''}
+                </span>` : ''}
                 <button class="watchlist-toggle-btn${isWatched ? ' is-watched' : ''}"
                         data-ticker="${esc(r.ticker)}">${isWatched ? '×' : '⭐'}</button>
             </div>
             <div class="result-card__scores">
-                <div class="score-badge score-badge--swing ${swingClass}">
-                    <span class="score-badge__mode">Swing</span>
-                    <span class="score-badge__value">${Number(r.swing?.cvs ?? 0).toFixed(1)}</span>
-                    <span class="score-badge__reco">${esc(r.swing?.recommendation ?? '')}</span>
+                <div class="score-tile score-tile--swing ${swingClass}">
+                    <span class="score-tile__mode">Swing</span>
+                    <span class="score-tile__value">${Number(r.swing?.cvs ?? 0).toFixed(1)}</span>
+                    <span class="score-tile__reco">${esc(r.swing?.recommendation ?? '')}</span>
                 </div>
-                <div class="score-badge score-badge--fund ${fundClass}">
-                    <span class="score-badge__mode">Fund</span>
-                    <span class="score-badge__value">${Number(r.fundamental?.cvs ?? 0).toFixed(1)}</span>
-                    <span class="score-badge__reco">${esc(r.fundamental?.recommendation ?? '')}</span>
+                <div class="score-tile score-tile--fund ${fundClass}">
+                    <span class="score-tile__mode">Fund</span>
+                    <span class="score-tile__value">${Number(r.fundamental?.cvs ?? 0).toFixed(1)}</span>
+                    <span class="score-tile__reco">${esc(r.fundamental?.recommendation ?? '')}</span>
                 </div>
             </div>
             <div class="result-card__radar">
@@ -330,8 +330,8 @@
                                 ps.momentum_fund ?? 0,
                                 ps.quality       ?? 0,
                             ],
-                            borderColor:     'rgba(234, 179, 8, 0.9)',
-                            backgroundColor: 'rgba(234, 179, 8, 0.08)',
+                            borderColor:     'rgba(250, 204, 21, 0.9)',
+                            backgroundColor: 'rgba(250, 204, 21, 0.08)',
                             pointRadius: 2,
                             borderWidth: 1.5,
                         },
@@ -393,9 +393,9 @@
     }
 
     function scoreClass(cvs) {
-        if (cvs >= 72) return 'score-badge--strong';
-        if (cvs >= 42) return 'score-badge--neutral';
-        return 'score-badge--weak';
+        if (cvs >= 72) return 'score-tile--strong';
+        if (cvs >= 42) return 'score-tile--neutral';
+        return 'score-tile--weak';
     }
 
     // ------------------------------------------------------------------

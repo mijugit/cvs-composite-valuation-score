@@ -68,6 +68,12 @@
             $cfgFile   = require dirname(__DIR__) . '/config/cvs-weights.php';
             $modeSwing = $cfgFile['modes']['swing']       ?? [];
             $modeFund  = $cfgFile['modes']['fundamental'] ?? [];
+
+            $tileLevelClass = static function (float $cvs): string {
+                if ($cvs >= 72) return 'score-tile--strong';
+                if ($cvs >= 42) return 'score-tile--neutral';
+                return 'score-tile--weak';
+            };
             ?>
 
             <?php if (!empty($financials['monthly_closes'])): ?>
@@ -79,29 +85,24 @@
             <!-- Dual CVS score header -->
             <div class="card card--result">
                 <?php if ($gs && isset($gsLabels[$gs])): ?>
-                    <div class="golden-signal golden-signal--<?= htmlspecialchars($gs) ?>">
-                        <?= $gsLabels[$gs]['stars'] ? htmlspecialchars($gsLabels[$gs]['stars']) . ' ' : '' ?>
-                        <?= htmlspecialchars($gsLabels[$gs]['label']) ?>
-                    </div>
+                    <span class="signal-pill signal-pill--<?= htmlspecialchars($gs) ?>">
+                        <?= $gsLabels[$gs]['stars'] ? htmlspecialchars($gsLabels[$gs]['stars']) . ' ' : '' ?><?= htmlspecialchars($gsLabels[$gs]['label']) ?>
+                    </span>
                 <?php endif; ?>
 
                 <div class="dual-cvs-header">
                     <!-- Swing score -->
-                    <div class="cvs-mode-tile cvs-mode-tile--swing">
-                        <div class="cvs-mode-tile__label"><?= htmlspecialchars($modeSwing['label'] ?? 'Swing') ?></div>
-                        <div class="cvs-mode-tile__score"><?= number_format((float)($swing['cvs'] ?? 0), 1) ?></div>
-                        <div class="cvs-mode-tile__reco">
-                            <span class="cvs-badge"><?= htmlspecialchars($swing['recommendation'] ?? '') ?></span>
-                        </div>
+                    <div class="score-tile score-tile--swing <?= $tileLevelClass((float)($swing['cvs'] ?? 0)) ?>">
+                        <span class="score-tile__mode"><?= htmlspecialchars($modeSwing['label'] ?? 'Swing') ?></span>
+                        <span class="score-tile__value"><?= number_format((float)($swing['cvs'] ?? 0), 1) ?></span>
+                        <span class="score-tile__reco"><?= htmlspecialchars($swing['recommendation'] ?? '') ?></span>
                     </div>
 
                     <!-- Fundamental score -->
-                    <div class="cvs-mode-tile cvs-mode-tile--fund">
-                        <div class="cvs-mode-tile__label"><?= htmlspecialchars($modeFund['label'] ?? 'Fundamentalny') ?></div>
-                        <div class="cvs-mode-tile__score"><?= number_format((float)($fund['cvs'] ?? 0), 1) ?></div>
-                        <div class="cvs-mode-tile__reco">
-                            <span class="cvs-badge cvs-badge--fund"><?= htmlspecialchars($fund['recommendation'] ?? '') ?></span>
-                        </div>
+                    <div class="score-tile score-tile--fund <?= $tileLevelClass((float)($fund['cvs'] ?? 0)) ?>">
+                        <span class="score-tile__mode"><?= htmlspecialchars($modeFund['label'] ?? 'Fundamentalny') ?></span>
+                        <span class="score-tile__value"><?= number_format((float)($fund['cvs'] ?? 0), 1) ?></span>
+                        <span class="score-tile__reco"><?= htmlspecialchars($fund['recommendation'] ?? '') ?></span>
                     </div>
                 </div>
 
@@ -140,9 +141,11 @@
                             <td><?= htmlspecialchars($row['label']) ?></td>
                             <td>
                                 <?php if ($score !== null): ?>
-                                <div class="pillar-bar">
-                                    <div class="pillar-bar__fill" style="width:<?= min(100, round((float)$score)) ?>%"></div>
-                                    <span><?= number_format((float)$score, 1) ?></span>
+                                <div class="progress-bar">
+                                    <div class="progress-bar__track">
+                                        <div class="progress-bar__fill" style="width:<?= min(100, round((float)$score)) ?>%"></div>
+                                    </div>
+                                    <span style="font-size:var(--text-xs);color:var(--c-muted);min-width:2.5rem;"><?= number_format((float)$score, 1) ?></span>
                                 </div>
                                 <?php else: ?>—<?php endif; ?>
                             </td>
@@ -361,8 +364,8 @@
                             {
                                 label: 'Fundamentalny',
                                 data: [ps.valuation ?? 0, ps.momentum_fund ?? 0, ps.quality ?? 0],
-                                borderColor:     'rgba(234, 179, 8, 0.9)',
-                                backgroundColor: 'rgba(234, 179, 8, 0.08)',
+                                borderColor:     'rgba(250, 204, 21, 0.9)',
+                                backgroundColor: 'rgba(250, 204, 21, 0.08)',
                                 pointRadius: 3,
                                 borderWidth: 2,
                             },
@@ -694,142 +697,3 @@
     <p><a href="/dashboard">&larr; Powrót do panelu</a></p>
 </section>
 
-<style>
-/* Detail heading with watchlist button */
-.analysis-detail__heading {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    flex-wrap: wrap;
-    margin-bottom: .25rem;
-}
-.analysis-detail__heading h1 { margin-bottom: 0; }
-
-/* Dual CVS tiles */
-.dual-cvs-header {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-    flex-wrap: wrap;
-}
-.cvs-mode-tile {
-    flex: 1;
-    min-width: 140px;
-    background: var(--c-bg);
-    border: 1px solid var(--c-border);
-    border-radius: 8px;
-    padding: 1rem;
-    text-align: center;
-}
-.cvs-mode-tile--swing  { border-color: rgba(79, 142, 247, .4); }
-.cvs-mode-tile--fund   { border-color: rgba(234, 179, 8, .4); }
-.cvs-mode-tile__label  { font-size: .8rem; color: var(--c-muted); margin-bottom: .35rem; }
-.cvs-mode-tile__score  { font-size: 2.2rem; font-weight: 700; }
-.cvs-mode-tile--swing .cvs-mode-tile__score { color: var(--c-primary); }
-.cvs-mode-tile--fund  .cvs-mode-tile__score { color: #eab308; }
-.cvs-mode-tile__reco   { margin-top: .35rem; }
-
-.cvs-badge--fund { background: rgba(234, 179, 8, .2); color: #eab308; }
-
-/* Golden signal banner */
-.golden-signal {
-    font-size: .9rem;
-    padding: .4rem 1rem;
-    border-radius: 99px;
-    display: inline-block;
-    margin-bottom: 1rem;
-}
-.golden-signal--strong    { background: rgba(34,197,94,.12);  color: #22c55e; }
-.golden-signal--watchlist { background: rgba(234,179,8,.12);  color: #eab308; }
-.golden-signal--momentum  { background: rgba(79,142,247,.12); color: var(--c-primary); }
-
-/* Radar */
-.detail-radar-wrapper { display: flex; flex-direction: column; align-items: center; margin: 1.5rem 0; }
-.detail-radar-legend  { font-size: .8rem; color: var(--c-muted); margin-top: .5rem; }
-.legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
-.legend-dot--swing { background: #4f8ef7; }
-.legend-dot--fund  { background: #eab308; }
-
-/* Raw data */
-.raw-data { margin-top: 1.5rem; }
-.raw-data summary { cursor: pointer; font-size: .85rem; color: var(--c-muted); margin-bottom: .5rem; }
-.raw-table td:first-child { color: var(--c-muted); font-size: .82rem; width: 55%; }
-
-/* Price chart section */
-.price-chart-section {
-    background: var(--c-card);
-    border: 1px solid var(--c-border);
-    border-radius: 10px;
-    padding: .75rem 1rem 1rem;
-    margin-bottom: 1.25rem;
-    height: 220px;
-    position: relative;
-}
-
-/* Forecast card (S-09) */
-.forecast-card { border-color: rgba(79, 142, 247, .25); }
-.forecast-block { margin-top: 1.5rem; }
-.forecast-block:first-of-type { margin-top: .5rem; }
-.forecast-block__head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    flex-wrap: wrap;
-    margin-bottom: .75rem;
-}
-.forecast-block h3 { margin: 0 0 .75rem; }
-.forecast-block__head h3 { margin: 0; }
-
-.upside-badge {
-    font-size: .85rem;
-    font-weight: 600;
-    padding: .25rem .7rem;
-    border-radius: 99px;
-}
-.upside-badge--pos { background: rgba(52, 199, 123, .15); color: var(--c-success); }
-.upside-badge--neg { background: rgba(224, 85, 85, .15);  color: var(--c-danger); }
-
-.forecast-targets {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-    gap: .75rem;
-}
-.forecast-tile {
-    background: var(--c-bg);
-    border: 1px solid var(--c-border);
-    border-radius: 8px;
-    padding: .75rem;
-    text-align: center;
-}
-.forecast-tile__label { font-size: .75rem; color: var(--c-muted); margin-bottom: .3rem; }
-.forecast-tile__value { font-size: 1.35rem; font-weight: 700; }
-.forecast-note { font-size: .8rem; color: var(--c-muted); margin-top: .6rem; }
-
-.consensus-label {
-    font-size: .9rem;
-    font-weight: 600;
-    color: var(--c-primary);
-}
-.consensus-label small { color: var(--c-muted); font-weight: 400; }
-
-.consensus-bars { list-style: none; display: flex; flex-direction: column; gap: .4rem; }
-.consensus-bar { display: flex; align-items: center; gap: .6rem; }
-.consensus-bar__label { flex: 0 0 110px; font-size: .82rem; color: var(--c-muted); }
-.consensus-bar__track {
-    flex: 1;
-    height: 14px;
-    background: var(--c-bg);
-    border-radius: 7px;
-    overflow: hidden;
-}
-.consensus-bar__fill { display: block; height: 100%; border-radius: 7px; }
-.consensus-bar__fill--sb { background: rgba(22,163,74,0.85); }
-.consensus-bar__fill--b  { background: rgba(74,222,128,0.85); }
-.consensus-bar__fill--h  { background: rgba(234,179,8,0.85); }
-.consensus-bar__fill--s  { background: rgba(249,115,22,0.85); }
-.consensus-bar__fill--ss { background: rgba(239,68,68,0.85); }
-.consensus-bar__count { flex: 0 0 28px; text-align: right; font-size: .82rem; font-weight: 600; }
-
-.forecast-chart-wrap { position: relative; height: 240px; }
-</style>
