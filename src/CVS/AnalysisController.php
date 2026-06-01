@@ -9,6 +9,9 @@ use CVS\Api\FinancialDataFetcher;
 use CVS\Core\Request;
 use CVS\Core\Response;
 use CVS\History\HistoryRepository;
+use CVS\Pro\AiUsageRepository;
+use CVS\Pro\ProGate;
+use CVS\Pro\ProRepository;
 use CVS\Watchlist\WatchlistRepository;
 
 /**
@@ -131,12 +134,17 @@ class AnalysisController
         $userId    = (int) $_SESSION['user_id'];
         $isWatched = $this->watchlist->isWatched($userId, $ticker);
 
+        $aiConfig = require dirname(__DIR__, 2) . '/config/ai.php';
+        $gate     = new ProGate(new ProRepository(), new AiUsageRepository(), $aiConfig);
+
         Response::view('analysis', [
-            'ticker'     => $ticker,
-            'result'     => $result->toArray(),
-            'financials' => $financials,   // S-03: raw data for detail panel
-            'isWatched'  => $isWatched,    // S-06: watchlist toggle button state
-            'error'      => null,
+            'ticker'          => $ticker,
+            'result'          => $result->toArray(),
+            'financials'      => $financials,         // S-03: raw data for detail panel
+            'isWatched'       => $isWatched,          // S-06: watchlist toggle button state
+            'canGenerateAi'   => $gate->canGenerate($userId),  // F-05: PRO gate for S-01
+            'aiUsage'         => $gate->getUsage($userId),     // F-05: usage counts for S-01
+            'error'           => null,
         ]);
     }
 
