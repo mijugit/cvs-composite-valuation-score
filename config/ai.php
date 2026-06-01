@@ -41,7 +41,9 @@ return [
 
     // PRO access limits — number of AI generation calls per user.
     'pro' => [
-        'daily_limit'   => (int) ($_ENV['AI_PRO_DAILY_LIMIT']   ?? 10),
-        'monthly_limit' => (int) ($_ENV['AI_PRO_MONTHLY_LIMIT'] ?? 100),
+        'daily_limit'        => (int) ($_ENV['AI_PRO_DAILY_LIMIT']        ?? 10),
+        'monthly_limit'      => (int) ($_ENV['AI_PRO_MONTHLY_LIMIT']      ?? 100),
+        'refresh_min_hours'  => (int) ($_ENV['AI_PRO_REFRESH_MIN_HOURS']  ?? 24),
+        'cache_fresh_days'   => (int) ($_ENV['AI_PRO_CACHE_FRESH_DAYS']   ?? 7),
     ],
 ];
