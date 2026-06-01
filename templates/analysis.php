@@ -680,7 +680,7 @@
                 var closes  = <?= json_encode(array_values($financials['monthly_closes'])) ?>;
                 var spyData = <?= json_encode(array_values($financials['spy_closes'] ?? [])) ?>;
                 var ticker  = <?= json_encode($ticker) ?>;
-                var n = 3;
+                var n = 12;
 
                 // Take last N points
                 var tickerRaw = closes.slice(-n);
