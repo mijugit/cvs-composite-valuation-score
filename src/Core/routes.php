@@ -12,10 +12,12 @@ declare(strict_types=1);
 use CVS\Auth\AuthController;
 use CVS\CVS\AnalysisController;
 use CVS\Watchlist\WatchlistController;
+use CVS\Pro\ProController;
 
 $auth      = new AuthController();
 $analysis  = new AnalysisController();
 $watchlist = new WatchlistController();
+$pro       = new ProController();
 
 // ------------------------------------------------------------------
 // Public routes
@@ -50,3 +52,13 @@ $router->get('/styleguide', function ($req) {
     AuthController::requireAuth();
     \CVS\Core\Response::view('styleguide');
 });
+
+// ------------------------------------------------------------------
+// PRO access (F-05)
+// ------------------------------------------------------------------
+
+$router->get('/admin/pro',                fn($req) => $pro->index($req));
+$router->post('/admin/pro',               fn($req) => $pro->store($req));
+$router->post('/admin/pro/revoke',        fn($req) => $pro->revoke($req));
+$router->post('/admin/pro/activate-code', fn($req) => $pro->activateCode($req));
+$router->post('/pro/activate',            fn($req) => $pro->activate($req));
