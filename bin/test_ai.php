@@ -21,6 +21,10 @@ if (file_exists($envFile)) {
 }
 
 $aiConfig = require ROOT_PATH . '/config/ai.php';
+// Extend timeouts for CLI test
+$aiConfig['timeout']       = 60;
+$aiConfig['total_timeout'] = 90;
+$aiConfig['max_retries']   = 1;
 
 use CVS\Ai\AiDivergenceService;
 use CVS\Ai\ClaudeClientFactory;
