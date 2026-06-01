@@ -26,16 +26,18 @@ class AiDivergenceService
     /**
      * Generate the divergence analysis narrative.
      *
-     * @param array<string, mixed> $cvsResult   CVSResult::toArray()
-     * @param array<string, mixed> $financials  FinancialDataFetcher output
+     * @param array<string, mixed> $cvsResult    CVSResult::toArray()
+     * @param array<string, mixed> $financials   FinancialDataFetcher output
+     * @param float|null           $cvsFairPrice Sector-parity implied price (null = not calculable)
      */
     public function generate(
         string $ticker,
         array  $cvsResult,
-        array  $financials
+        array  $financials,
+        ?float $cvsFairPrice = null
     ): AiResult {
         $system  = $this->buildSystemPrompt();
-        $message = $this->buildUserMessage($ticker, $cvsResult, $financials);
+        $message = $this->buildUserMessage($ticker, $cvsResult, $financials, $cvsFairPrice);
 
         return $this->client->sendMessage(
             [['role' => 'user', 'content' => $message]],
@@ -66,6 +68,11 @@ Explain what the CVS Swing and Fundamental scores indicate. Interpret the pillar
 breakdown — which pillars are strong or weak, and how they drive the overall score.
 Connect the pillar scores to their real-world meaning (e.g., high Valuation pillar
 means the stock looks cheap relative to sector peers on EV/FCF basis).
+If CVS Model Implied Fair Value is provided, explain briefly what it means:
+it is the theoretical stock price at which the company's EV/FCF multiple would equal
+the sector median — i.e., the "sector-parity price" derived from the model's own
+inputs (Forward FCF², Net Debt, Shares Outstanding). Note whether the current price
+is at a premium or discount to this implied fair value.
 
 ## 2. Opinia rynku (analitycy)
 Summarize what analysts collectively think: their consensus recommendation, price
@@ -77,7 +84,9 @@ Explain concisely WHY the CVS model and analysts disagree. Identify the specific
 pillar or metric driving the gap. For example: the model may score Valuation high
 (cheap on EV/FCF) while analysts see a Growth risk that lowers their targets —
 or Momentum is strong but analysts expect mean-reversion. Be specific and grounded
-in the numbers provided.
+in the numbers provided. If CVS Fair Value is available, reference it when discussing
+the valuation gap: compare the CVS implied fair value to analyst mean price target
+to show where each methodology places "fair" for this stock.
 
 ## 4. Komu wierzyć i w jakim horyzoncie
 Provide a practical take: under what conditions and in which time horizon would
@@ -102,7 +111,8 @@ SYSTEM;
     private function buildUserMessage(
         string $ticker,
         array  $cvsResult,
-        array  $financials
+        array  $financials,
+        ?float $cvsFairPrice = null
     ): string {
         $swing   = $cvsResult['swing']       ?? [];
         $fund    = $cvsResult['fundamental'] ?? [];
@@ -134,6 +144,34 @@ SYSTEM;
         $lines[] = "- Momentum - Swing profile: {$pMomSwing}/100";
         $lines[] = "- Momentum - Fundamental profile: {$pMomFund}/100";
         $lines[] = "- Quality (gross margin, leverage, growth): {$pQual}/100";
+        $lines[] = '';
+        $lines[] = 'CVS MODEL IMPLIED FAIR VALUE (Sector-Parity Price):';
+        if ($cvsFairPrice !== null) {
+            $curPrice  = (float) ($financials['current_price'] ?? 0);
+            $fairFmt   = '$' . number_format($cvsFairPrice, 2);
+            $lines[]   = "- Fair Value: {$fairFmt}";
+            if ($curPrice > 0) {
+                $premium = (($curPrice - $cvsFairPrice) / $cvsFairPrice) * 100;
+                $dir     = $premium >= 0 ? 'premium' : 'discount';
+                $lines[] = sprintf(
+                    '- Current price vs Fair Value: %s %.1f%% %s (current=$%.2f)',
+                    $dir === 'premium' ? '+' : '',
+                    $premium,
+                    $dir,
+                    $curPrice
+                );
+            }
+            $bm = $this->getSectorBenchmark($financials);
+            if ($bm !== null) {
+                $lines[] = '- Calculation method: Fair EV = sector_median_EV/FCF ('
+                    . $bm['median_ev_fcf'] . 'x) × Forward_FCF²; '
+                    . 'Fair Price = (Fair EV - Net Debt) / Shares Outstanding';
+                $lines[] = '- This represents the price at which the stock would be fairly valued '
+                    . 'relative to its sector peer median on an EV/FCF basis (Valuation pillar = 50/100).';
+            }
+        } else {
+            $lines[] = '- Not calculable (insufficient FCF or growth data for this company).';
+        }
         $lines[] = '';
         $lines[] = 'ANALYST CONSENSUS:';
 
@@ -176,6 +214,18 @@ SYSTEM;
         }
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * @param array<string, mixed> $financials
+     * @return array<string, mixed>|null
+     */
+    private function getSectorBenchmark(array $financials): ?array
+    {
+        $sector     = (string) ($financials['sector'] ?? 'DEFAULT');
+        $benchmarks = require dirname(__DIR__, 2) . '/config/cvs-weights.php';
+        $bms        = $benchmarks['benchmarks'] ?? [];
+        return $bms[$sector] ?? $bms['DEFAULT'] ?? null;
     }
 
     private function analystConsensusLabel(float $mean): string
