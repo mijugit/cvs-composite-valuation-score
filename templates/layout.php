@@ -6,6 +6,7 @@
     <title>CVS — Composite Valuation Score</title>
     <meta name="csrf-token" content="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
     <link rel="stylesheet" href="/css/tokens.css">
+    <link rel="stylesheet" href="/css/components.css">
     <link rel="stylesheet" href="/css/app.css">
 </head>
 <body>
