@@ -166,12 +166,17 @@
                 }
                 $growth = $growth !== null ? min($growth, $maxGrowthPct) : null;
 
-                if ($fcf > 0 && $growth !== null && $medEvFcf > 0 && $shares > 0) {
+                $quoteCcy    = (string) ($financials['currency']           ?? 'USD');
+                $financialCcy = (string) ($financials['financial_currency'] ?? $quoteCcy);
+                $currencyOK  = ($quoteCcy === '' || $financialCcy === '' || $quoteCcy === $financialCcy);
+
+                if ($fcf > 0 && $growth !== null && $medEvFcf > 0 && $shares > 0 && $currencyOK) {
                     $fwdFcf      = $fcf * (1 + $growth / 100) ** 2;
                     $fairEv      = $medEvFcf * $fwdFcf;
-                    $fairMktCap  = $fairEv - $debt + $cash;
-                    $fairPriceRaw = $fairMktCap / $shares;
-                    if ($fairPriceRaw > 0) {
+                    $fairPriceRaw = ($fairEv - $debt + $cash) / $shares;
+                    $curPrice    = (float) ($financials['current_price'] ?? 0);
+                    // Sanity bounds: suppress if outside 0.05× – 10× current price.
+                    if ($fairPriceRaw > 0 && ($curPrice <= 0 || ($fairPriceRaw / $curPrice >= 0.05 && $fairPriceRaw / $curPrice <= 10.0))) {
                         $cvsFairPrice = round($fairPriceRaw, 2);
                     }
                 }

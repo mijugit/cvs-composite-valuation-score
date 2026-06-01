@@ -196,10 +196,32 @@ class AiAnalysisController
             return null;
         }
 
+        // Currency mismatch guard: financials in TWD/EUR/etc. but price in USD → skip.
+        $quoteCurrency    = (string) ($financials['currency']           ?? 'USD');
+        $financialCurrency = (string) ($financials['financial_currency'] ?? $quoteCurrency);
+        if ($quoteCurrency !== '' && $financialCurrency !== '' && $quoteCurrency !== $financialCurrency) {
+            return null;
+        }
+
         $fwdFcf = $fcf * (1 + $growth / 100) ** 2;
         $fairEv = $medEvFcf * $fwdFcf;
         $price  = ($fairEv - $debt + $cash) / $shares;
 
-        return $price > 0 ? round($price, 2) : null;
+        if ($price <= 0) {
+            return null;
+        }
+
+        // Sanity bounds: fair value must be within 0.05× – 10× current price.
+        // Values outside this range indicate a data quality problem (currency mismatch,
+        // unusual share structure, stale FCF) — suppress rather than mislead.
+        $currentPrice = (float) ($financials['current_price'] ?? 0);
+        if ($currentPrice > 0) {
+            $ratio = $price / $currentPrice;
+            if ($ratio > 10.0 || $ratio < 0.05) {
+                return null;
+            }
+        }
+
+        return round($price, 2);
     }
 }

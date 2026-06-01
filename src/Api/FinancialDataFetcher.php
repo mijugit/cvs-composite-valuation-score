@@ -405,6 +405,10 @@ class FinancialDataFetcher
             // Company metadata
             'sector'                     => is_string($ap['sector'] ?? null) ? $ap['sector'] : null,
 
+            // Currency — needed for fair-value guard (financial_currency may differ from quote currency)
+            'currency'           => is_string($sd['currency']  ?? null) ? $sd['currency']  : null,
+            'financial_currency' => is_string($fin['financialCurrency'] ?? null) ? $fin['financialCurrency'] : null,
+
             // Company profile (assetProfile — already fetched, zero extra cost)
             'long_name'        => is_string($ap['longName']             ?? null) ? $ap['longName']             : null,
             'industry'         => is_string($ap['industry']             ?? null) ? $ap['industry']             : null,
