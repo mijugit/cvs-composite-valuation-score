@@ -49,6 +49,9 @@ class AiAnalysisController
 
     public function generate(Request $req): void
     {
+        // AI generation can take up to 60s — extend PHP execution limit.
+        @set_time_limit(120);
+
         AuthController::requireAuth();
 
         if (!$req->verifyCsrf()) {

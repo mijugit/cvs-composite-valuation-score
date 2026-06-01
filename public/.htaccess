@@ -1,6 +1,11 @@
 Options -Indexes
 RewriteEngine On
 
+# Increase PHP execution time for AI generation endpoint (can take 30-60s)
+<IfModule mod_php.c>
+    php_value max_execution_time 120
+</IfModule>
+
 # Redirect all requests to index.php (front controller)
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
