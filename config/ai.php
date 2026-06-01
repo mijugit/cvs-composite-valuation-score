@@ -38,4 +38,10 @@ return [
 
     // Exponential backoff base (ms): delay = base * 2^attempt. Set 0 in tests.
     'retry_base_delay_ms' => (int) ($_ENV['AI_RETRY_BASE_DELAY_MS'] ?? 500),
+
+    // PRO access limits — number of AI generation calls per user.
+    'pro' => [
+        'daily_limit'   => (int) ($_ENV['AI_PRO_DAILY_LIMIT']   ?? 10),
+        'monthly_limit' => (int) ($_ENV['AI_PRO_MONTHLY_LIMIT'] ?? 100),
+    ],
 ];

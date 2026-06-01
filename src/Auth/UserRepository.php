@@ -61,7 +61,7 @@ class UserRepository
     public function findById(int $id): ?array
     {
         $stmt = $this->db->prepare(
-            'SELECT id, email FROM users WHERE id = ? LIMIT 1'
+            'SELECT id, email, is_admin FROM users WHERE id = ? LIMIT 1'
         );
         $stmt->execute([$id]);
         $row = $stmt->fetch();
