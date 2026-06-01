@@ -69,6 +69,48 @@
             $modeSwing = $cfgFile['modes']['swing']       ?? [];
             $modeFund  = $cfgFile['modes']['fundamental'] ?? [];
 
+            // CVS Fair Value: price at which Valuation pillar = 50 (sector-median parity).
+            // Fair EV = median_ev_fcf × forward_FCF; Fair Price = (Fair EV - debt + cash) / shares.
+            $cvsFairPrice = null;
+            if (!empty($financials)) {
+                $sector      = (string) ($financials['sector'] ?? 'DEFAULT');
+                $benchmarks  = $cfgFile['benchmarks'] ?? [];
+                $bm          = $benchmarks[$sector] ?? $benchmarks['DEFAULT'] ?? [];
+                $medEvFcf    = (float) ($bm['median_ev_fcf'] ?? 0);
+                $maxGrowthPct= (float) ($bm['max_growth']    ?? 20);
+
+                $fcf    = (float) ($financials['free_cash_flow']          ?? 0);
+                if ($fcf <= 0) $fcf = (float) ($financials['free_cash_flow_adjusted'] ?? 0);
+
+                $debt   = (float) ($financials['total_debt']  ?? 0);
+                $cash   = (float) ($financials['cash']        ?? 0);
+                $shares = (float) ($financials['shares_outstanding'] ?? 0);
+
+                // Growth: implied EPS or revenue growth, capped to sector max.
+                $fwdEps   = (float) ($financials['forward_eps']  ?? 0);
+                $trailEps = (float) ($financials['trailing_eps'] ?? 0);
+                $growth   = null;
+                if ($fwdEps > 0 && $trailEps > 0) {
+                    $implied = ($fwdEps / $trailEps - 1) * 100;
+                    if ($implied > 0 && $implied <= 200) $growth = $implied;
+                }
+                if ($growth === null) {
+                    $rg = (float) ($financials['revenue_growth'] ?? 0);
+                    if ($rg > 0) $growth = $rg * 100;
+                }
+                $growth = $growth !== null ? min($growth, $maxGrowthPct) : null;
+
+                if ($fcf > 0 && $growth !== null && $medEvFcf > 0 && $shares > 0) {
+                    $fwdFcf      = $fcf * (1 + $growth / 100) ** 2;
+                    $fairEv      = $medEvFcf * $fwdFcf;
+                    $fairMktCap  = $fairEv - $debt + $cash;
+                    $fairPriceRaw = $fairMktCap / $shares;
+                    if ($fairPriceRaw > 0) {
+                        $cvsFairPrice = round($fairPriceRaw, 2);
+                    }
+                }
+            }
+
             $tileLevelClass = static function (float $cvs): string {
                 if ($cvs >= 72) return 'score-tile--strong';
                 if ($cvs >= 42) return 'score-tile--neutral';
@@ -283,6 +325,14 @@
                             <div class="forecast-tile__value">$<?= number_format((float) $tVal, 2) ?></div>
                         </div>
                         <?php endforeach; ?>
+                        <?php if ($cvsFairPrice !== null): ?>
+                        <div class="forecast-tile forecast-tile--cvs">
+                            <div class="forecast-tile__label">CVS Fair Value</div>
+                            <div class="forecast-tile__value" style="color:var(--c-fund);">
+                                $<?= number_format($cvsFairPrice, 2) ?>
+                            </div>
+                        </div>
+                        <?php endif; ?>
                     </div>
                     <?php if ($fcNum !== null): ?>
                         <p class="forecast-note">Na podstawie <?= (int) $fcNum ?> ocen analityków<?php if ($curPrice !== null): ?> · cena bieżąca $<?= number_format((float) $curPrice, 2) ?><?php endif; ?>.</p>
@@ -926,6 +976,19 @@
                         borderDash: [5, 3],
                         spanGaps: false,
                     },
+                <?php if ($cvsFairPrice !== null): ?>
+                    {
+                        label: 'CVS Fair Value',
+                        data: fan(<?= json_encode($cvsFairPrice) ?>),
+                        borderColor: 'rgba(250, 204, 21, 0.95)',
+                        backgroundColor: 'transparent',
+                        borderWidth: 2,
+                        pointRadius: 4,
+                        pointBackgroundColor: 'rgba(250, 204, 21, 0.95)',
+                        borderDash: [8, 4],
+                        spanGaps: false,
+                    },
+                <?php endif; ?>
                 ];
 
                 new Chart(ctx.getContext('2d'), {
