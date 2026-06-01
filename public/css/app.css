@@ -2,22 +2,9 @@
    CVS — Composite Valuation Score | Base stylesheet
    ============================================================ */
 
-/* --- Reset & variables ------------------------------------ */
+/* --- Reset & base ----------------------------------------- */
+/* Design tokens live in tokens.css (loaded before this file). */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-:root {
-    --c-bg:        #0f1117;
-    --c-surface:   #1a1d27;
-    --c-border:    #2a2d3a;
-    --c-primary:   #4f8ef7;
-    --c-success:   #34c77b;
-    --c-warn:      #f5a623;
-    --c-danger:    #e05555;
-    --c-text:      #dde1f0;
-    --c-muted:     #7a7f99;
-    --radius:      8px;
-    --shadow:      0 2px 12px rgba(0,0,0,.4);
-}
 
 html { font-size: 16px; }
 body {
@@ -248,8 +235,8 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
 /* Swing badge: primary blue accent */
 .score-badge--swing .score-badge__value { color: var(--c-primary); }
 
-/* Fund badge: gold accent */
-.score-badge--fund  .score-badge__value { color: #eab308; }
+/* Fund badge: yellow accent */
+.score-badge--fund  .score-badge__value { color: var(--c-fund); }
 
 /* Per-score-level border tint on the badge */
 .score-badge.score-badge--strong { border-color: rgba(52, 199, 123, .35); }
@@ -265,7 +252,7 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
     flex-shrink: 0;
 }
 .result-card__signal--strong    { background: rgba(34, 197, 94, .15);  color: #22c55e; }
-.result-card__signal--watchlist { background: rgba(234, 179, 8, .15);  color: #eab308; }
+.result-card__signal--watchlist { background: rgba(250, 204, 21, .15);  color: var(--c-fund); }
 .result-card__signal--momentum  { background: rgba(79, 142, 247, .15); color: var(--c-primary); }
 
 /* Fail label inside gate-rejected card */

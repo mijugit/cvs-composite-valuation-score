@@ -1,0 +1,56 @@
+/* ============================================================
+   CVS — Design Tokens
+   Single source of truth: colours, spacing, type, shape, shadow.
+   Load order: tokens.css → components.css → app.css
+   ============================================================ */
+
+:root {
+    /* --- Backgrounds (navy dark) --- */
+    --c-bg:        #07101e;
+    --c-surface:   #0e1b2f;
+    --c-surface-2: #152639;
+    --c-border:    #1c3048;
+
+    /* --- Text --- */
+    --c-text:  #dce8f5;
+    --c-muted: #5a7595;
+
+    /* --- Interactive (blue) --- */
+    --c-primary: #4090e0;
+
+    /* --- CVS accent: yellow (fund score, golden signals) --- */
+    --c-fund: #facc15;
+
+    /* --- Semantic --- */
+    --c-success: #22c55e;
+    --c-warn:    #f59e0b;
+    --c-danger:  #ef4444;
+
+    /* --- Spacing scale --- */
+    --space-1: .25rem;   /*  4px */
+    --space-2: .5rem;    /*  8px */
+    --space-3: .75rem;   /* 12px */
+    --space-4: 1rem;     /* 16px */
+    --space-5: 1.5rem;   /* 24px */
+    --space-6: 2rem;     /* 32px */
+
+    /* --- Typography scale --- */
+    --text-xs:   .75rem;
+    --text-sm:   .875rem;
+    --text-base: 1rem;
+    --text-lg:   1.125rem;
+    --text-xl:   1.25rem;
+    --text-2xl:  1.5rem;
+    --leading-tight:  1.25;
+    --leading-normal: 1.6;
+
+    /* --- Shape --- */
+    --radius:      8px;
+    --radius-sm:   4px;
+    --radius-lg:   12px;
+    --radius-pill: 999px;
+
+    /* --- Shadow --- */
+    --shadow:    0 2px 12px rgba(0,0,0,.5);
+    --shadow-lg: 0 8px 32px rgba(0,0,0,.6);
+}
