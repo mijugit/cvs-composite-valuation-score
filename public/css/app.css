@@ -408,8 +408,37 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
 }
 .dual-cvs-header .score-tile { flex: 1; min-width: 140px; text-align: center; }
 
-.detail-radar-wrapper { display: flex; flex-direction: column; align-items: center; margin: 1.5rem 0; max-width: 260px; margin-left: auto; margin-right: auto; }
+/* Radar + price chart side-by-side row */
+.radar-price-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.5rem;
+    margin: 1.5rem 0;
+    flex-wrap: wrap;
+}
+.detail-radar-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 0 0 220px;
+    max-width: 220px;
+}
 .detail-radar-legend  { font-size: var(--text-xs); color: var(--c-muted); margin-top: .5rem; }
+
+.price-chart-compact {
+    flex: 1;
+    min-width: 200px;
+    height: 220px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+.price-chart-compact__label {
+    font-size: var(--text-xs);
+    color: var(--c-muted);
+    margin-bottom: .4rem;
+}
+.price-chart-compact canvas { flex: 1; }
 .legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
 .legend-dot--swing { background: var(--c-primary); }
 .legend-dot--fund  { background: var(--c-fund); }

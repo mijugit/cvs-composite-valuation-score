@@ -76,11 +76,6 @@
             };
             ?>
 
-            <?php if (!empty($financials['monthly_closes'])): ?>
-            <div class="price-chart-section">
-                <canvas id="price-chart"></canvas>
-            </div>
-            <?php endif; ?>
 
             <!-- Dual CVS score header -->
             <div class="card card--result">
@@ -106,13 +101,21 @@
                     </div>
                 </div>
 
-                <!-- Radar chart with two lines -->
-                <div class="detail-radar-wrapper">
-                    <canvas id="detail-radar" width="300" height="300"></canvas>
-                    <div class="detail-radar-legend">
-                        <span class="legend-dot legend-dot--swing"></span> Swing &nbsp;
-                        <span class="legend-dot legend-dot--fund"></span> Fundamentalny
+                <!-- Radar + Price chart side-by-side -->
+                <div class="radar-price-row">
+                    <div class="detail-radar-wrapper">
+                        <canvas id="detail-radar" width="300" height="300"></canvas>
+                        <div class="detail-radar-legend">
+                            <span class="legend-dot legend-dot--swing"></span> Swing &nbsp;
+                            <span class="legend-dot legend-dot--fund"></span> Fundamentalny
+                        </div>
                     </div>
+                    <?php if (!empty($financials['monthly_closes'])): ?>
+                    <div class="price-chart-compact">
+                        <div class="price-chart-compact__label">Kurs akcji — ostatnie 3 miesiące</div>
+                        <canvas id="price-chart"></canvas>
+                    </div>
+                    <?php endif; ?>
                 </div>
 
                 <!-- Pillar table with weights -->
@@ -677,7 +680,7 @@
                 var closes  = <?= json_encode(array_values($financials['monthly_closes'])) ?>;
                 var spyData = <?= json_encode(array_values($financials['spy_closes'] ?? [])) ?>;
                 var ticker  = <?= json_encode($ticker) ?>;
-                var n = 12;
+                var n = 3;
 
                 // Take last N points
                 var tickerRaw = closes.slice(-n);
