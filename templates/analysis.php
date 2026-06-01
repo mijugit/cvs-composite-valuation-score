@@ -373,7 +373,18 @@
 
                 <?php if (!empty($cachedAi)): ?>
                 <div class="ai-narrative" id="ai-result">
-                    <?= nl2br(htmlspecialchars((string) $cachedAi['content'])) ?>
+                    <?php
+                    // Render cached AI narrative: convert section headers and paragraphs.
+                    $raw  = htmlspecialchars((string) $cachedAi['content']);
+                    // "## N. Title" → <h3>
+                    $html = preg_replace('/^## (\d+\. .+)$/m', '<h3 class="ai-narrative__section">$1</h3>', $raw);
+                    // "N. Title" at start of line (without ##) → <h3>
+                    $html = preg_replace('/^(\d+\. [^\n]{5,60})$/m', '<h3 class="ai-narrative__section">$1</h3>', $html ?? $raw);
+                    // Blank lines → paragraph breaks
+                    $html = preg_replace('/\n{2,}/', '</p><p>', $html ?? $raw);
+                    $html = str_replace("\n", '<br>', $html ?? $raw);
+                    echo '<p>' . $html . '</p>';
+                    ?>
                 </div>
                 <?php elseif (empty($canGenerateAi)): ?>
                 <p style="color:var(--c-muted);font-size:var(--text-sm);">
