@@ -73,7 +73,6 @@
         if (e.target === this) this.hidden = true;
     });
     </script>
-    <?php endif; ?>
 
     <?php if (!empty($error)): ?>
         <p class="alert alert--error"><?= htmlspecialchars($error) ?></p>
