@@ -62,7 +62,9 @@ a:hover { text-decoration: underline; }
 
 /* --- Card ------------------------------------------------- */
 .card {
-    background: var(--c-surface);
+    background: rgba(14, 27, 47, 0.72);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
     border: 1px solid var(--c-border);
     border-radius: var(--radius);
     padding: 1.5rem;
