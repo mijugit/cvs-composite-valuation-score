@@ -8,6 +8,7 @@
             <?php endif; ?>
         </h1>
         <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+            <a href="/track-record/<?= urlencode($ticker) ?>" class="btn btn--ghost btn--sm">Historia CVS</a>
             <button id="btn-company-info" class="btn btn--ghost btn--sm">
                 Informacje o spółce
             </button>

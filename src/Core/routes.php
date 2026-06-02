@@ -12,13 +12,15 @@ declare(strict_types=1);
 use CVS\Ai\AiAnalysisController;
 use CVS\Auth\AuthController;
 use CVS\CVS\AnalysisController;
+use CVS\TrackRecord\TrackRecordController;
 use CVS\Watchlist\WatchlistController;
 use CVS\Pro\ProController;
 
-$auth      = new AuthController();
-$analysis  = new AnalysisController();
-$watchlist = new WatchlistController();
-$pro       = new ProController();
+$auth        = new AuthController();
+$analysis    = new AnalysisController();
+$watchlist   = new WatchlistController();
+$pro         = new ProController();
+$trackRecord = new TrackRecordController();
 $aiConfig   = require dirname(__DIR__, 2) . '/config/ai.php';
 $aiAnalysis = new AiAnalysisController($aiConfig);
 
@@ -71,3 +73,10 @@ $router->post('/pro/activate',            fn($req) => $pro->activate($req));
 // ------------------------------------------------------------------
 
 $router->post('/analysis/{ticker}/generate-ai', fn($req) => $aiAnalysis->generate($req));
+
+// ------------------------------------------------------------------
+// Track Record (S-02)
+// ------------------------------------------------------------------
+
+$router->get('/track-record',          fn($req) => $trackRecord->index($req));
+$router->get('/track-record/{ticker}', fn($req) => $trackRecord->show($req));
