@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CVS — Composite Valuation Score</title>
+    <link rel="icon" type="image/png" sizes="64x64" href="/images/favicon.png">
+    <link rel="shortcut icon" href="/images/favicon.png">
     <meta name="csrf-token" content="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
     <link rel="stylesheet" href="/css/tokens.css">
     <link rel="stylesheet" href="/css/components.css">
