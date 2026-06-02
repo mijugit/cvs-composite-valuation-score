@@ -38,9 +38,10 @@ class CvsSnapshotRepository
      * the existing row (MySQL ON DUPLICATE KEY / SQLite UNIQUE constraint
      * handled in PHP so both engines work).
      *
-     * @param array<string, mixed> $result CVSResult::toArray()
+     * @param array<string, mixed> $result        CVSResult::toArray()
+     * @param float|null           $priceAtSnapshot Current price at scoring time (for track record S-02)
      */
-    public function save(string $ticker, array $result): void
+    public function save(string $ticker, array $result, ?float $priceAtSnapshot = null): void
     {
         $scoreDate = (new DateTimeImmutable())->format('Y-m-d');
         $scoredAt  = (new DateTimeImmutable())->format('Y-m-d H:i:s');
@@ -53,29 +54,30 @@ class CvsSnapshotRepository
         $ps    = isset($result['pillar_scores'])  ? json_encode($result['pillar_scores'])  : null;
 
         $params = [
-            ':ticker'        => $ticker,
-            ':score_date'    => $scoreDate,
-            ':scored_at'     => $scoredAt,
-            ':cvs_swing'     => isset($swing['cvs']) ? (float) $swing['cvs'] : null,
-            ':cvs_fund'      => isset($fund['cvs'])  ? (float) $fund['cvs']  : null,
-            ':reco_swing'    => $swing['recommendation'] ?? null,
-            ':reco_fund'     => $fund['recommendation']  ?? null,
-            ':golden_signal' => $gs !== '' ? $gs : null,
-            ':quality_gate'  => $gate,
-            ':gate_failures' => $gf,
-            ':pillar_scores' => $ps,
+            ':ticker'            => $ticker,
+            ':score_date'        => $scoreDate,
+            ':scored_at'         => $scoredAt,
+            ':price_at_snapshot' => $priceAtSnapshot,
+            ':cvs_swing'         => isset($swing['cvs']) ? (float) $swing['cvs'] : null,
+            ':cvs_fund'          => isset($fund['cvs'])  ? (float) $fund['cvs']  : null,
+            ':reco_swing'        => $swing['recommendation'] ?? null,
+            ':reco_fund'         => $fund['recommendation']  ?? null,
+            ':golden_signal'     => $gs !== '' ? $gs : null,
+            ':quality_gate'      => $gate,
+            ':gate_failures'     => $gf,
+            ':pillar_scores'     => $ps,
         ];
 
         try {
             $stmt = $this->db->prepare('
                 INSERT INTO cvs_snapshots
-                    (ticker, score_date, scored_at, cvs_swing, cvs_fund,
-                     reco_swing, reco_fund, golden_signal, quality_gate,
-                     gate_failures, pillar_scores)
+                    (ticker, score_date, scored_at, price_at_snapshot,
+                     cvs_swing, cvs_fund, reco_swing, reco_fund,
+                     golden_signal, quality_gate, gate_failures, pillar_scores)
                 VALUES
-                    (:ticker, :score_date, :scored_at, :cvs_swing, :cvs_fund,
-                     :reco_swing, :reco_fund, :golden_signal, :quality_gate,
-                     :gate_failures, :pillar_scores)
+                    (:ticker, :score_date, :scored_at, :price_at_snapshot,
+                     :cvs_swing, :cvs_fund, :reco_swing, :reco_fund,
+                     :golden_signal, :quality_gate, :gate_failures, :pillar_scores)
             ');
             $stmt->execute($params);
         } catch (PDOException $e) {
@@ -91,15 +93,16 @@ class CvsSnapshotRepository
             try {
                 $upd = $this->db->prepare('
                     UPDATE cvs_snapshots
-                    SET scored_at     = :scored_at,
-                        cvs_swing     = :cvs_swing,
-                        cvs_fund      = :cvs_fund,
-                        reco_swing    = :reco_swing,
-                        reco_fund     = :reco_fund,
-                        golden_signal = :golden_signal,
-                        quality_gate  = :quality_gate,
-                        gate_failures = :gate_failures,
-                        pillar_scores = :pillar_scores
+                    SET scored_at         = :scored_at,
+                        price_at_snapshot = :price_at_snapshot,
+                        cvs_swing         = :cvs_swing,
+                        cvs_fund          = :cvs_fund,
+                        reco_swing        = :reco_swing,
+                        reco_fund         = :reco_fund,
+                        golden_signal     = :golden_signal,
+                        quality_gate      = :quality_gate,
+                        gate_failures     = :gate_failures,
+                        pillar_scores     = :pillar_scores
                     WHERE ticker = :ticker AND score_date = :score_date
                 ');
                 $upd->execute($params);

@@ -25,18 +25,19 @@ class CvsSnapshotRepositoryTest extends TestCase
 
         $pdo->exec('
             CREATE TABLE cvs_snapshots (
-                id            INTEGER PRIMARY KEY AUTOINCREMENT,
-                ticker        TEXT    NOT NULL,
-                score_date    TEXT    NOT NULL,
-                scored_at     TEXT    NOT NULL,
-                cvs_swing     REAL    NULL,
-                cvs_fund      REAL    NULL,
-                reco_swing    TEXT    NULL,
-                reco_fund     TEXT    NULL,
-                golden_signal TEXT    NULL,
-                quality_gate  INTEGER NOT NULL DEFAULT 0,
-                gate_failures TEXT    NULL,
-                pillar_scores TEXT    NULL,
+                id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticker             TEXT    NOT NULL,
+                score_date         TEXT    NOT NULL,
+                scored_at          TEXT    NOT NULL,
+                price_at_snapshot  REAL    NULL,
+                cvs_swing          REAL    NULL,
+                cvs_fund           REAL    NULL,
+                reco_swing         TEXT    NULL,
+                reco_fund          TEXT    NULL,
+                golden_signal      TEXT    NULL,
+                quality_gate       INTEGER NOT NULL DEFAULT 0,
+                gate_failures      TEXT    NULL,
+                pillar_scores      TEXT    NULL,
                 UNIQUE (ticker, score_date)
             )
         ');
@@ -101,6 +102,26 @@ class CvsSnapshotRepositoryTest extends TestCase
         $this->assertSame(0, (int) $row['quality_gate']);
         $this->assertNull($row['cvs_swing']);
         $this->assertNull($row['golden_signal']);
+    }
+
+    public function test_save_stores_price_at_snapshot(): void
+    {
+        $repo = $this->makeRepo();
+        $repo->save('AAPL', $this->passResult('AAPL'), 185.50);
+
+        $row = $repo->findLatestByTicker('AAPL');
+        $this->assertNotNull($row);
+        $this->assertEquals(185.50, (float) $row['price_at_snapshot']);
+    }
+
+    public function test_save_null_price_ok_backward_compat(): void
+    {
+        $repo = $this->makeRepo();
+        $repo->save('AAPL', $this->passResult('AAPL')); // no price — null by default
+
+        $row = $repo->findLatestByTicker('AAPL');
+        $this->assertNotNull($row);
+        $this->assertNull($row['price_at_snapshot']);
     }
 
     public function test_save_is_idempotent_same_day(): void
