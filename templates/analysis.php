@@ -567,7 +567,7 @@
                             <input type="text" name="name" placeholder="Twoje imię (opcjonalne)" maxlength="100">
                         </div>
                         <div class="form-group" style="margin-bottom:.75rem;">
-                            <textarea name="message" rows="2" placeholder="Do czego chcesz używać PRO? (opcjonalne)" maxlength="500"></textarea>
+                            <textarea name="message" rows="2" placeholder="Dopisz tutaj swoją prośbę lub uwagi (opcjonalne)" maxlength="500"></textarea>
                         </div>
                         <button type="submit" class="btn btn--secondary btn--sm" style="width:100%;">
                             Wyślij prośbę do admina

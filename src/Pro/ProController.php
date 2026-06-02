@@ -190,9 +190,13 @@ class ProController
                     <td style="padding:8px;">' . $msgDisplay . '</td></tr>
             </table>
             <p style="margin-top:16px;">
-                <a href="https://cvs.timeflow.fun/admin/pro" style="background:#1e3a5f;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;">
-                    Przejdź do panelu PRO →
+                <a href="https://cvs.timeflow.fun/admin/pro"
+                   style="background:#facc15;color:#0e1b2f;padding:12px 24px;text-decoration:none;border-radius:6px;font-weight:bold;font-size:15px;display:inline-block;">
+                    &#8594; Nadaj kod PRO temu użytkownikowi
                 </a>
+            </p>
+            <p style="color:#555;font-size:13px;margin-top:8px;">
+                Link: <a href="https://cvs.timeflow.fun/admin/pro" style="color:#1e3a5f;">https://cvs.timeflow.fun/admin/pro</a>
             </p>
             <p style="color:#888;font-size:12px;margin-top:12px;">
                 Wiadomość wygenerowana automatycznie przez CVS Composite Valuation Score.
