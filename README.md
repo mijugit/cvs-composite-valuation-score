@@ -1,131 +1,160 @@
+![CVS — Composite Valuation Score](public/images/FP_CVS.png)
+
 # CVS — Composite Valuation Score
 
-A web app that scores US-listed stocks (NYSE / NASDAQ) with a single composite
-valuation number (0–100) and a clear recommendation — answering not *"how much
-am I paying?"* but *"how much am I paying relative to what I get?"*.
+**Czy ta spółka jest tania czy droga?** CVS odpowiada jedną liczbą — oceniając spółkę nie przez pryzmat ceny bezwzględnej, ale względem sektora, dynamiki przychodów i jakości biznesu jednocześnie.
 
 🔗 **Live:** https://cvs.timeflow.fun/
 
-> ⚠️ **Disclaimer:** *Wyniki CVS to hipoteza modelu analitycznego, nie rekomendacja
-> inwestycyjna. Inwestuj świadomie.*
-> CVS results are an analytical-model hypothesis, **not investment advice**. The
-> tool is for educational and screening purposes only. Do your own research.
+![PHP](https://img.shields.io/badge/PHP-8.2-777BB4?logo=php&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-PDO-4479A1?logo=mysql&logoColor=white)
+![Claude API](https://img.shields.io/badge/Claude-Sonnet_4.6-D97706?logo=anthropic&logoColor=white)
+![PHPUnit](https://img.shields.io/badge/PHPUnit-11-3C8DB7?logo=php&logoColor=white)
+![PHPStan](https://img.shields.io/badge/PHPStan-Level_6-9B5DE5)
+
+> ⚠️ **Disclaimer:** Wyniki CVS to hipoteza modelu analitycznego, nie rekomendacja
+> inwestycyjna. Inwestuj świadomie. CVS results are an analytical-model hypothesis,
+> **not investment advice**. For educational and screening purposes only.
 
 ---
 
-## Why CVS
+## Dlaczego CVS
 
-Traditional valuation multiples (P/E, P/S, EV/EBITDA, PEG) tell you the price tag
-but not whether it's a good deal. A company at P/E 40 can be cheap if it grows
-60% a year; one at P/E 12 can be expensive if it's shrinking. CVS answers a
-relative question across several independent dimensions:
+Tradycyjne wskaźniki wyceny (P/E, P/S, PEG) mówią *ile płacisz*, ale nie *czy to dużo*. Spółka przy P/E 40 może być tania, jeśli rośnie 60% rocznie; spółka przy P/E 12 może być droga, jeśli zwalnia. CVS odpowiada na pytanie relatywne w kilku wymiarach jednocześnie:
 
-> *Is this company cheap or expensive relative to (a) its own growth, (b) its
-> sector benchmark, (c) its own price history, and (d) the quality of the
-> business?*
+> *Czy ta spółka jest tania czy droga względem (a) własnego wzrostu, (b) mediany sektora, (c) swojej historii cenowej i (d) jakości fundamentalnej?*
 
-The model is deliberately **value-oriented and contrarian** — it will call a
-hot momentum name "expensive" when the multiples say so. That divergence from
-the analyst consensus is a feature, not a bug.
+Model jest świadomie **wartościowy i kontrariański** — nazwie drogi papier "Unikaj", nawet gdy analitycy mówią "Kupuj". Ta rozbieżność jest informacją, nie błędem. Aplikacja w fazie 2 wyjaśnia tę rozbieżność przez analizę AI.
 
-## The model
+---
 
-CVS combines **three pillars**, computed in **two modes** simultaneously (the raw
-pillar scores are identical; only the weights differ):
+## Model CVS
 
-| Pillar              | Swing (1–4M) | Fundamental (6–12M) | What it measures                              |
-|---------------------|:------------:|:-------------------:|-----------------------------------------------|
-| **Valuation**       | 40%          | 65%                 | EV/FCF vs sector medians (relative valuation) |
-| **Momentum**        | 45%          | 15%                 | Price ROC vs SPY (excess return)              |
-| **Quality**         | 15%          | 20%                 | Gross margin, leverage, forward growth        |
+Trzy filary, dwa tryby równolegle (surowe wyniki pilarów są identyczne, różnią się tylko wagi):
 
-**Recommendation scale:**
+| Filar | Swing (1–4M) | Fundamentalny (6–12M) | Co mierzy |
+|---|:---:|:---:|---|
+| **Wycena** | 40% | 65% | EV/FCF vs mediany sektora |
+| **Momentum** | 45% | 15% | ROC ceny vs SPY (excess return) |
+| **Jakość** | 15% | 20% | Marża brutto, dźwignia, wzrost forward |
 
-| Score   | Label            |
-|---------|------------------|
-| ≥ 72    | ⬆⬆ SILNE KUPUJ   |
-| 58–71   | ⬆ AKUMULUJ       |
-| 42–57   | → NEUTRALNIE     |
-| 28–41   | ⬇ REDUKUJ        |
-| < 28    | ⬇⬇ UNIKAJ        |
+**Skala rekomendacji:**
 
-**Golden signals** flag the most interesting setups: ⭐⭐ when both modes score
-≥ 58 (value *and* momentum), ⭐ when only the fundamental mode does (a setup —
-wait for momentum).
+| Score | Etykieta |
+|---|---|
+| ≥ 72 | ⬆⬆ SILNE KUPUJ |
+| 58–71 | ⬆ AKUMULUJ |
+| 42–57 | → NEUTRALNIE |
+| 28–41 | ⬇ REDUKUJ |
+| < 28 | ⬇⬇ UNIKAJ |
 
-All model parameters — weights, thresholds, sector benchmarks — live in a single
-config file and are never hard-coded into the scoring logic. The core score is
-**deterministic**: the same inputs always produce the same result.
+**Złote sygnały:** ⭐⭐ gdy oba tryby ≥ 58 (wartość *i* momentum), ⭐ gdy tylko tryb fundamentalny (setup — czekaj na momentum).
 
-## Features
+Wszystkie parametry (wagi, progi, benchmarki sektorowe) są w jednym pliku konfiguracyjnym, nigdy zahardkodowane. Rdzeń modelu jest **deterministyczny** — te same dane zawsze dają ten sam wynik.
 
-- 🔐 Account-based access (email + password), per-account data isolation
-- 📊 Analyse up to 10 tickers at once, ranked by CVS with both modes shown
-- 🕸️ Radar chart of the three pillars per company
-- 🔎 Detail panel with the raw financial data feeding the model
-- 📈 12-month price chart vs SPY
-- ⭐ Watchlist (with ~600-ticker autocomplete across S&P 500 + NASDAQ 100)
-- 🕘 Analysis history
-- 🎯 Analyst forecast card — price targets and recommendation consensus
+---
 
-### On the roadmap
+## Funkcjonalności
 
-- 🤖 AI-powered interpretation explaining *why* CVS and analysts disagree
-- 🧭 CVS screener across watched tickers, with sector / threshold / signal filters
-- 🔔 Watchlist alerts on state changes (threshold crossing, golden signal)
-- 📚 Model track record — how past CVS calls fared against the market
-- 🎨 Visual redesign
+### Rdzeń analityczny
+- 🔐 Konta użytkowników (email + hasło), izolacja danych per konto
+- 📊 Analiza do 10 tickerów jednocześnie, ranking wg CVS (oba tryby)
+- 🕸️ Radar chart trzech pilarów per spółka
+- 🔎 Panel szczegółów z surowymi danymi finansowymi
+- 📈 12-miesięczny wykres kursu vs SPY (benchmark S&P 500, indeks baza=100)
+- 🎯 Karta prognoz analityków — cele cenowe, konsensus rekomendacji
+- ⭐ Watchlist z autocompletą ~600 spółek (S&P 500 + NASDAQ 100)
+- 🕘 Historia analiz
 
-## Tech stack
+### System sygnalizacyjny (Faza 2)
+- 🤖 **Analiza AI** — Claude Sonnet 4.6 wyjaśnia *dlaczego* CVS i analitycy się rozmijają (4-sekcyjna narracja PL, shared cache 7 dni, brama PRO)
+- 📉 **CVS Fair Value** — cena implikowana przez model (parytet sektorowy EV/FCF), widoczna na fan chart analityków
+- 🧭 **Screener CVS** — ranking watchlisty z filtrami (sektor, rekomendacja, golden signal, min CVS) i sortem
+- 🔔 **Alerty watchlisty** — mail gdy spółka zmieni rekomendację lub złoty sygnał; deduplikacja, ON/OFF per user i per ticker
+- 📚 **Track record modelu** — historyczna trafność rekomendacji CVS vs późniejsza cena
+- ℹ️ **Informacje o spółce** — opis biznesowy z Yahoo Finance (zero dodatkowych API callów)
 
-- **PHP 8.2** (vanilla, no framework), PSR-4 (`CVS\` namespace)
-- **MySQL** via PDO
-- **Apache** front controller (`public/index.php`)
-- Market data from **Yahoo Finance** (cURL)
-- **Composer** for dependencies, **PHPUnit** for tests
+### Infrastruktura
+- 🔑 **Dostęp PRO** — kody per user wydawane przez admina, brama chroniąca generowanie AI, limity 10/dzień + 100/miesiąc
+- 📧 **Maile transakcyjne** — PHPMailer + SMTP, alerty + formularz prośby o kod PRO
+- 🗓️ **Dzienny re-scoring** — cron CF 2×/dzień, snapshoty CVS zasilające screener i track record
 
-## Getting started
+---
+
+## Stack technologiczny
+
+| Warstwa | Technologia |
+|---|---|
+| Backend | PHP 8.2, vanilla (PSR-4, `CVS\` namespace), brak frameworka |
+| Baza danych | MySQL via PDO singleton |
+| Frontend | Vanilla PHP templates, plain CSS (tokens + components), Chart.js |
+| AI | Claude API (Anthropic) — Sonnet 4.6, prompt caching |
+| Email | PHPMailer + SMTP CF |
+| Dane rynkowe | Yahoo Finance (cURL, session cache 1h) |
+| Testy | PHPUnit 11 (164 testów offline), PHPStan level 6 |
+| Hosting | Cyber_Folks (shared), Apache, cron CLI |
+| Deploy | SSH + git pull ręczny |
+
+---
+
+## Szybki start
 
 ```bash
-# 1. Install dependencies
+# 1. Zależności
 composer install
 
-# 2. Configure environment
-cp .env.example .env        # then fill in DB credentials etc.
+# 2. Środowisko
+cp .env.example .env   # uzupełnij DB, ANTHROPIC_API_KEY, SMTP
 
-# 3. Run database migrations
-#    apply database/migrations/*.sql to your MySQL database
+# 3. Migracje MySQL
+# wgraj kolejno database/migrations/*.sql
 
-# 4. Start a local dev server (document root is public/)
+# 4. Dev server (document root = public/)
 php -S localhost:8000 -t public
 ```
 
-Run the test suite (fully offline — no network calls):
+Testy (w pełni offline — brak callów do API):
 
 ```bash
 vendor/bin/phpunit
+vendor/bin/phpstan analyse
 ```
-
-## Project structure
-
-```
-src/Core/        Router, Request, Response, Database (PDO singleton)
-src/Auth/        Authentication + user repository
-src/CVS/         CVSModel, CVSResult, AnalysisController, Pillars/
-src/Api/         FinancialDataFetcher (Yahoo Finance)
-config/          app.php, cvs-weights.php (model parameters)
-templates/       Plain-PHP views wrapped by layout.php
-public/          Front controller + static assets
-database/        SQL migrations
-```
-
-## Conventions
-
-- `declare(strict_types=1)` at the top of every PHP file
-- UI strings → **Polish**; code identifiers, comments, docblocks → **English**
-- New routes go in `src/Core/routes.php`; CSRF is verified on every POST
 
 ---
 
-*This is a personal analytical project. Not affiliated with any broker or data
-provider. Market data is sourced from public endpoints.*
+## Struktura projektu
+
+```
+src/
+  Core/        Router, Request, Response, Database
+  Auth/        AuthController, UserRepository
+  CVS/         CVSModel, CVSResult, AnalysisController, Pillars/
+  Api/          FinancialDataFetcher (Yahoo Finance)
+  Ai/          ClaudeClient, AiDivergenceService, AiAnalysisController
+  Alerts/      AlertRepository, AlertService, AlertController
+  Mail/        MailService (PHPMailer wrapper)
+  Pro/         ProGate, ProRepository, AiUsageRepository
+  Screener/    ScreenerRepository, ScreenerController
+  TrackRecord/ CvsSnapshotRepository, TrackRecordRepository
+config/
+  cvs-weights.php   parametry modelu (NIGDY hardkodowane)
+  ai.php            Claude API config
+  mail.php          SMTP config
+templates/     Plain-PHP views
+public/        Front controller + assets (CSS, JS, images)
+database/      Migracje SQL (001–011)
+bin/           rescore.php (cron), gen_favicon.php
+```
+
+---
+
+## Konwencje kodu
+
+- `declare(strict_types=1)` w każdym pliku PHP
+- UI strings → **polski**; identyfikatory kodu, komentarze, docbloki → **angielski**
+- Nowe trasy wyłącznie w `src/Core/routes.php`; CSRF weryfikowany na każdym POST
+- PHPStan level 6 musi być zielony przed każdym commitem
+
+---
+
+*Projekt osobisty. Bez afiliacji z brokerami ani dostawcami danych. Dane rynkowe z publicznych endpointów Yahoo Finance.*
