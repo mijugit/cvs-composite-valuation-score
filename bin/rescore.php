@@ -77,7 +77,8 @@ foreach ($tickers as $ticker) {
 
     $result = $model->calculate($ticker, $financials);
     $price  = isset($financials['current_price']) ? (float) $financials['current_price'] : null;
-    $snapshots->save($ticker, $result->toArray(), $price);
+    $sector = isset($financials['sector'])        ? (string) $financials['sector']        : null;
+    $snapshots->save($ticker, $result->toArray(), $price, $sector);
     $success++;
 }
 

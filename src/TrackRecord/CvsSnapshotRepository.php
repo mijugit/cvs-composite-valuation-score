@@ -38,10 +38,11 @@ class CvsSnapshotRepository
      * the existing row (MySQL ON DUPLICATE KEY / SQLite UNIQUE constraint
      * handled in PHP so both engines work).
      *
-     * @param array<string, mixed> $result        CVSResult::toArray()
-     * @param float|null           $priceAtSnapshot Current price at scoring time (for track record S-02)
+     * @param array<string, mixed> $result          CVSResult::toArray()
+     * @param float|null           $priceAtSnapshot Current price at scoring time (S-02)
+     * @param string|null          $sector          Yahoo Finance sector (S-03 screener filter)
      */
-    public function save(string $ticker, array $result, ?float $priceAtSnapshot = null): void
+    public function save(string $ticker, array $result, ?float $priceAtSnapshot = null, ?string $sector = null): void
     {
         $scoreDate = (new DateTimeImmutable())->format('Y-m-d');
         $scoredAt  = (new DateTimeImmutable())->format('Y-m-d H:i:s');
@@ -55,6 +56,7 @@ class CvsSnapshotRepository
 
         $params = [
             ':ticker'            => $ticker,
+            ':sector'            => $sector,
             ':score_date'        => $scoreDate,
             ':scored_at'         => $scoredAt,
             ':price_at_snapshot' => $priceAtSnapshot,
@@ -71,11 +73,11 @@ class CvsSnapshotRepository
         try {
             $stmt = $this->db->prepare('
                 INSERT INTO cvs_snapshots
-                    (ticker, score_date, scored_at, price_at_snapshot,
+                    (ticker, sector, score_date, scored_at, price_at_snapshot,
                      cvs_swing, cvs_fund, reco_swing, reco_fund,
                      golden_signal, quality_gate, gate_failures, pillar_scores)
                 VALUES
-                    (:ticker, :score_date, :scored_at, :price_at_snapshot,
+                    (:ticker, :sector, :score_date, :scored_at, :price_at_snapshot,
                      :cvs_swing, :cvs_fund, :reco_swing, :reco_fund,
                      :golden_signal, :quality_gate, :gate_failures, :pillar_scores)
             ');
@@ -93,7 +95,8 @@ class CvsSnapshotRepository
             try {
                 $upd = $this->db->prepare('
                     UPDATE cvs_snapshots
-                    SET scored_at         = :scored_at,
+                    SET sector            = :sector,
+                        scored_at         = :scored_at,
                         price_at_snapshot = :price_at_snapshot,
                         cvs_swing         = :cvs_swing,
                         cvs_fund          = :cvs_fund,

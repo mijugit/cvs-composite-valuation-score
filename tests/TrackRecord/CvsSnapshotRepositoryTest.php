@@ -27,6 +27,7 @@ class CvsSnapshotRepositoryTest extends TestCase
             CREATE TABLE cvs_snapshots (
                 id                 INTEGER PRIMARY KEY AUTOINCREMENT,
                 ticker             TEXT    NOT NULL,
+                sector             TEXT    NULL,
                 score_date         TEXT    NOT NULL,
                 scored_at          TEXT    NOT NULL,
                 price_at_snapshot  REAL    NULL,
@@ -102,6 +103,26 @@ class CvsSnapshotRepositoryTest extends TestCase
         $this->assertSame(0, (int) $row['quality_gate']);
         $this->assertNull($row['cvs_swing']);
         $this->assertNull($row['golden_signal']);
+    }
+
+    public function test_save_stores_sector(): void
+    {
+        $repo = $this->makeRepo();
+        $repo->save('AAPL', $this->passResult('AAPL'), 185.50, 'Technology');
+
+        $row = $repo->findLatestByTicker('AAPL');
+        $this->assertNotNull($row);
+        $this->assertSame('Technology', $row['sector']);
+    }
+
+    public function test_save_null_sector_ok(): void
+    {
+        $repo = $this->makeRepo();
+        $repo->save('AAPL', $this->passResult('AAPL')); // no sector
+
+        $row = $repo->findLatestByTicker('AAPL');
+        $this->assertNotNull($row);
+        $this->assertNull($row['sector']);
     }
 
     public function test_save_stores_price_at_snapshot(): void
