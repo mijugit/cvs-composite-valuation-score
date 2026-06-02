@@ -14,7 +14,7 @@ body::before {
     inset: 0;
     z-index: -1;
     background: url('/images/BG_CVS.png') center / cover no-repeat;
-    opacity: .07;
+    opacity: .25;
     pointer-events: none;
 }
 
