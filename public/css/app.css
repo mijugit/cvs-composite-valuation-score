@@ -121,7 +121,9 @@ a:hover { text-decoration: underline; }
 .auth-box {
     max-width: 420px;
     margin: 3rem auto;
-    background: var(--c-surface);
+    background: rgba(14, 27, 47, 0.72);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
     border: 1px solid var(--c-border);
     border-radius: var(--radius);
     padding: 2rem;
