@@ -46,8 +46,12 @@ $_SESSION = [];
 
 $config = require ROOT_PATH . '/config/cvs-weights.php';
 
+use CVS\Alerts\AlertRepository;
+use CVS\Alerts\AlertService;
 use CVS\Api\FinancialDataFetcher;
+use CVS\Auth\UserRepository;
 use CVS\CVS\CVSModel;
+use CVS\Mail\MailService;
 use CVS\TrackRecord\CvsSnapshotRepository;
 use CVS\Watchlist\WatchlistRepository;
 
@@ -55,6 +59,13 @@ $watchlist   = new WatchlistRepository();
 $fetcher     = new FinancialDataFetcher($config);
 $model       = new CVSModel($config);
 $snapshots   = new CvsSnapshotRepository();
+
+$mailConfig  = require ROOT_PATH . '/config/mail.php';
+$alertSvc    = new AlertService(
+    new AlertRepository(),
+    new MailService(null, $mailConfig),
+    new UserRepository()
+);
 
 $tickers = $watchlist->findAllDistinctTickers();
 
@@ -79,6 +90,13 @@ foreach ($tickers as $ticker) {
     $price  = isset($financials['current_price']) ? (float) $financials['current_price'] : null;
     $sector = isset($financials['sector'])        ? (string) $financials['sector']        : null;
     $snapshots->save($ticker, $result->toArray(), $price, $sector);
+
+    // S-04: check for state change and notify watching users.
+    $alerted = $alertSvc->checkAndNotify($ticker, $result->toArray());
+    if ($alerted > 0) {
+        error_log(sprintf('rescore: alert sent for %s to %d user(s)', $ticker, $alerted));
+    }
+
     $success++;
 }
 
