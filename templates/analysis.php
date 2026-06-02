@@ -242,7 +242,19 @@
                     </div>
                     <?php if (!empty($financials['monthly_closes'])): ?>
                     <div class="price-chart-compact">
-                        <div class="price-chart-compact__label">Kurs akcji — ostatnie 3 miesiące</div>
+                        <div class="price-chart-compact__label">
+                            Kurs akcji — 12 miesięcy (baza=100)
+                            <span class="chart-hint" tabindex="0">ⓘ
+                                <span class="chart-hint__tooltip">
+                                    <strong>Jak czytać wykres?</strong><br>
+                                    Obie linie są przeliczone do bazy&nbsp;100 na początku okresu —
+                                    porównujesz tempo wzrostu, nie cenę nominalną.<br><br>
+                                    <strong><?= htmlspecialchars($ticker) ?></strong> — miesięczne zamknięcia spółki.<br>
+                                    <strong>SPY</strong> — ETF odwzorowujący indeks S&amp;P 500 (benchmark rynku US).
+                                    Linia spółki powyżej SPY = spółka biła rynek w tym okresie.
+                                </span>
+                            </span>
+                        </div>
                         <canvas id="price-chart"></canvas>
                     </div>
                     <?php endif; ?>
