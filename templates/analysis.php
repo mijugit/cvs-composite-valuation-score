@@ -550,6 +550,30 @@
                         <button id="btn-pro-submit" class="btn btn--primary btn--sm">Aktywuj</button>
                         <button id="btn-pro-cancel" class="btn btn--ghost btn--sm">Anuluj</button>
                     </div>
+
+                    <!-- PRO request form -->
+                    <hr style="border:none;border-top:1px solid var(--c-border);margin:1.25rem 0;">
+                    <p style="font-size:var(--text-sm);color:var(--c-muted);margin-bottom:.75rem;">
+                        Nie masz kodu? Wyślij prośbę do admina.
+                    </p>
+                    <?php if (!empty($_SESSION['pro_request_sent'])): ?>
+                    <p style="color:var(--c-success);font-size:var(--text-sm);text-align:center;">
+                        ✓ Prośba wysłana — admin skontaktuje się wkrótce.
+                    </p>
+                    <?php else: ?>
+                    <form method="POST" action="/pro/request">
+                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
+                        <div class="form-group" style="margin-bottom:.5rem;">
+                            <input type="text" name="name" placeholder="Twoje imię (opcjonalne)" maxlength="100">
+                        </div>
+                        <div class="form-group" style="margin-bottom:.75rem;">
+                            <textarea name="message" rows="2" placeholder="Do czego chcesz używać PRO? (opcjonalne)" maxlength="500"></textarea>
+                        </div>
+                        <button type="submit" class="btn btn--secondary btn--sm" style="width:100%;">
+                            Wyślij prośbę do admina
+                        </button>
+                    </form>
+                    <?php endif; ?>
                 </div>
             </div>
 

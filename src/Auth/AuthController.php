@@ -69,7 +69,8 @@ class AuthController
         }
 
         session_regenerate_id(true);
-        $_SESSION['user_id'] = $user['id'];
+        $_SESSION['user_id']    = $user['id'];
+        $_SESSION['user_email'] = $user['email']; // S-05: used by PRO request form
         unset($_SESSION['csrf_token']); // Force fresh token after login.
 
         Response::redirect('/dashboard');

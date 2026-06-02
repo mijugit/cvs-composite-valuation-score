@@ -67,6 +67,7 @@ $router->post('/admin/pro',               fn($req) => $pro->store($req));
 $router->post('/admin/pro/revoke',        fn($req) => $pro->revoke($req));
 $router->post('/admin/pro/activate-code', fn($req) => $pro->activateCode($req));
 $router->post('/pro/activate',            fn($req) => $pro->activate($req));
+$router->post('/pro/request',             fn($req) => $pro->sendRequest($req));
 
 // ------------------------------------------------------------------
 // AI Analysis (S-01)

@@ -25,6 +25,11 @@
 </header>
 
 <main class="site-main">
+    <?php if (!empty($_SESSION['_flash'])): ?>
+    <div class="container" style="padding-top:.75rem;padding-bottom:0;">
+        <div class="alert alert--success"><?= htmlspecialchars((string) $_SESSION['_flash']) ?></div>
+    </div>
+    <?php unset($_SESSION['_flash']); endif; ?>
     <div class="container">
         <?php echo $content ?? ''; ?>
     </div>
