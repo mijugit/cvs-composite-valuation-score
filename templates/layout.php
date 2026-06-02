@@ -17,6 +17,7 @@
         <?php if (!empty($_SESSION['user_id'])): ?>
         <nav class="site-nav">
             <a href="/dashboard">Panel</a>
+            <a href="/screener">Screener</a>
             <a href="/track-record">Track Record</a>
             <a href="/logout">Wyloguj</a>
         </nav>
