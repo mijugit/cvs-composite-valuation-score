@@ -9,6 +9,22 @@
         </h1>
         <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
             <a href="/track-record/<?= urlencode($ticker) ?>" class="btn btn--ghost btn--sm">Historia CVS</a>
+            <?php
+            $alertGlobalOn     = $alertsEnabled ?? false;
+            $alertTickerOff    = $tickerAlertDisabled ?? false;
+            $alertBtnLabel     = $alertTickerOff ? '🔕 Alerty OFF' : '🔔 Alerty ON';
+            $alertBtnClass     = $alertTickerOff ? 'btn--ghost' : 'btn--secondary';
+            $alertBtnTitle     = !$alertGlobalOn
+                ? 'Włącz alerty globalnie na dashboardzie'
+                : ($alertTickerOff ? 'Włącz alerty dla tej spółki' : 'Wycisz alerty dla tej spółki');
+            ?>
+            <button id="btn-alert-ticker"
+                    class="btn btn--sm <?= $alertBtnClass ?>"
+                    data-ticker="<?= htmlspecialchars($ticker) ?>"
+                    data-disabled="<?= $alertTickerOff ? '1' : '0' ?>"
+                    <?= !$alertGlobalOn ? 'disabled title="' . htmlspecialchars($alertBtnTitle) . '"' : 'title="' . htmlspecialchars($alertBtnTitle) . '"' ?>>
+                <?= $alertBtnLabel ?>
+            </button>
             <button id="btn-company-info" class="btn btn--ghost btn--sm">
                 Informacje o spółce
             </button>
@@ -761,6 +777,23 @@
                 if (btnCancel) {
                     btnCancel.addEventListener('click', hideModal);
                 }
+
+                // Per-ticker alert toggle
+                document.getElementById('btn-alert-ticker')?.addEventListener('click', function () {
+                    var btn  = this;
+                    if (btn.disabled) return;
+                    fetch('/alerts/ticker', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-Token': csrf},
+                        body: new URLSearchParams({_csrf: csrf, ticker: btn.dataset.ticker}),
+                    }).then(function (r) { return r.json(); }).then(function (d) {
+                        if (!d.ok) return;
+                        btn.dataset.disabled = d.disabled ? '1' : '0';
+                        btn.textContent  = d.disabled ? '🔕 Alerty OFF' : '🔔 Alerty ON';
+                        btn.className    = 'btn btn--sm ' + (d.disabled ? 'btn--ghost' : 'btn--secondary');
+                        btn.title        = d.disabled ? 'Włącz alerty dla tej spółki' : 'Wycisz alerty dla tej spółki';
+                    });
+                });
             })();
             </script>
 

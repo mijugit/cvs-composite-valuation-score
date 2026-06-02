@@ -1,5 +1,33 @@
 <section class="dashboard">
-    <h1>Panel analizy CVS</h1>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;margin-bottom:1rem;">
+        <h1 style="margin:0;">Panel analizy CVS</h1>
+        <div style="display:flex;align-items:center;gap:.5rem;font-size:var(--text-sm);">
+            <span style="color:var(--c-muted);">Alerty:</span>
+            <button id="btn-alerts-global"
+                    class="btn btn--sm <?= ($alertsEnabled ?? false) ? 'btn--primary' : 'btn--ghost' ?>"
+                    data-enabled="<?= ($alertsEnabled ?? false) ? '1' : '0' ?>"
+                    title="<?= ($alertsEnabled ?? false) ? 'Wyłącz alerty' : 'Włącz alerty email przy zmianie stanu spółki' ?>">
+                <?= ($alertsEnabled ?? false) ? '🔔 ON' : '🔕 OFF' ?>
+            </button>
+        </div>
+    </div>
+    <script>
+    document.getElementById('btn-alerts-global')?.addEventListener('click', function () {
+        var btn  = this;
+        var csrf = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+        fetch('/alerts/global', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-Token': csrf},
+            body: new URLSearchParams({_csrf: csrf}),
+        }).then(function (r) { return r.json(); }).then(function (d) {
+            if (!d.ok) return;
+            btn.dataset.enabled = d.enabled ? '1' : '0';
+            btn.textContent = d.enabled ? '🔔 ON' : '🔕 OFF';
+            btn.className   = 'btn btn--sm ' + (d.enabled ? 'btn--primary' : 'btn--ghost');
+            btn.title = d.enabled ? 'Wyłącz alerty' : 'Włącz alerty email przy zmianie stanu spółki';
+        });
+    });
+    </script>
 
     <?php /* Watchlist section — always rendered; hidden when empty so JS can reveal it */ ?>
     <div class="watchlist-section card"

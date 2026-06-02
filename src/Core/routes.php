@@ -10,6 +10,7 @@ declare(strict_types=1);
  */
 
 use CVS\Ai\AiAnalysisController;
+use CVS\Alerts\AlertController;
 use CVS\Auth\AuthController;
 use CVS\CVS\AnalysisController;
 use CVS\Screener\ScreenerController;
@@ -23,6 +24,7 @@ $watchlist   = new WatchlistController();
 $pro         = new ProController();
 $trackRecord = new TrackRecordController();
 $screener    = new ScreenerController();
+$alertCtrl   = new AlertController();
 $aiConfig   = require dirname(__DIR__, 2) . '/config/ai.php';
 $aiAnalysis = new AiAnalysisController($aiConfig);
 
@@ -89,3 +91,10 @@ $router->get('/track-record/{ticker}', fn($req) => $trackRecord->show($req));
 // ------------------------------------------------------------------
 
 $router->get('/screener', fn($req) => $screener->index($req));
+
+// ------------------------------------------------------------------
+// Watchlist Alerts (S-04)
+// ------------------------------------------------------------------
+
+$router->post('/alerts/global', fn($req) => $alertCtrl->toggleGlobal($req));
+$router->post('/alerts/ticker', fn($req) => $alertCtrl->toggleTicker($req));

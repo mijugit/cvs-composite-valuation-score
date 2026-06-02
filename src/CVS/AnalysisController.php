@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CVS\CVS;
 
 use CVS\Ai\AiAnalysisRepository;
+use CVS\Alerts\AlertRepository;
 use CVS\Auth\AuthController;
 use CVS\Api\FinancialDataFetcher;
 use CVS\Core\Request;
@@ -46,12 +47,15 @@ class AnalysisController
     public function dashboard(Request $req): void
     {
         AuthController::requireAuth();
-        $userId    = (int) $_SESSION['user_id'];
-        $watchlist = $this->watchlist->findByUser($userId);
-        $history   = $this->history->findByUser($userId, $this->maxHistory);
+        $userId        = (int) $_SESSION['user_id'];
+        $watchlist     = $this->watchlist->findByUser($userId);
+        $history       = $this->history->findByUser($userId, $this->maxHistory);
+        $alertRepo     = new AlertRepository();
+        $alertsEnabled = $alertRepo->isGlobalEnabled($userId);
         Response::view('dashboard', [
-            'watchlist' => $watchlist,
-            'history'   => $history,
+            'watchlist'     => $watchlist,
+            'history'       => $history,
+            'alertsEnabled' => $alertsEnabled, // S-04
         ]);
     }
 
@@ -145,16 +149,22 @@ class AnalysisController
             && $aiRepo->findByTicker($ticker) !== null
             && $aiRepo->needsRefresh($ticker, $minHours);
 
+        $alertRepo          = new AlertRepository();
+        $alertsEnabled      = $alertRepo->isGlobalEnabled($userId);
+        $tickerAlertDisabled = $alertRepo->isTickerDisabled($userId, $ticker);
+
         Response::view('analysis', [
-            'ticker'          => $ticker,
-            'result'          => $result->toArray(),
-            'financials'      => $financials,         // S-03: raw data for detail panel
-            'isWatched'       => $isWatched,          // S-06: watchlist toggle button state
-            'canGenerateAi'   => $gate->canGenerate($userId),  // F-05: PRO gate for S-01
-            'aiUsage'         => $gate->getUsage($userId),     // F-05: usage counts for S-01
-            'cachedAi'        => $cachedAi,           // S-01: cached analysis (all logged users)
-            'aiCanRefresh'    => $aiCanRefresh,        // S-01: PRO can force refresh after minHours
-            'error'           => null,
+            'ticker'               => $ticker,
+            'result'               => $result->toArray(),
+            'financials'           => $financials,
+            'isWatched'            => $isWatched,
+            'canGenerateAi'        => $gate->canGenerate($userId),
+            'aiUsage'              => $gate->getUsage($userId),
+            'cachedAi'             => $cachedAi,
+            'aiCanRefresh'         => $aiCanRefresh,
+            'alertsEnabled'        => $alertsEnabled,        // S-04
+            'tickerAlertDisabled'  => $tickerAlertDisabled,  // S-04
+            'error'                => null,
         ]);
     }
 
