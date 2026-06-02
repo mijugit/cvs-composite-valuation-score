@@ -46,34 +46,6 @@
         </div>
     </div>
 
-    <?php /* Analysis history (S-08) — last N analyses, newest first; hidden when empty */ ?>
-    <?php if (!empty($history)): ?>
-    <div class="history-section card">
-        <h3>Ostatnie analizy</h3>
-        <table class="history-table">
-            <thead>
-                <tr>
-                    <th>Ticker</th>
-                    <th>CVS Swing</th>
-                    <th>Rekomendacja</th>
-                    <th>Data</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($history as $row): ?>
-                <?php $passed = (int) ($row['quality_gate'] ?? 0) === 1; ?>
-                <tr<?= $passed ? '' : ' class="gate-fail"' ?>>
-                    <td><a href="/analysis/<?= urlencode((string) $row['ticker']) ?>"><?= htmlspecialchars((string) $row['ticker']) ?></a></td>
-                    <td><?= $row['cvs_swing'] !== null ? number_format((float) $row['cvs_swing'], 1) : '—' ?></td>
-                    <td><?= $passed ? htmlspecialchars((string) ($row['reco_swing'] ?? '—')) : 'Odrzucono' ?></td>
-                    <td><?= htmlspecialchars(date('d.m', strtotime((string) $row['analysed_at']))) ?></td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-    <?php endif; ?>
-
     <div class="analysis-form-wrapper card">
         <h2>Wprowadź symbole spółek</h2>
         <p class="hint">Wpisz do 10 tickerów (NYSE / NASDAQ), oddzielonych przecinkami lub spacjami.<br>
@@ -104,4 +76,53 @@
 
     <div id="spinner" class="spinner" hidden>Pobieram dane&hellip;</div>
     <div id="error-msg" class="alert alert--error" hidden></div>
+
+    <?php /* Analysis history — collapsible accordion, newest first */ ?>
+    <?php if (!empty($history)): ?>
+    <div class="history-section card history-accordion">
+        <button class="history-accordion__toggle" aria-expanded="false" aria-controls="history-body">
+            <span class="history-accordion__title">
+                Ostatnie analizy
+                <span class="history-accordion__count"><?= count($history) ?></span>
+            </span>
+            <span class="history-accordion__arrow">▼</span>
+        </button>
+        <div class="history-accordion__body" id="history-body" hidden>
+            <table class="history-table">
+                <thead>
+                    <tr>
+                        <th>Ticker</th>
+                        <th>CVS Swing</th>
+                        <th>Rekomendacja</th>
+                        <th>Data</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($history as $row): ?>
+                    <?php $passed = (int) ($row['quality_gate'] ?? 0) === 1; ?>
+                    <tr<?= $passed ? '' : ' class="gate-fail"' ?>>
+                        <td><a href="/analysis/<?= urlencode((string) $row['ticker']) ?>"><?= htmlspecialchars((string) $row['ticker']) ?></a></td>
+                        <td><?= $row['cvs_swing'] !== null ? number_format((float) $row['cvs_swing'], 1) : '—' ?></td>
+                        <td><?= $passed ? htmlspecialchars((string) ($row['reco_swing'] ?? '—')) : 'Odrzucono' ?></td>
+                        <td><?= htmlspecialchars(date('d.m.y', strtotime((string) $row['analysed_at']))) ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <script>
+    (function () {
+        var toggle = document.querySelector('.history-accordion__toggle');
+        var body   = document.getElementById('history-body');
+        if (!toggle || !body) return;
+        toggle.addEventListener('click', function () {
+            var open = toggle.getAttribute('aria-expanded') === 'true';
+            toggle.setAttribute('aria-expanded', open ? 'false' : 'true');
+            body.hidden = open;
+            toggle.querySelector('.history-accordion__arrow').textContent = open ? '▼' : '▲';
+        });
+    })();
+    </script>
+    <?php endif; ?>
 </section>
