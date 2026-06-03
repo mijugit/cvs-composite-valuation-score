@@ -11,6 +11,53 @@ declare(strict_types=1);
  */
 return [
 
+    // --- Model versioning (Phase 3) ---
+    // Bump model_version whenever the scoring methodology changes so that
+    // track-record rows from different methodologies are never mixed.
+    // FR-010: never hardcode this in business logic — always read from here.
+    'model_version' => '3.0',
+
+    // --- Peer-group configuration (Phase 3) ---
+    // Controls empirical subsector median lookups in MedianResolver.
+    //
+    // min_sample_count (N): minimum number of tickers in a bucket before the
+    //   subsector median is trusted. Below N → fall back to sector median.
+    //   Set conservatively: a median from 3 tickers is noisy.
+    //
+    // anchor_blend: rule used to combine subsector score with sector anchor.
+    //   'min'      — final score = min(subsectorScore, sectorScore).
+    //                Kotwica can only pull the score DOWN, never up.
+    //                Default safe start — tune on real data in Phase 3 manual verification.
+    //   'weighted' — reserved for future tuning; MedianResolver will read
+    //                anchor_weight when this mode is active.
+    //
+    // anchor_weight: weight of the sector anchor when anchor_blend='weighted'.
+    //   0.0 = pure subsector, 1.0 = pure sector anchor.
+    //
+    // enabled: master switch. false = Phase 3 code loaded but resolver always
+    //   falls back to legacy benchmarks (safe rollout / kill-switch).
+    'peer_group' => [
+        'enabled'          => true,
+        'min_sample_count' => 5,
+        'anchor_blend'     => 'min',
+        'anchor_weight'    => 0.3,
+    ],
+
+    // --- Batch schedule (Phase 3) ---
+    // Maps day-of-week (1=Mon…7=Sun) to the list of sectors refreshed that day.
+    // This spreads the ~477-ticker population crawl across the week to stay
+    // well within Yahoo Finance's unofficial rate limits.
+    // Sector names must match values returned by Yahoo Finance assetProfile.sector.
+    'batch_schedule' => [
+        1 => ['Technology', 'Communication Services'],
+        2 => ['Healthcare', 'Financial Services'],
+        3 => ['Consumer Cyclical', 'Consumer Defensive'],
+        4 => ['Industrials', 'Basic Materials'],
+        5 => ['Energy', 'Utilities', 'Real Estate'],
+        6 => [],
+        7 => [],
+    ],
+
     // --- Dual-mode scoring profiles (S-05) ---
     // Each mode defines pillar weights and ROC composite weights for MomentumPillar.
     // Pillar raw scores (Valuation, Quality) are identical in both modes.
