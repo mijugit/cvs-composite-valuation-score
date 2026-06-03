@@ -16,6 +16,9 @@ declare(strict_types=1);
  *     tickers at once.
  *   - Deterministic medians: stored in DB before scoring; ValuationPillar
  *     reads frozen values, never calls this script at request time.
+ *   - Resilient DB connection: medianas are flushed per-sector so that a
+ *     long Yahoo fetch loop does not trigger MySQL wait_timeout (CF shared
+ *     hosting drops idle connections after ~60-120 s).
  *
  * Cron entry (Cyber_Folks, "Ścieżka" type, runs daily Mon–Sun):
  *   0 14 * * *  /usr/local/bin/php84 /home/.../bin/refresh_peer_medians.php
@@ -52,13 +55,14 @@ $config = require ROOT_PATH . '/config/cvs-weights.php';
 use CVS\Api\FinancialDataFetcher;
 use CVS\CVS\Valuation\PeerMedianRepository;
 use CVS\CVS\Valuation\ValuationMetrics;
+use CVS\Core\Database;
 
 // ------------------------------------------------------------------
 // Resolve which sectors to process today
 // ------------------------------------------------------------------
 
-$dayOfWeek   = (int) date('N'); // 1=Mon … 7=Sun
-$schedule    = $config['batch_schedule'] ?? [];
+$dayOfWeek     = (int) date('N'); // 1=Mon … 7=Sun
+$schedule      = $config['batch_schedule'] ?? [];
 $todaysSectors = $schedule[$dayOfWeek] ?? [];
 
 if (empty($todaysSectors)) {
@@ -86,144 +90,147 @@ if (!file_exists($tickersFile)) {
 $allTickers = json_decode((string) file_get_contents($tickersFile), true) ?? [];
 
 // ------------------------------------------------------------------
-// Fetch & accumulate metrics per ticker
+// Process one sector at a time and flush medians after each sector.
+// This keeps the MySQL connection alive on CF shared hosting where
+// wait_timeout can be as low as 60-120 s — flushing per sector ensures
+// the connection is used every ~20-40 s at most.
 // ------------------------------------------------------------------
 
 $fetcher      = new FinancialDataFetcher($config['data_source']);
-$medianRepo   = new PeerMedianRepository();
 $modelVersion = $config['model_version'] ?? '3.0';
+$benchmarks   = $config['benchmarks'] ?? [];
 
-/**
- * Accumulator: buckets[level][bucket_key] = ['ev_fcf' => float[], 'ev_sales' => float[], 'gm' => float[]]
- * @var array<string, array<string, array<string, float[]>>> $buckets
- */
-$buckets = [];
+$totalSuccess = 0;
+$totalFailed  = 0;
+$totalSkipped = 0;
+$totalSaved   = 0;
 
-$success = 0;
-$failed  = 0;
-$skipped = 0;
+foreach ($todaysSectors as $targetSector) {
 
-foreach ($allTickers as $entry) {
-    $ticker = strtoupper(trim($entry['symbol'] ?? ''));
-    if ($ticker === '') {
-        continue;
-    }
+    /**
+     * Accumulator for this sector's tickers.
+     * buckets[level][bucket_key][metric] = float[]
+     * @var array<string, array<string, array<string, float[]|string>>> $buckets
+     */
+    $buckets = [];
 
-    $financials = $fetcher->fetch($ticker);
-
-    if ($financials === null) {
-        error_log(sprintf('refresh_peer_medians: fetch failed for %s — skipping', $ticker));
-        $failed++;
-        continue;
-    }
-
-    $sector   = $financials['sector']   ?? null;
-    $industry = $financials['industry'] ?? null;
-
-    // Only process tickers whose sector is in today's schedule.
-    if ($sector === null || !in_array($sector, $todaysSectors, true)) {
-        $skipped++;
-        continue;
-    }
-
-    // Forward growth (capped to sector max_growth).
-    $benchmarks = $config['benchmarks'] ?? [];
-    $bm         = $benchmarks[$sector] ?? $benchmarks['DEFAULT'] ?? null;
-    if ($bm === null) {
-        $skipped++;
-        continue;
-    }
-
-    $growthPct = ValuationMetrics::extractForwardGrowth($financials);
-    if ($growthPct === null) {
-        $skipped++;
-        continue;
-    }
-    $growthPct = min($growthPct, (float) $bm['max_growth']);
-
-    // EV/FCF (Variant A).
-    $evFcf = ValuationMetrics::forwardEvFcf($financials, $growthPct);
-
-    // Growth-adjusted EV/Sales (Variant B).
-    $evSalesAdj = ValuationMetrics::forwardEvSalesAdjusted($financials, $growthPct);
-
-    // Gross margin (fraction → %).
-    $gmFrac = isset($financials['gross_margins']) ? (float) $financials['gross_margins'] : null;
-    $gmPct  = $gmFrac !== null ? $gmFrac * 100.0 : null;
-
-    // Accumulate at sector level (anchor/fallback).
-    if ($evFcf !== null) {
-        $buckets['sector'][$sector]['ev_fcf'][] = $evFcf;
-    }
-    if ($evSalesAdj !== null) {
-        $buckets['sector'][$sector]['ev_sales'][] = $evSalesAdj;
-    }
-    if ($gmPct !== null) {
-        $buckets['sector'][$sector]['gm'][] = $gmPct;
-    }
-
-    // Accumulate at industry level (subsector peer-group).
-    if ($industry !== null) {
-        if ($evFcf !== null) {
-            $buckets['industry'][$industry]['ev_fcf'][]   = $evFcf;
-            $buckets['industry'][$industry]['_sector']    = $sector; // track parent
-        }
-        if ($evSalesAdj !== null) {
-            $buckets['industry'][$industry]['ev_sales'][] = $evSalesAdj;
-            $buckets['industry'][$industry]['_sector']    = $sector;
-        }
-        if ($gmPct !== null) {
-            $buckets['industry'][$industry]['gm'][]       = $gmPct;
-            $buckets['industry'][$industry]['_sector']    = $sector;
-        }
-    }
-
-    $success++;
-}
-
-// ------------------------------------------------------------------
-// Compute medians and persist
-// ------------------------------------------------------------------
-
-$saved = 0;
-
-foreach ($buckets as $level => $levelBuckets) {
-    foreach ($levelBuckets as $bucketKey => $data) {
-        if (str_starts_with($bucketKey, '_')) {
-            continue; // skip internal metadata keys like '_sector'
+    // --- Fetch all tickers for this sector ---
+    foreach ($allTickers as $entry) {
+        $ticker = strtoupper(trim($entry['symbol'] ?? ''));
+        if ($ticker === '') {
+            continue;
         }
 
-        $parentSector = $level === 'industry' ? ($data['_sector'] ?? null) : null;
+        $financials = $fetcher->fetch($ticker);
 
-        foreach (['ev_fcf', 'ev_sales', 'gm'] as $metric) {
-            $values = $data[$metric] ?? [];
-            if (empty($values)) {
+        if ($financials === null) {
+            error_log(sprintf('refresh_peer_medians: fetch failed for %s — skipping', $ticker));
+            $totalFailed++;
+            continue;
+        }
+
+        $sector   = $financials['sector']   ?? null;
+        $industry = $financials['industry'] ?? null;
+
+        if ($sector !== $targetSector) {
+            $totalSkipped++;
+            continue;
+        }
+
+        $bm = $benchmarks[$sector] ?? $benchmarks['DEFAULT'] ?? null;
+        if ($bm === null) {
+            $totalSkipped++;
+            continue;
+        }
+
+        $growthPct = ValuationMetrics::extractForwardGrowth($financials);
+        if ($growthPct === null) {
+            $totalSkipped++;
+            continue;
+        }
+        $growthPct = min($growthPct, (float) $bm['max_growth']);
+
+        $evFcf      = ValuationMetrics::forwardEvFcf($financials, $growthPct);
+        $evSalesAdj = ValuationMetrics::forwardEvSalesAdjusted($financials, $growthPct);
+        $gmFrac     = isset($financials['gross_margins']) ? (float) $financials['gross_margins'] : null;
+        $gmPct      = $gmFrac !== null ? $gmFrac * 100.0 : null;
+
+        // Sector-level bucket (anchor/fallback).
+        if ($evFcf !== null)      { $buckets['sector'][$sector]['ev_fcf'][]  = $evFcf; }
+        if ($evSalesAdj !== null) { $buckets['sector'][$sector]['ev_sales'][] = $evSalesAdj; }
+        if ($gmPct !== null)      { $buckets['sector'][$sector]['gm'][]       = $gmPct; }
+
+        // Industry-level bucket (peer-group).
+        if ($industry !== null) {
+            if ($evFcf !== null)      { $buckets['industry'][$industry]['ev_fcf'][]  = $evFcf; }
+            if ($evSalesAdj !== null) { $buckets['industry'][$industry]['ev_sales'][] = $evSalesAdj; }
+            if ($gmPct !== null)      { $buckets['industry'][$industry]['gm'][]       = $gmPct; }
+            // Track parent sector for industry rows.
+            $buckets['industry'][$industry]['_sector'] = $sector;
+        }
+
+        $totalSuccess++;
+    }
+
+    // --- Flush medians for this sector (reconnect if needed) ---
+    // Re-instantiate repository here so we get a fresh PDO connection after
+    // the potentially long Yahoo fetch loop.
+    Database::reconnect();
+    $medianRepo = new PeerMedianRepository();
+
+    foreach ($buckets as $level => $levelBuckets) {
+        foreach ($levelBuckets as $bucketKey => $data) {
+            if (str_starts_with((string) $bucketKey, '_')) {
                 continue;
             }
 
-            $median      = self_median($values);
-            $sampleCount = count($values);
+            $parentSector = ($level === 'industry') ? (string) ($data['_sector'] ?? '') : null;
+            if ($parentSector === '') {
+                $parentSector = null;
+            }
 
-            $medianRepo->upsertMedian(
-                $level,
-                $bucketKey,
-                $parentSector,
-                $modelVersion,
-                $metric,
-                $median,
-                $sampleCount
-            );
-            $saved++;
+            foreach (['ev_fcf', 'ev_sales', 'gm'] as $metric) {
+                /** @var float[] $values */
+                $values = array_filter(
+                    (array) ($data[$metric] ?? []),
+                    static fn($v): bool => is_float($v) || is_int($v)
+                );
+                if (empty($values)) {
+                    continue;
+                }
+
+                $values      = array_values($values);
+                $median      = batch_median($values);
+                $sampleCount = count($values);
+
+                $medianRepo->upsertMedian(
+                    $level,
+                    $bucketKey,
+                    $parentSector,
+                    $modelVersion,
+                    $metric,
+                    $median,
+                    $sampleCount
+                );
+                $totalSaved++;
+            }
         }
     }
+
+    error_log(sprintf(
+        'refresh_peer_medians: sector "%s" flushed — buckets: %d industry, %d sector',
+        $targetSector,
+        isset($buckets['industry']) ? count($buckets['industry']) : 0,
+        isset($buckets['sector'])   ? count($buckets['sector'])   : 0
+    ));
 }
 
 error_log(sprintf(
     'refresh_peer_medians: done — fetched=%d failed=%d skipped=%d median_rows_saved=%d version=%s',
-    $success,
-    $failed,
-    $skipped,
-    $saved,
+    $totalSuccess,
+    $totalFailed,
+    $totalSkipped,
+    $totalSaved,
     $modelVersion
 ));
 
@@ -238,15 +245,13 @@ exit(0);
  *
  * @param float[] $values
  */
-function self_median(array $values): float
+function batch_median(array $values): float
 {
     sort($values);
     $n   = count($values);
     $mid = (int) floor($n / 2);
 
-    if ($n % 2 === 0) {
-        return ($values[$mid - 1] + $values[$mid]) / 2.0;
-    }
-
-    return $values[$mid];
+    return ($n % 2 === 0)
+        ? ($values[$mid - 1] + $values[$mid]) / 2.0
+        : $values[$mid];
 }

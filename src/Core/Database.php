@@ -48,4 +48,17 @@ class Database
 
         return self::$instance;
     }
+
+    /**
+     * Force a fresh connection on the next call to connection().
+     *
+     * Used by long-running CLI scripts (e.g. bin/refresh_peer_medians.php)
+     * that must write to the DB after a lengthy Yahoo Finance fetch loop.
+     * CF shared hosting drops idle MySQL connections after ~60-120 s, so
+     * reconnecting per-sector keeps the connection alive.
+     */
+    public static function reconnect(): void
+    {
+        self::$instance = null;
+    }
 }
