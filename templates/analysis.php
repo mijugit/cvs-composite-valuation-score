@@ -273,7 +273,6 @@
                     </thead>
                     <tbody>
                         <?php
-                        <?php
                         // Valuation reference badge (FR-005) — shows which benchmark was used
                         $valRef    = $result['valuation_reference'] ?? [];
                         $valSource = $valRef['source'] ?? '';
