@@ -153,14 +153,15 @@ $signalChip = static function (?string $sig): string {
             $sec   = htmlspecialchars((string) ($row['sector']     ?? '—'));
             $date  = htmlspecialchars(substr((string) $row['score_date'], 0, 10));
 
-            // Colour reco
-            $recoColor = '';
-            $recoStr = (string) ($row['reco_swing'] ?? '');
-            if (str_contains($recoStr, 'SILNE KUPUJ') || str_contains($recoStr, 'AKUMULUJ')) {
-                $recoColor = 'color:var(--c-success);';
-            } elseif (str_contains($recoStr, 'UNIKAJ') || str_contains($recoStr, 'REDUKUJ')) {
-                $recoColor = 'color:var(--c-danger);';
-            }
+            // Colour reco — full 5-level palette matching watchlist chip colours
+            $recoStr   = (string) ($row['reco_swing'] ?? '');
+            $recoColor = match (true) {
+                str_contains($recoStr, 'SILNE KUPUJ') => 'color:var(--c-success);font-weight:700;',
+                str_contains($recoStr, 'AKUMULUJ')    => 'color:var(--c-primary);font-weight:700;',
+                str_contains($recoStr, 'REDUKUJ')     => 'color:var(--c-warn);',
+                str_contains($recoStr, 'UNIKAJ')      => 'color:var(--c-danger);',
+                default                               => 'color:var(--c-muted);',
+            };
         ?>
         <tr>
             <td>
