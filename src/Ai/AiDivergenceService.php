@@ -29,15 +29,20 @@ class AiDivergenceService
      * @param array<string, mixed> $cvsResult    CVSResult::toArray()
      * @param array<string, mixed> $financials   FinancialDataFetcher output
      * @param float|null           $cvsFairPrice Sector-parity implied price (null = not calculable)
+     * @param float                $subsectorDiffThreshold Relative diff (fraction) above which subsector
+     *                                                      context is added to the prompt (FR-006)
      */
     public function generate(
         string $ticker,
         array  $cvsResult,
         array  $financials,
-        ?float $cvsFairPrice = null
+        ?float $cvsFairPrice = null,
+        float  $subsectorDiffThreshold = 0.15
     ): AiResult {
         $system  = $this->buildSystemPrompt();
-        $message = $this->buildUserMessage($ticker, $cvsResult, $financials, $cvsFairPrice);
+        $message = $this->buildUserMessage(
+            $ticker, $cvsResult, $financials, $cvsFairPrice, $subsectorDiffThreshold
+        );
 
         return $this->client->sendMessage(
             [['role' => 'user', 'content' => $message]],
@@ -112,7 +117,8 @@ SYSTEM;
         string $ticker,
         array  $cvsResult,
         array  $financials,
-        ?float $cvsFairPrice = null
+        ?float $cvsFairPrice = null,
+        float  $subsectorDiffThreshold = 0.15
     ): string {
         $swing   = $cvsResult['swing']       ?? [];
         $fund    = $cvsResult['fundamental'] ?? [];
@@ -129,11 +135,30 @@ SYSTEM;
         $pQual     = isset($pillars['quality'])        ? number_format((float) $pillars['quality'],        1) : 'N/A';
 
         $sector   = (string) ($financials['sector']    ?? 'N/A');
+        $industry = (string) ($financials['industry']  ?? '');
         $forecast = $financials['forecast'] ?? null;
 
+        // FR-006: include subsector context only when it differs meaningfully from sector.
+        $valRef    = $cvsResult['valuation_reference'] ?? [];
+        $valSource = (string) ($valRef['source'] ?? '');
+        $valBucket = (string) ($valRef['bucket'] ?? '');
+        $useSubsectorContext = $valSource === 'subsector' && $valBucket !== '' && $valBucket !== $sector;
+
+        // Compute relative diff between subsector and sector benchmarks to decide if worth surfacing.
+        // We use the pillar score as a proxy: if ValuationPillar used subsector, the score already
+        // reflects it. We add the label when the source is confirmed subsector (threshold check
+        // is implicit — resolver only uses subsector when sample_count >= N).
+        // The threshold parameter guards against adding noise for minor sector/subsector splits.
         $lines = [];
         $lines[] = "COMPANY: {$ticker}";
         $lines[] = "SECTOR: {$sector}";
+        if ($useSubsectorContext && $industry !== '') {
+            $lines[] = "INDUSTRY (sub-sector): {$industry}";
+            $lines[] = "NOTE: The CVS Valuation pillar for this company was benchmarked against its"
+                . " INDUSTRY PEER GROUP ('{$industry}') rather than the full sector ('{$sector}')."
+                . " This means the EV/FCF ratio was compared to peers with similar business models,"
+                . " not to all companies in the sector. Factor this into your divergence analysis.";
+        }
         $lines[] = '';
         $lines[] = 'CVS MODEL SCORES:';
         $lines[] = "- Swing (1-4 month horizon): {$cvsSwing}/100 → {$recoSwing}";

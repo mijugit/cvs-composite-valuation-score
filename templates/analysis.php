@@ -273,17 +273,36 @@
                     </thead>
                     <tbody>
                         <?php
+                        <?php
+                        // Valuation reference badge (FR-005) — shows which benchmark was used
+                        $valRef    = $result['valuation_reference'] ?? [];
+                        $valSource = $valRef['source'] ?? '';
+                        $valBucket = $valRef['bucket'] ?? '';
+                        $valBadge  = '';
+                        if ($valSource === 'subsector' && $valBucket !== '') {
+                            $valBadge = ' <span title="Benchmark: podsektor ' . htmlspecialchars($valBucket) . '"'
+                                . ' style="font-size:.7rem;background:rgba(64,144,224,.15);color:var(--c-primary);'
+                                . 'border-radius:3px;padding:1px 5px;margin-left:.3rem;cursor:default;">'
+                                . '⊂ ' . htmlspecialchars($valBucket) . '</span>';
+                        } elseif (in_array($valSource, ['sector_fallback', 'cold_start'], true) && $valBucket !== '') {
+                            $valBadge = ' <span title="Benchmark: sektor ' . htmlspecialchars($valBucket) . '"'
+                                . ' style="font-size:.7rem;background:rgba(255,255,255,.06);color:var(--c-muted);'
+                                . 'border-radius:3px;padding:1px 5px;margin-left:.3rem;cursor:default;">'
+                                . '≈ ' . htmlspecialchars($valBucket) . '</span>';
+                        }
+                        ?>
+                        <?php
                         $pillarRows = [
-                            ['key' => 'valuation',      'label' => 'Wycena (EV/FCF)',     'sw' => '40%', 'fn' => '65%'],
-                            ['key' => 'momentum_swing', 'label' => 'Momentum (Swing)',     'sw' => '45%', 'fn' => '—'],
-                            ['key' => 'momentum_fund',  'label' => 'Momentum (Fund)',      'sw' => '—',   'fn' => '15%'],
-                            ['key' => 'quality',        'label' => 'Jakość fundamentalna', 'sw' => '15%', 'fn' => '20%'],
+                            ['key' => 'valuation',      'label' => 'Wycena (EV/FCF)',     'sw' => '40%', 'fn' => '65%', 'badge' => $valBadge],
+                            ['key' => 'momentum_swing', 'label' => 'Momentum (Swing)',     'sw' => '45%', 'fn' => '—',   'badge' => ''],
+                            ['key' => 'momentum_fund',  'label' => 'Momentum (Fund)',      'sw' => '—',   'fn' => '15%', 'badge' => ''],
+                            ['key' => 'quality',        'label' => 'Jakość fundamentalna', 'sw' => '15%', 'fn' => '20%', 'badge' => ''],
                         ];
                         foreach ($pillarRows as $row):
                             $score = $ps[$row['key']] ?? null;
                         ?>
                         <tr>
-                            <td><?= htmlspecialchars($row['label']) ?></td>
+                            <td><?= htmlspecialchars($row['label']) ?><?= $row['badge'] ?></td>
                             <td>
                                 <?php if ($score !== null): ?>
                                 <div class="progress-bar">
