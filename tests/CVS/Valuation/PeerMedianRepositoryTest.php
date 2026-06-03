@@ -1,0 +1,149 @@
+<?php
+
+declare(strict_types=1);
+
+namespace CVS\Tests\CVS\Valuation;
+
+use CVS\CVS\Valuation\PeerMedianRepository;
+use PDO;
+use PHPUnit\Framework\TestCase;
+
+/**
+ * Unit tests for PeerMedianRepository — SQLite in-memory.
+ */
+class PeerMedianRepositoryTest extends TestCase
+{
+    private PDO $db;
+    private PeerMedianRepository $repo;
+
+    protected function setUp(): void
+    {
+        $this->db = new PDO('sqlite::memory:');
+        $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+        // Bootstrap table (mirrors 012_create_peer_medians.sql for SQLite).
+        $this->db->exec('CREATE TABLE peer_medians (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            level        TEXT NOT NULL,
+            bucket_key   TEXT NOT NULL,
+            parent_sector TEXT NULL,
+            model_version TEXT NOT NULL,
+            metric_type  TEXT NOT NULL,
+            median_value REAL NULL,
+            sample_count INTEGER NOT NULL DEFAULT 0,
+            computed_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (level, bucket_key, model_version, metric_type)
+        )');
+
+        $this->repo = new PeerMedianRepository($this->db);
+    }
+
+    // ------------------------------------------------------------------
+    // findByBucket — cold start
+    // ------------------------------------------------------------------
+
+    public function test_find_returns_null_when_no_row(): void
+    {
+        $result = $this->repo->findByBucket('industry', 'Electronic Gaming', '3.0', 'ev_fcf');
+        $this->assertNull($result);
+    }
+
+    // ------------------------------------------------------------------
+    // upsertMedian — insert
+    // ------------------------------------------------------------------
+
+    public function test_insert_and_find_industry_row(): void
+    {
+        $this->repo->upsertMedian('industry', 'Electronic Gaming & Multimedia', 'Communication Services', '3.0', 'ev_fcf', 18.5, 7);
+
+        $row = $this->repo->findByBucket('industry', 'Electronic Gaming & Multimedia', '3.0', 'ev_fcf');
+
+        $this->assertNotNull($row);
+        $this->assertEqualsWithDelta(18.5, $row['median'], 0.001);
+        $this->assertSame(7, $row['sample_count']);
+    }
+
+    public function test_insert_sector_row_with_null_parent(): void
+    {
+        $this->repo->upsertMedian('sector', 'Communication Services', null, '3.0', 'ev_fcf', 22.0, 35);
+
+        $row = $this->repo->findByBucket('sector', 'Communication Services', '3.0', 'ev_fcf');
+
+        $this->assertNotNull($row);
+        $this->assertEqualsWithDelta(22.0, $row['median'], 0.001);
+        $this->assertSame(35, $row['sample_count']);
+    }
+
+    public function test_insert_null_median_when_sample_below_threshold(): void
+    {
+        $this->repo->upsertMedian('industry', 'Tiny Niche', null, '3.0', 'ev_fcf', null, 2);
+
+        $row = $this->repo->findByBucket('industry', 'Tiny Niche', '3.0', 'ev_fcf');
+
+        $this->assertNotNull($row);
+        $this->assertNull($row['median']);
+        $this->assertSame(2, $row['sample_count']);
+    }
+
+    // ------------------------------------------------------------------
+    // upsertMedian — update (idempotent re-run)
+    // ------------------------------------------------------------------
+
+    public function test_upsert_overwrites_existing_row(): void
+    {
+        $this->repo->upsertMedian('industry', 'Entertainment', 'Communication Services', '3.0', 'ev_fcf', 25.0, 10);
+        $this->repo->upsertMedian('industry', 'Entertainment', 'Communication Services', '3.0', 'ev_fcf', 26.5, 12);
+
+        $row = $this->repo->findByBucket('industry', 'Entertainment', '3.0', 'ev_fcf');
+
+        $this->assertNotNull($row);
+        $this->assertEqualsWithDelta(26.5, $row['median'], 0.001);
+        $this->assertSame(12, $row['sample_count']);
+    }
+
+    public function test_upsert_different_metrics_stored_separately(): void
+    {
+        $this->repo->upsertMedian('sector', 'Technology', null, '3.0', 'ev_fcf',   32.0, 50);
+        $this->repo->upsertMedian('sector', 'Technology', null, '3.0', 'ev_sales',  8.0, 50);
+        $this->repo->upsertMedian('sector', 'Technology', null, '3.0', 'gm',       55.0, 50);
+
+        $evFcf   = $this->repo->findByBucket('sector', 'Technology', '3.0', 'ev_fcf');
+        $evSales = $this->repo->findByBucket('sector', 'Technology', '3.0', 'ev_sales');
+        $gm      = $this->repo->findByBucket('sector', 'Technology', '3.0', 'gm');
+
+        $this->assertEqualsWithDelta(32.0, $evFcf['median'],   0.001);
+        $this->assertEqualsWithDelta(8.0,  $evSales['median'], 0.001);
+        $this->assertEqualsWithDelta(55.0, $gm['median'],      0.001);
+    }
+
+    // ------------------------------------------------------------------
+    // findAllByVersion
+    // ------------------------------------------------------------------
+
+    public function test_find_all_by_version_returns_only_matching(): void
+    {
+        $this->repo->upsertMedian('sector', 'Technology', null, '3.0', 'ev_fcf', 32.0, 50);
+        $this->repo->upsertMedian('sector', 'Technology', null, '2.0', 'ev_fcf', 30.0, 40); // different version
+
+        $rows = $this->repo->findAllByVersion('3.0');
+
+        $this->assertCount(1, $rows);
+        $this->assertSame('3.0', $rows[0]['model_version']);
+    }
+
+    // ------------------------------------------------------------------
+    // Version isolation
+    // ------------------------------------------------------------------
+
+    public function test_versions_stored_independently(): void
+    {
+        $this->repo->upsertMedian('sector', 'Healthcare', null, '3.0', 'ev_fcf', 28.0, 20);
+        $this->repo->upsertMedian('sector', 'Healthcare', null, '4.0', 'ev_fcf', 30.0, 25);
+
+        $v3 = $this->repo->findByBucket('sector', 'Healthcare', '3.0', 'ev_fcf');
+        $v4 = $this->repo->findByBucket('sector', 'Healthcare', '4.0', 'ev_fcf');
+
+        $this->assertEqualsWithDelta(28.0, $v3['median'], 0.001);
+        $this->assertEqualsWithDelta(30.0, $v4['median'], 0.001);
+    }
+}
