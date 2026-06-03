@@ -35,8 +35,17 @@
          <?= empty($watchlist) ? 'hidden' : '' ?>>
         <h3>Obserwowane</h3>
         <div class="watchlist-chips">
-            <?php foreach ($watchlist ?? [] as $t): ?>
-            <span class="watchlist-chip" data-ticker="<?= htmlspecialchars($t) ?>">
+            <?php foreach ($watchlist ?? [] as $t):
+                $reco      = $watchlistRecos[$t] ?? '';
+                $recoClass = match (true) {
+                    str_contains($reco, 'SILNE KUPUJ') => 'reco--strong-buy',
+                    str_contains($reco, 'AKUMULUJ')    => 'reco--accumulate',
+                    str_contains($reco, 'REDUKUJ')     => 'reco--reduce',
+                    str_contains($reco, 'UNIKAJ')      => 'reco--avoid',
+                    default                            => '',
+                };
+            ?>
+            <span class="watchlist-chip <?= $recoClass ?>" data-ticker="<?= htmlspecialchars($t) ?>">
                 <?= htmlspecialchars($t) ?>
                 <button class="watchlist-chip__remove"
                         data-ticker="<?= htmlspecialchars($t) ?>"

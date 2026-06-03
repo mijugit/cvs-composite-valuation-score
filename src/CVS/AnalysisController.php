@@ -14,6 +14,7 @@ use CVS\History\HistoryRepository;
 use CVS\Pro\AiUsageRepository;
 use CVS\Pro\ProGate;
 use CVS\Pro\ProRepository;
+use CVS\TrackRecord\CvsSnapshotRepository;
 use CVS\Watchlist\WatchlistRepository;
 
 /**
@@ -52,10 +53,24 @@ class AnalysisController
         $history       = $this->history->findByUser($userId, $this->maxHistory);
         $alertRepo     = new AlertRepository();
         $alertsEnabled = $alertRepo->isGlobalEnabled($userId);
+
+        // Build ticker→reco_swing map from latest snapshots for colour-coding chips.
+        $watchlistRecos = [];
+        if (!empty($watchlist)) {
+            $snapshotRepo = new CvsSnapshotRepository();
+            foreach ($snapshotRepo->findAllLatest() as $row) {
+                $t = strtoupper((string) ($row['ticker'] ?? ''));
+                if (in_array($t, $watchlist, true) && isset($row['reco_swing'])) {
+                    $watchlistRecos[$t] = (string) $row['reco_swing'];
+                }
+            }
+        }
+
         Response::view('dashboard', [
-            'watchlist'     => $watchlist,
-            'history'       => $history,
-            'alertsEnabled' => $alertsEnabled, // S-04
+            'watchlist'      => $watchlist,
+            'watchlistRecos' => $watchlistRecos, // ticker→reco_swing map for chip colours
+            'history'        => $history,
+            'alertsEnabled'  => $alertsEnabled,
         ]);
     }
 

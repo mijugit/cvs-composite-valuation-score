@@ -324,6 +324,12 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
 
 .watchlist-chip:hover { border-color: var(--c-primary); }
 
+/* Chip border colours by latest recommendation (from cvs_snapshots) */
+.watchlist-chip.reco--strong-buy  { border-color: var(--c-success);  box-shadow: 0 0 0 1px var(--c-success); }
+.watchlist-chip.reco--accumulate  { border-color: var(--c-primary);  box-shadow: 0 0 0 1px var(--c-primary); }
+.watchlist-chip.reco--reduce      { border-color: var(--c-warn);     box-shadow: 0 0 0 1px var(--c-warn); }
+.watchlist-chip.reco--avoid       { border-color: var(--c-danger);   box-shadow: 0 0 0 1px var(--c-danger); }
+
 .watchlist-chip__remove {
     background: transparent;
     border: none;
