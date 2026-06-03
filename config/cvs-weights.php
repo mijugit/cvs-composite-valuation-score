@@ -143,7 +143,7 @@ return [
         'max_tickers'     => 10,    // soft cap; enforced by response-time guardrail
         'timeout_seconds' => 25,    // API call timeout per ticker
         'cache_ttl'       => 3600,  // seconds; cache raw API response per ticker
-        'max_watchlist'   => 20,    // max watchlist entries per user (S-06)
+        'max_watchlist'   => 50,    // max watchlist entries per user (S-06)
         'max_history'     => 20,    // max analysis-history entries shown on dashboard (S-08)
     ],
 

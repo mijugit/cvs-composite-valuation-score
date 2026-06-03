@@ -74,6 +74,12 @@ a:hover { text-decoration: underline; }
 .card--fail  { border-color: var(--c-danger); }
 .card--result { border-color: var(--c-primary); }
 
+/* backdrop-filter creates a new stacking context, which clips the ticker
+   autocomplete dropdown. Elevate the form card above sibling cards so the
+   dropdown renders on top of the history accordion below it. */
+.analysis-form-wrapper { position: relative; z-index: 2; }
+.history-section       { position: relative; z-index: 1; }
+
 /* --- Forms ------------------------------------------------ */
 .form { display: flex; flex-direction: column; gap: 1rem; }
 .form-group { display: flex; flex-direction: column; gap: .35rem; }
