@@ -86,10 +86,12 @@ foreach ($tickers as $ticker) {
         continue;
     }
 
-    $result = $model->calculate($ticker, $financials);
-    $price  = isset($financials['current_price']) ? (float) $financials['current_price'] : null;
-    $sector = isset($financials['sector'])        ? (string) $financials['sector']        : null;
-    $snapshots->save($ticker, $result->toArray(), $price, $sector);
+    $result       = $model->calculate($ticker, $financials);
+    $price        = isset($financials['current_price']) ? (float)  $financials['current_price'] : null;
+    $sector       = isset($financials['sector'])        ? (string) $financials['sector']        : null;
+    $industry     = isset($financials['industry'])      ? (string) $financials['industry']      : null;
+    $modelVersion = $result->modelVersion !== '' ? $result->modelVersion : null;
+    $snapshots->save($ticker, $result->toArray(), $price, $sector, $industry, $modelVersion);
 
     // S-04: check for state change and notify watching users.
     $alerted = $alertSvc->checkAndNotify($ticker, $result->toArray());

@@ -34,13 +34,19 @@ class TrackRecordRepository
     /**
      * All evaluated snapshot pairs across all tickers.
      *
+     * When $modelVersion is provided, only snapshots from that version are
+     * paired together — methodologies are never mixed (Phase 3 guardrail).
+     *
      * @return array<int, array<string, mixed>>
      */
-    public function getEvaluations(int $horizonDays = 30): array
+    public function getEvaluations(int $horizonDays = 30, ?string $modelVersion = null): array
     {
         [$cutoffOld, $cutoffRecent] = $this->dateCutoffs($horizonDays);
 
-        $stmt = $this->db->prepare('
+        $versionFilter = $modelVersion !== null ? 'AND old.model_version = ?' : '';
+        $latestVersionFilter = $modelVersion !== null ? 'AND model_version = ?' : '';
+
+        $stmt = $this->db->prepare("
             SELECT
                 old.ticker,
                 old.score_date,
@@ -49,6 +55,7 @@ class TrackRecordRepository
                 old.reco_swing,
                 old.reco_fund,
                 old.golden_signal,
+                old.model_version,
                 old.price_at_snapshot  AS price_then,
                 latest.price_now       AS price_now,
                 ROUND(
@@ -62,14 +69,26 @@ class TrackRecordRepository
                 FROM cvs_snapshots
                 WHERE score_date >= ?
                   AND price_at_snapshot IS NOT NULL
+                  {$latestVersionFilter}
                 GROUP BY ticker
             ) latest ON latest.ticker = old.ticker
             WHERE old.score_date <= ?
               AND old.price_at_snapshot IS NOT NULL
               AND old.quality_gate = 1
+              {$versionFilter}
             ORDER BY old.ticker ASC, old.score_date ASC
-        ');
-        $stmt->execute([$cutoffRecent, $cutoffOld]);
+        ");
+
+        $params = [$cutoffRecent];
+        if ($modelVersion !== null) {
+            $params[] = $modelVersion; // for latestVersionFilter
+        }
+        $params[] = $cutoffOld;
+        if ($modelVersion !== null) {
+            $params[] = $modelVersion; // for versionFilter
+        }
+
+        $stmt->execute($params);
         return $stmt->fetchAll() ?: [];
     }
 
@@ -78,12 +97,15 @@ class TrackRecordRepository
      *
      * @return array<int, array<string, mixed>>
      */
-    public function getForTicker(string $ticker, int $horizonDays = 30): array
+    public function getForTicker(string $ticker, int $horizonDays = 30, ?string $modelVersion = null): array
     {
         $ticker = strtoupper($ticker);
         [$cutoffOld, $cutoffRecent] = $this->dateCutoffs($horizonDays);
 
-        $stmt = $this->db->prepare('
+        $versionFilter = $modelVersion !== null ? 'AND old.model_version = ?' : '';
+        $latestVersionFilter = $modelVersion !== null ? 'AND model_version = ?' : '';
+
+        $stmt = $this->db->prepare("
             SELECT
                 old.ticker,
                 old.score_date,
@@ -92,6 +114,7 @@ class TrackRecordRepository
                 old.reco_swing,
                 old.reco_fund,
                 old.golden_signal,
+                old.model_version,
                 old.price_at_snapshot  AS price_then,
                 latest.price_now       AS price_now,
                 ROUND(
@@ -106,15 +129,28 @@ class TrackRecordRepository
                 WHERE score_date >= ?
                   AND price_at_snapshot IS NOT NULL
                   AND ticker = ?
+                  {$latestVersionFilter}
                 GROUP BY ticker
             ) latest ON latest.ticker = old.ticker
             WHERE old.ticker = ?
               AND old.score_date <= ?
               AND old.price_at_snapshot IS NOT NULL
               AND old.quality_gate = 1
+              {$versionFilter}
             ORDER BY old.score_date ASC
-        ');
-        $stmt->execute([$cutoffRecent, $ticker, $ticker, $cutoffOld]);
+        ");
+
+        $params = [$cutoffRecent, $ticker];
+        if ($modelVersion !== null) {
+            $params[] = $modelVersion; // for latestVersionFilter
+        }
+        $params[] = $ticker;
+        $params[] = $cutoffOld;
+        if ($modelVersion !== null) {
+            $params[] = $modelVersion; // for versionFilter
+        }
+
+        $stmt->execute($params);
         return $stmt->fetchAll() ?: [];
     }
 

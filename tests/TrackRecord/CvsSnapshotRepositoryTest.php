@@ -28,6 +28,8 @@ class CvsSnapshotRepositoryTest extends TestCase
                 id                 INTEGER PRIMARY KEY AUTOINCREMENT,
                 ticker             TEXT    NOT NULL,
                 sector             TEXT    NULL,
+                industry           TEXT    NULL,
+                model_version      TEXT    NULL,
                 score_date         TEXT    NOT NULL,
                 scored_at          TEXT    NOT NULL,
                 price_at_snapshot  REAL    NULL,
@@ -224,5 +226,43 @@ class CvsSnapshotRepositoryTest extends TestCase
         $tomorrow = new DateTimeImmutable('tomorrow');
         $rows = $repo->findByTickerSince('AAPL', $tomorrow);
         $this->assertSame([], $rows);
+    }
+
+    // ------------------------------------------------------------------
+    // Phase 3: industry + model_version
+    // ------------------------------------------------------------------
+
+    public function test_save_stores_industry_and_model_version(): void
+    {
+        $repo = $this->makeRepo();
+        $repo->save('TTWO', $this->passResult('TTWO'), 200.0, 'Communication Services', 'Electronic Gaming & Multimedia', '3.0');
+
+        $row = $repo->findLatestByTicker('TTWO');
+        $this->assertNotNull($row);
+        $this->assertSame('Electronic Gaming & Multimedia', $row['industry']);
+        $this->assertSame('3.0', $row['model_version']);
+    }
+
+    public function test_save_null_industry_and_version_backward_compat(): void
+    {
+        $repo = $this->makeRepo();
+        $repo->save('AAPL', $this->passResult('AAPL')); // old callers don't pass industry/version
+
+        $row = $repo->findLatestByTicker('AAPL');
+        $this->assertNotNull($row);
+        $this->assertNull($row['industry']);
+        $this->assertNull($row['model_version']);
+    }
+
+    public function test_upsert_updates_industry_and_version(): void
+    {
+        $repo = $this->makeRepo();
+        $repo->save('AAPL', $this->passResult('AAPL'), 150.0, 'Technology', null, null);
+        $repo->save('AAPL', $this->passResult('AAPL'), 152.0, 'Technology', 'Consumer Electronics', '3.0');
+
+        $row = $repo->findLatestByTicker('AAPL');
+        $this->assertNotNull($row);
+        $this->assertSame('Consumer Electronics', $row['industry']);
+        $this->assertSame('3.0', $row['model_version']);
     }
 }

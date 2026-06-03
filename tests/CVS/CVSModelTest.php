@@ -7,6 +7,8 @@ namespace CVS\Tests\CVS;
 use CVS\CVS\CVSModel;
 use CVS\CVS\Pillars\ValuationPillar;
 use CVS\CVS\Pillars\MomentumPillar;
+use CVS\CVS\Valuation\PeerMedianRepository;
+use PDO;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -18,10 +20,36 @@ use PHPUnit\Framework\TestCase;
 class CVSModelTest extends TestCase
 {
     private array $config;
+    private PeerMedianRepository $peerRepo;
 
     protected function setUp(): void
     {
         $this->config = require dirname(__DIR__, 2) . '/config/cvs-weights.php';
+
+        // Provide an in-memory SQLite peer-median repo so CVSModel does not
+        // try to connect to a real MySQL database during offline tests.
+        // Empty DB → MedianResolver always falls back to cold-start (static
+        // benchmarks) → identical scoring to the legacy path.
+        $pdo = new PDO('sqlite::memory:');
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $pdo->exec('CREATE TABLE peer_medians (
+            id INTEGER PRIMARY KEY,
+            level TEXT NOT NULL,
+            bucket_key TEXT NOT NULL,
+            parent_sector TEXT NULL,
+            model_version TEXT NOT NULL,
+            metric_type TEXT NOT NULL,
+            median_value REAL NULL,
+            sample_count INTEGER NOT NULL DEFAULT 0,
+            computed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(level, bucket_key, model_version, metric_type)
+        )');
+        $this->peerRepo = new PeerMedianRepository($pdo);
+    }
+
+    private function model(): CVSModel
+    {
+        return new CVSModel($this->config, $this->peerRepo);
     }
 
     // ------------------------------------------------------------------
@@ -30,7 +58,7 @@ class CVSModelTest extends TestCase
 
     public function test_quality_gate_fails_on_zero_revenue(): void
     {
-        $model  = new CVSModel($this->config);
+        $model  = $this->model();
         $result = $model->calculate('TEST', $this->baseFinancials(['revenue' => 0]));
 
         $this->assertFalse($result->qualityGatePassed);
@@ -40,7 +68,7 @@ class CVSModelTest extends TestCase
 
     public function test_quality_gate_fails_on_high_leverage(): void
     {
-        $model  = new CVSModel($this->config);
+        $model  = $this->model();
         $result = $model->calculate('TEST', $this->baseFinancials([
             'total_debt'   => 1_000_000,
             'total_equity' =>   100_000, // D/E = 10x → FAIL (threshold 5x)
@@ -55,7 +83,7 @@ class CVSModelTest extends TestCase
 
     public function test_swing_cvs_is_between_0_and_100(): void
     {
-        $model  = new CVSModel($this->config);
+        $model  = $this->model();
         $result = $model->calculate('TEST', $this->baseFinancials());
 
         $this->assertTrue($result->qualityGatePassed);
@@ -66,7 +94,7 @@ class CVSModelTest extends TestCase
 
     public function test_fundamental_cvs_is_between_0_and_100(): void
     {
-        $model  = new CVSModel($this->config);
+        $model  = $this->model();
         $result = $model->calculate('TEST', $this->baseFinancials());
 
         $this->assertTrue($result->qualityGatePassed);
@@ -77,7 +105,7 @@ class CVSModelTest extends TestCase
 
     public function test_cvs_backward_compat_returns_swing(): void
     {
-        $model  = new CVSModel($this->config);
+        $model  = $this->model();
         $result = $model->calculate('TEST', $this->baseFinancials());
 
         $this->assertSame($result->swingCvs, $result->cvs());
@@ -89,7 +117,7 @@ class CVSModelTest extends TestCase
 
     public function test_pillar_scores_contain_valuation(): void
     {
-        $model  = new CVSModel($this->config);
+        $model  = $this->model();
         $result = $model->calculate('TEST', $this->baseFinancials());
 
         $this->assertArrayHasKey('valuation',      $result->pillarScores);
@@ -104,7 +132,7 @@ class CVSModelTest extends TestCase
 
     public function test_same_input_always_produces_same_cvs(): void
     {
-        $model      = new CVSModel($this->config);
+        $model      = $this->model();
         $financials = $this->baseFinancials();
 
         $a = $model->calculate('AAPL', $financials);
@@ -121,7 +149,7 @@ class CVSModelTest extends TestCase
 
     public function test_toArray_contains_disclaimer(): void
     {
-        $model  = new CVSModel($this->config);
+        $model  = $this->model();
         $result = $model->calculate('TEST', $this->baseFinancials());
         $arr    = $result->toArray();
 
@@ -135,7 +163,7 @@ class CVSModelTest extends TestCase
 
     public function test_toArray_contains_swing_and_fundamental(): void
     {
-        $model  = new CVSModel($this->config);
+        $model  = $this->model();
         $result = $model->calculate('TEST', $this->baseFinancials());
         $arr    = $result->toArray();
 
@@ -152,7 +180,7 @@ class CVSModelTest extends TestCase
     public function test_golden_signal_strong_when_both_high(): void
     {
         // Force both swing and fundamental high: excellent momentum + cheap valuation
-        $model      = new CVSModel($this->config);
+        $model      = $this->model();
         $financials = $this->baseFinancials([
             // Excellent momentum: +60% in 1M, SPY flat
             'monthly_closes' => [60.0, 62.0, 64.0, 66.0, 68.0, 70.0, 96.0],
@@ -182,7 +210,7 @@ class CVSModelTest extends TestCase
     public function test_golden_signal_null_when_both_low(): void
     {
         // Force both scores low: very expensive stock, terrible momentum
-        $model      = new CVSModel($this->config);
+        $model      = $this->model();
         $financials = $this->baseFinancials([
             // Negative momentum: falling knife
             'monthly_closes' => [160.0, 155.0, 150.0, 145.0, 140.0, 130.0, 120.0],
@@ -216,7 +244,7 @@ class CVSModelTest extends TestCase
 
     public function test_strong_buy_threshold(): void
     {
-        $model      = new CVSModel($this->config);
+        $model      = $this->model();
         $financials = $this->baseFinancials([
             // Excellent growth
             'revenue_history'       => [500_000, 700_000, 1_000_000, 1_400_000, 2_000_000],
@@ -311,7 +339,7 @@ class CVSModelTest extends TestCase
     {
         // Short history (7 entries) makes 1M dominant in swing; 6M in fundamental.
         // With a strong 1M spike, swing momentum > fundamental momentum.
-        $model      = new CVSModel($this->config);
+        $model      = $this->model();
         $financials = $this->baseFinancials([
             // Big recent spike: 1M ago was 100, now 140 → 40% 1M gain
             // But 6M ago was 130 → only 7.7% 6M gain

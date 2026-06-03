@@ -7,6 +7,9 @@ namespace CVS\CVS;
 use CVS\CVS\Pillars\ValuationPillar;
 use CVS\CVS\Pillars\MomentumPillar;
 use CVS\CVS\Pillars\QualityPillar;
+use CVS\CVS\Valuation\MedianResolver;
+use CVS\CVS\Valuation\PeerMedianRepository;
+use CVS\Core\Database;
 
 /**
  * CVS model orchestrator — S-05 dual-mode rebuild.
@@ -34,14 +37,37 @@ class CVSModel
     private ValuationPillar $valuation;
     private MomentumPillar  $momentum;
 
-    /** @param array<string, mixed> $config  Full contents of config/cvs-weights.php */
-    public function __construct(private readonly array $config)
+    /**
+     * @param array<string, mixed>     $config  Full contents of config/cvs-weights.php
+     * @param PeerMedianRepository|null $repo   Injected for tests; production uses DB singleton
+     */
+    public function __construct(private readonly array $config, ?PeerMedianRepository $repo = null)
     {
         $this->qualityGate = new QualityGate($config['quality_gate']);
-        // Valuation pillar needs all benchmarks (resolves sector internally).
-        $this->valuation   = new ValuationPillar($config['benchmarks'] ?? []);
+
+        // Build ValuationPillar with peer-group resolver when enabled (FR-010).
+        $peerConfig = $config['peer_group'] ?? [];
+        if (!empty($peerConfig['enabled'])) {
+            $repository = $repo ?? new PeerMedianRepository();
+            $resolver   = new MedianResolver(
+                repo:           $repository,
+                benchmarks:     $config['benchmarks'] ?? [],
+                minSampleCount: (int) ($peerConfig['min_sample_count'] ?? 5),
+                modelVersion:   (string) ($config['model_version'] ?? '3.0'),
+            );
+            $this->valuation = new ValuationPillar(
+                benchmarks:   $config['benchmarks'] ?? [],
+                resolver:     $resolver,
+                anchorBlend:  (string) ($peerConfig['anchor_blend']  ?? 'min'),
+                anchorWeight: (float)  ($peerConfig['anchor_weight'] ?? 0.3),
+            );
+        } else {
+            // Legacy / peer_group disabled — static benchmarks only.
+            $this->valuation = new ValuationPillar($config['benchmarks'] ?? []);
+        }
+
         // Momentum pillar is constructed with swing config (cap/divisor are shared).
-        $this->momentum    = new MomentumPillar($config['modes']['swing'] ?? []);
+        $this->momentum = new MomentumPillar($config['modes']['swing'] ?? []);
     }
 
     // ------------------------------------------------------------------
@@ -104,6 +130,12 @@ class CVSModel
         $swingReco = $this->mapToLabel((int) round($swingCvs));
         $fundReco  = $this->mapToLabel((int) round($fundCvs));
 
+        // Step 5 — Valuation reference (source + bucket used, for FR-005 transparency).
+        $valuationReference = [
+            'source'       => $this->valuation->lastSource(),
+            'bucket'       => $this->valuation->lastBucketKey(),
+        ];
+
         return CVSResult::passed(
             ticker:                    $ticker,
             swingCvs:                  $swingCvs,
@@ -116,7 +148,11 @@ class CVSModel
             ],
             swingRecommendation:       $swingReco,
             fundamentalRecommendation: $fundReco,
-            config:                    $this->config
+            config:                    $this->config,
+            modelVersion:              (string) ($this->config['model_version'] ?? ''),
+            industry:                  is_string($financials['industry'] ?? null)
+                                         ? (string) $financials['industry'] : null,
+            valuationReference:        $valuationReference,
         );
     }
 

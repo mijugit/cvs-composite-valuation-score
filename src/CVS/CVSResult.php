@@ -29,6 +29,12 @@ class CVSResult
     /** @var array<string, float>  valuation, momentum_swing, momentum_fund, quality */
     public readonly array   $pillarScores;
 
+    // Phase 3: model versioning + valuation transparency
+    public readonly string  $modelVersion;
+    public readonly ?string $industry;
+    /** @var array{source: string, bucket: string} */
+    public readonly array   $valuationReference;
+
     /**
      * @param bool                 $qualityGatePassed
      * @param string               $ticker
@@ -49,17 +55,23 @@ class CVSResult
         ?string $swingRecommendation,
         ?string $fundamentalRecommendation,
         ?string $goldenSignal,
-        array   $pillarScores
+        array   $pillarScores,
+        string  $modelVersion        = '',
+        ?string $industry            = null,
+        array   $valuationReference  = ['source' => 'cold_start', 'bucket' => ''],
     ) {
-        $this->qualityGatePassed          = $qualityGatePassed;
-        $this->ticker                     = $ticker;
-        $this->gateFailures               = $gateFailures;
-        $this->swingCvs                   = $swingCvs;
-        $this->fundamentalCvs             = $fundamentalCvs;
-        $this->swingRecommendation        = $swingRecommendation;
-        $this->fundamentalRecommendation  = $fundamentalRecommendation;
-        $this->goldenSignal               = $goldenSignal;
-        $this->pillarScores               = $pillarScores;
+        $this->qualityGatePassed         = $qualityGatePassed;
+        $this->ticker                    = $ticker;
+        $this->gateFailures              = $gateFailures;
+        $this->swingCvs                  = $swingCvs;
+        $this->fundamentalCvs            = $fundamentalCvs;
+        $this->swingRecommendation       = $swingRecommendation;
+        $this->fundamentalRecommendation = $fundamentalRecommendation;
+        $this->goldenSignal              = $goldenSignal;
+        $this->pillarScores              = $pillarScores;
+        $this->modelVersion              = $modelVersion;
+        $this->industry                  = $industry;
+        $this->valuationReference        = $valuationReference;
     }
 
     // ------------------------------------------------------------------
@@ -73,13 +85,16 @@ class CVSResult
      * @param array<string, mixed> $config         Full cvs-weights.php config (for threshold reading)
      */
     public static function passed(
-        string $ticker,
-        float  $swingCvs,
-        float  $fundamentalCvs,
-        array  $pillarScores,
-        string $swingRecommendation,
-        string $fundamentalRecommendation,
-        array  $config = []
+        string  $ticker,
+        float   $swingCvs,
+        float   $fundamentalCvs,
+        array   $pillarScores,
+        string  $swingRecommendation,
+        string  $fundamentalRecommendation,
+        array   $config              = [],
+        string  $modelVersion        = '',
+        ?string $industry            = null,
+        array   $valuationReference  = ['source' => 'cold_start', 'bucket' => ''],
     ): self {
         $goldenSignal = self::computeGoldenSignal($swingCvs, $fundamentalCvs, $config);
 
@@ -92,7 +107,10 @@ class CVSResult
             swingRecommendation:       $swingRecommendation,
             fundamentalRecommendation: $fundamentalRecommendation,
             goldenSignal:              $goldenSignal,
-            pillarScores:              $pillarScores
+            pillarScores:              $pillarScores,
+            modelVersion:              $modelVersion,
+            industry:                  $industry,
+            valuationReference:        $valuationReference,
         );
     }
 
@@ -163,10 +181,13 @@ class CVSResult
                 'cvs'            => $this->fundamentalCvs,
                 'recommendation' => $this->fundamentalRecommendation,
             ],
-            'golden_signal'  => $this->goldenSignal,
-            'pillar_scores'  => $this->pillarScores,
+            'golden_signal'       => $this->goldenSignal,
+            'pillar_scores'       => $this->pillarScores,
+            'model_version'       => $this->modelVersion,
+            'industry'            => $this->industry,
+            'valuation_reference' => $this->valuationReference,
             // Legal disclaimer — must accompany every CVS result (PRD FR-009).
-            'disclaimer'     => 'Wyniki CVS to hipoteza modelu analitycznego, nie rekomendacja inwestycyjna. Inwestuj świadomie.',
+            'disclaimer'          => 'Wyniki CVS to hipoteza modelu analitycznego, nie rekomendacja inwestycyjna. Inwestuj świadomie.',
         ];
     }
 

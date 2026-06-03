@@ -41,9 +41,17 @@ class CvsSnapshotRepository
      * @param array<string, mixed> $result          CVSResult::toArray()
      * @param float|null           $priceAtSnapshot Current price at scoring time (S-02)
      * @param string|null          $sector          Yahoo Finance sector (S-03 screener filter)
+     * @param string|null          $industry        Yahoo Finance industry / sub-sector (Phase 3)
+     * @param string|null          $modelVersion    CVS model version stamp (Phase 3)
      */
-    public function save(string $ticker, array $result, ?float $priceAtSnapshot = null, ?string $sector = null): void
-    {
+    public function save(
+        string  $ticker,
+        array   $result,
+        ?float  $priceAtSnapshot = null,
+        ?string $sector          = null,
+        ?string $industry        = null,
+        ?string $modelVersion    = null
+    ): void {
         $scoreDate = (new DateTimeImmutable())->format('Y-m-d');
         $scoredAt  = (new DateTimeImmutable())->format('Y-m-d H:i:s');
 
@@ -57,6 +65,8 @@ class CvsSnapshotRepository
         $params = [
             ':ticker'            => $ticker,
             ':sector'            => $sector,
+            ':industry'          => $industry,
+            ':model_version'     => $modelVersion,
             ':score_date'        => $scoreDate,
             ':scored_at'         => $scoredAt,
             ':price_at_snapshot' => $priceAtSnapshot,
@@ -73,17 +83,17 @@ class CvsSnapshotRepository
         try {
             $stmt = $this->db->prepare('
                 INSERT INTO cvs_snapshots
-                    (ticker, sector, score_date, scored_at, price_at_snapshot,
-                     cvs_swing, cvs_fund, reco_swing, reco_fund,
+                    (ticker, sector, industry, model_version, score_date, scored_at,
+                     price_at_snapshot, cvs_swing, cvs_fund, reco_swing, reco_fund,
                      golden_signal, quality_gate, gate_failures, pillar_scores)
                 VALUES
-                    (:ticker, :sector, :score_date, :scored_at, :price_at_snapshot,
-                     :cvs_swing, :cvs_fund, :reco_swing, :reco_fund,
+                    (:ticker, :sector, :industry, :model_version, :score_date, :scored_at,
+                     :price_at_snapshot, :cvs_swing, :cvs_fund, :reco_swing, :reco_fund,
                      :golden_signal, :quality_gate, :gate_failures, :pillar_scores)
             ');
             $stmt->execute($params);
         } catch (PDOException $e) {
-            $msg = $e->getMessage();
+            $msg   = $e->getMessage();
             $isDup = str_contains($msg, 'Duplicate') || str_contains($msg, 'UNIQUE constraint');
 
             if (!$isDup) {
@@ -96,6 +106,8 @@ class CvsSnapshotRepository
                 $upd = $this->db->prepare('
                     UPDATE cvs_snapshots
                     SET sector            = :sector,
+                        industry          = :industry,
+                        model_version     = :model_version,
                         scored_at         = :scored_at,
                         price_at_snapshot = :price_at_snapshot,
                         cvs_swing         = :cvs_swing,
