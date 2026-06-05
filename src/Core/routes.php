@@ -16,12 +16,14 @@ use CVS\CVS\AnalysisController;
 use CVS\Screener\ScreenerController;
 use CVS\TrackRecord\TrackRecordController;
 use CVS\Watchlist\WatchlistController;
+use CVS\Admin\SectorsController;
 use CVS\Pro\ProController;
 
 $auth        = new AuthController();
 $analysis    = new AnalysisController();
 $watchlist   = new WatchlistController();
 $pro         = new ProController();
+$sectors     = new SectorsController();
 $trackRecord = new TrackRecordController();
 $screener    = new ScreenerController();
 $alertCtrl   = new AlertController();
@@ -70,6 +72,13 @@ $router->get('/admin/pro',                fn($req) => $pro->index($req));
 $router->post('/admin/pro',               fn($req) => $pro->store($req));
 $router->post('/admin/pro/revoke',        fn($req) => $pro->revoke($req));
 $router->post('/admin/pro/activate-code', fn($req) => $pro->activateCode($req));
+
+// ------------------------------------------------------------------
+// Admin: Sectors (admin-sector-refresh)
+// ------------------------------------------------------------------
+
+$router->get('/admin/sectors',          fn($req) => $sectors->index($req));
+$router->post('/admin/sectors/refresh', fn($req) => $sectors->refresh($req));
 $router->post('/pro/activate',            fn($req) => $pro->activate($req));
 $router->post('/pro/request',             fn($req) => $pro->sendRequest($req));
 

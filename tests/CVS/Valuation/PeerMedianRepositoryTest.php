@@ -132,6 +132,64 @@ class PeerMedianRepositoryTest extends TestCase
     }
 
     // ------------------------------------------------------------------
+    // findSectorStats
+    // ------------------------------------------------------------------
+
+    public function test_find_sector_stats_returns_empty_on_no_data(): void
+    {
+        $stats = $this->repo->findSectorStats('3.0');
+
+        $this->assertSame([], $stats['sector']);
+        $this->assertSame([], $stats['industry']);
+    }
+
+    public function test_find_sector_stats_pivots_metrics_per_bucket(): void
+    {
+        $this->repo->upsertMedian('sector', 'Technology', null, '3.0', 'ev_fcf',  32.0, 50);
+        $this->repo->upsertMedian('sector', 'Technology', null, '3.0', 'ev_sales', 8.0, 50);
+        $this->repo->upsertMedian('sector', 'Technology', null, '3.0', 'gm',      55.0, 50);
+
+        $stats = $this->repo->findSectorStats('3.0');
+
+        $this->assertArrayHasKey('Technology', $stats['sector']);
+        $row = $stats['sector']['Technology'];
+        $this->assertEqualsWithDelta(32.0, $row['ev_fcf'],  0.001);
+        $this->assertEqualsWithDelta(8.0,  $row['ev_sales'], 0.001);
+        $this->assertEqualsWithDelta(55.0, $row['gm'],      0.001);
+        $this->assertSame(50, $row['sample_count']);
+    }
+
+    public function test_find_sector_stats_industry_includes_parent_sector(): void
+    {
+        $this->repo->upsertMedian('industry', 'Software—Application', 'Technology', '3.0', 'ev_fcf', 35.0, 20);
+
+        $stats = $this->repo->findSectorStats('3.0');
+
+        $this->assertArrayHasKey('Software—Application', $stats['industry']);
+        $this->assertSame('Technology', $stats['industry']['Software—Application']['parent_sector']);
+    }
+
+    public function test_find_sector_stats_isolates_by_model_version(): void
+    {
+        $this->repo->upsertMedian('sector', 'Healthcare', null, '3.0', 'ev_fcf', 20.0, 15);
+        $this->repo->upsertMedian('sector', 'Healthcare', null, '2.0', 'ev_fcf', 18.0, 10);
+
+        $stats = $this->repo->findSectorStats('3.0');
+
+        $this->assertArrayHasKey('Healthcare', $stats['sector']);
+        $this->assertEqualsWithDelta(20.0, $stats['sector']['Healthcare']['ev_fcf'], 0.001);
+    }
+
+    public function test_find_sector_stats_handles_null_median(): void
+    {
+        $this->repo->upsertMedian('sector', 'Technology', null, '3.0', 'ev_fcf', null, 2);
+
+        $stats = $this->repo->findSectorStats('3.0');
+
+        $this->assertNull($stats['sector']['Technology']['ev_fcf']);
+    }
+
+    // ------------------------------------------------------------------
     // Version isolation
     // ------------------------------------------------------------------
 

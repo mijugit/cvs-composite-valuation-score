@@ -164,6 +164,62 @@ class PeerMedianRepository
     }
 
     /**
+     * Aggregate peer-median rows per (level, bucket_key) for the admin sectors panel.
+     *
+     * Returns:
+     * [
+     *   'sector'   => [ sectorName   => ['computed_at'=>..., 'sample_count'=>..., 'ev_fcf'=>..., 'ev_sales'=>..., 'gm'=>...] ],
+     *   'industry' => [ industryName => ['parent_sector'=>..., ...same metrics...] ],
+     * ]
+     *
+     * @return array{sector: array<string, array<string, mixed>>, industry: array<string, array<string, mixed>>}
+     */
+    public function findSectorStats(string $modelVersion): array
+    {
+        $result = ['sector' => [], 'industry' => []];
+
+        foreach (['sector', 'industry'] as $level) {
+            $stmt = $this->db->prepare('
+                SELECT bucket_key, parent_sector, metric_type, median_value, sample_count, computed_at
+                FROM   peer_medians
+                WHERE  level         = :level
+                  AND  model_version = :model_version
+                ORDER  BY bucket_key, metric_type
+            ');
+            $stmt->execute([':level' => $level, ':model_version' => $modelVersion]);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+            foreach ($rows as $row) {
+                $key = (string) $row['bucket_key'];
+                if (!isset($result[$level][$key])) {
+                    $result[$level][$key] = [
+                        'computed_at'   => $row['computed_at'],
+                        'sample_count'  => (int) $row['sample_count'],
+                        'ev_fcf'        => null,
+                        'ev_sales'      => null,
+                        'gm'            => null,
+                    ];
+                    if ($level === 'industry') {
+                        $result[$level][$key]['parent_sector'] = (string) ($row['parent_sector'] ?? '');
+                    }
+                }
+                $metric = (string) $row['metric_type'];
+                if (in_array($metric, ['ev_fcf', 'ev_sales', 'gm'], true)) {
+                    $result[$level][$key][$metric] = $row['median_value'] !== null
+                        ? (float) $row['median_value']
+                        : null;
+                }
+                // Use the latest computed_at across metrics for this bucket.
+                if ($row['computed_at'] > $result[$level][$key]['computed_at']) {
+                    $result[$level][$key]['computed_at'] = $row['computed_at'];
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * Fetch all rows for a given model version (useful for diagnostics / reports).
      *
      * @return array<int, array<string, mixed>>
