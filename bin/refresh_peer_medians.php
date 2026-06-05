@@ -58,23 +58,47 @@ use CVS\CVS\Valuation\ValuationMetrics;
 use CVS\Core\Database;
 
 // ------------------------------------------------------------------
-// Resolve which sectors to process today
+// Resolve which sectors to process today (or --sector=X override)
 // ------------------------------------------------------------------
 
-$dayOfWeek     = (int) date('N'); // 1=Mon … 7=Sun
-$schedule      = $config['batch_schedule'] ?? [];
-$todaysSectors = $schedule[$dayOfWeek] ?? [];
-
-if (empty($todaysSectors)) {
-    error_log(sprintf('refresh_peer_medians: day %d has no sectors scheduled — nothing to do.', $dayOfWeek));
-    exit(0);
+$forceSector = null;
+foreach ($argv ?? [] as $arg) {
+    if (str_starts_with($arg, '--sector=')) {
+        $forceSector = trim(substr($arg, 9));
+        break;
+    }
 }
 
-error_log(sprintf(
-    'refresh_peer_medians: day %d — processing sectors: %s',
-    $dayOfWeek,
-    implode(', ', $todaysSectors)
-));
+$schedule = $config['batch_schedule'] ?? [];
+
+if ($forceSector !== null) {
+    /** @var list<string> $allScheduledSectors */
+    $allScheduledSectors = array_values(array_unique(array_merge(...array_values($schedule))));
+    if (!in_array($forceSector, $allScheduledSectors, true)) {
+        error_log(sprintf(
+            'refresh_peer_medians: unknown sector "%s" — valid sectors: %s',
+            $forceSector,
+            implode(', ', $allScheduledSectors)
+        ));
+        exit(1);
+    }
+    $todaysSectors = [$forceSector];
+    error_log(sprintf('refresh_peer_medians: manual override — processing sector: %s', $forceSector));
+} else {
+    $dayOfWeek     = (int) date('N'); // 1=Mon … 7=Sun
+    $todaysSectors = $schedule[$dayOfWeek] ?? [];
+
+    if (empty($todaysSectors)) {
+        error_log(sprintf('refresh_peer_medians: day %d has no sectors scheduled — nothing to do.', $dayOfWeek));
+        exit(0);
+    }
+
+    error_log(sprintf(
+        'refresh_peer_medians: day %d — processing sectors: %s',
+        $dayOfWeek,
+        implode(', ', $todaysSectors)
+    ));
+}
 
 // ------------------------------------------------------------------
 // Load ticker population
