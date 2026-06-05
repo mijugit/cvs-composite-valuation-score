@@ -107,6 +107,44 @@
 .signal-pill--strong    { background: rgba(34,  197, 94,  .15); color: var(--c-success); }
 .signal-pill--watchlist { background: rgba(250, 204, 21,  .15); color: var(--c-fund); }
 .signal-pill--momentum  { background: rgba(64,  144, 224, .15); color: var(--c-primary); }
+.signal-pill--neutral   { background: var(--c-border, rgba(255,255,255,.08)); color: var(--c-text-muted, #888); }
+
+/* --- Admin Sectors table ----------------------------------- */
+.sectors-table td, .sectors-table th { vertical-align: middle; }
+
+.sector-row { cursor: pointer; transition: background .12s; }
+.sector-row:hover { background: rgba(255,255,255,.04); }
+.sector-row--no-children { cursor: default; }
+.sector-row--no-children:hover { background: none; }
+
+.sector-row__arrow {
+    display: inline-block;
+    font-size: .6rem;
+    margin-right: .35rem;
+    transition: transform .18s;
+    color: var(--c-text-muted, #888);
+}
+.sector-row--expanded .sector-row__arrow { transform: rotate(90deg); }
+
+.industry-row td { background: rgba(0,0,0,.15); }
+
+/* Toast */
+.sectors-toast {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    background: var(--c-surface, #1e1e2e);
+    border: 1px solid var(--c-border, rgba(255,255,255,.12));
+    color: var(--c-text, #e2e8f0);
+    padding: .75rem 1.25rem;
+    border-radius: .5rem;
+    font-size: .875rem;
+    box-shadow: 0 4px 24px rgba(0,0,0,.4);
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity .2s;
+}
+.sectors-toast.sectors-toast--visible { opacity: 1; }
 
 /* --- Progress bar (canonical — replaces pillar-bar) -------- */
 /*

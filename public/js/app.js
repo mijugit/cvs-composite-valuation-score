@@ -692,4 +692,79 @@
         return [...prefix, ...substr].slice(0, MAX_SUGGESTIONS);
     }
 
+// ------------------------------------------------------------------
+// Admin Sectors — accordion + refresh AJAX + toast
+// ------------------------------------------------------------------
+
+(function () {
+    'use strict';
+
+    const sectorRows = document.querySelectorAll('.sector-row');
+    if (!sectorRows.length) return;
+
+    function getCsrfSectors() {
+        return document.querySelector('meta[name="csrf-token"]')?.content
+            ?? document.getElementById('csrf-token')?.value
+            ?? '';
+    }
+
+    let toastTimer = null;
+    function showToast(msg) {
+        const el = document.getElementById('sectors-toast');
+        if (!el) return;
+        el.textContent = msg;
+        el.hidden = false;
+        el.classList.add('sectors-toast--visible');
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+            el.classList.remove('sectors-toast--visible');
+            setTimeout(() => { el.hidden = true; }, 200);
+        }, 4000);
+    }
+
+    // Accordion
+    sectorRows.forEach(row => {
+        row.addEventListener('click', e => {
+            if (e.target.closest('.js-refresh-sector')) return;
+            const slug = row.dataset.sector;
+            if (!slug) return;
+            const children = document.querySelectorAll('.industry-row--' + slug);
+            if (!children.length) return;
+            children.forEach(r => { r.hidden = !r.hidden; });
+            row.classList.toggle('sector-row--expanded');
+        });
+    });
+
+    // Refresh AJAX
+    document.querySelectorAll('.js-refresh-sector').forEach(btn => {
+        btn.addEventListener('click', async e => {
+            e.stopPropagation();
+            const sector = btn.dataset.sector;
+            btn.disabled = true;
+            btn.textContent = '…';
+            const csrf = getCsrfSectors();
+            try {
+                const resp = await fetch('/admin/sectors/refresh', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type':     'application/x-www-form-urlencoded',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-Token':     csrf,
+                    },
+                    body: new URLSearchParams({ sector, _csrf: csrf }),
+                });
+                const data = await resp.json();
+                showToast(data.ok
+                    ? 'Odświeżanie ' + sector + ' uruchomiono'
+                    : 'Błąd: ' + (data.error ?? 'nieznany'));
+            } catch {
+                showToast('Błąd połączenia');
+            } finally {
+                btn.textContent = 'Odśwież';
+                btn.disabled = false;
+            }
+        });
+    });
+}());
+
 })();
