@@ -21,6 +21,10 @@
             <a href="/dashboard">Panel</a>
             <a href="/screener">Screener</a>
             <a href="/track-record">Track Record</a>
+            <?php if (!empty($_SESSION['is_admin'])): ?>
+            <a href="/admin/pro">Panel PRO</a>
+            <a href="/admin/sectors">Sektory</a>
+            <?php endif; ?>
             <a href="/logout">Wyloguj</a>
         </nav>
         <?php endif; ?>
