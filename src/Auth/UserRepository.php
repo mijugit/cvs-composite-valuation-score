@@ -50,7 +50,7 @@ class UserRepository
     public function findByEmail(string $email): ?array
     {
         $stmt = $this->db->prepare(
-            'SELECT id, email, password_hash FROM users WHERE email = ? LIMIT 1'
+            'SELECT id, email, password_hash, is_admin FROM users WHERE email = ? LIMIT 1'
         );
         $stmt->execute([$email]);
         $row = $stmt->fetch();
