@@ -22,8 +22,15 @@
             <a href="/screener">Screener</a>
             <a href="/track-record">Track Record</a>
             <?php if (!empty($_SESSION['is_admin'])): ?>
-            <a href="/admin/pro">Panel PRO</a>
-            <a href="/admin/sectors">Sektory</a>
+            <div class="admin-menu">
+                <button class="admin-menu__trigger" type="button" aria-haspopup="true">
+                    Admin <span class="admin-menu__caret">▾</span>
+                </button>
+                <ul class="admin-menu__dropdown" role="menu">
+                    <li><a href="/admin/pro" role="menuitem">Panel PRO</a></li>
+                    <li><a href="/admin/sectors" role="menuitem">Sektory</a></li>
+                </ul>
+            </div>
             <?php endif; ?>
             <a href="/logout">Wyloguj</a>
         </nav>
