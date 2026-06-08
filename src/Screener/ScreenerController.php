@@ -19,7 +19,12 @@ class ScreenerController
 
     public function __construct()
     {
-        $this->repo = new ScreenerRepository();
+        // Hotfix (2026-06-08): inject the live model_version so the repository
+        // can filter out cvs-overlay-penalties shadow rows (3.1) — see
+        // ScreenerRepository::$liveModelVersion / findAllLatest().
+        $config      = require dirname(__DIR__, 2) . '/config/cvs-weights.php';
+        $liveVersion = $config['model_version'] ?? null;
+        $this->repo  = new ScreenerRepository(null, $liveVersion !== null ? (string) $liveVersion : null);
     }
 
     public function index(Request $req): void

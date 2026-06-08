@@ -17,9 +17,23 @@ class ScreenerRepository
 {
     private PDO $db;
 
-    public function __construct(?PDO $db = null)
+    /**
+     * Live model_version (config/cvs-weights.php → model_version).
+     *
+     * Hotfix (2026-06-08): cvs-overlay-penalties shadow persistence (p4, SHA
+     * 9530a10) writes a second row per (ticker, score_date) under model_version
+     * 3.1 alongside the live 3.0 row. Without filtering, findAllLatest() returns
+     * BOTH rows for the same day (both satisfy MAX(score_date)), doubling the
+     * screener listing. Restrict to the live version; shadow rows are an internal
+     * preview, never user-facing. Nullable for backward-compat with callers/tests
+     * that don't pass it (falls back to the pre-fix unfiltered behaviour).
+     */
+    private ?string $liveModelVersion;
+
+    public function __construct(?PDO $db = null, ?string $liveModelVersion = null)
     {
-        $this->db = $db ?? Database::connection();
+        $this->db               = $db ?? Database::connection();
+        $this->liveModelVersion = $liveModelVersion;
     }
 
     // ------------------------------------------------------------------
@@ -128,6 +142,26 @@ class ScreenerRepository
      */
     private function findAllLatest(): array
     {
+        if ($this->liveModelVersion !== null) {
+            $stmt = $this->db->prepare('
+                SELECT s.*
+                FROM cvs_snapshots s
+                INNER JOIN (
+                    SELECT ticker, MAX(score_date) AS max_date
+                    FROM cvs_snapshots
+                    WHERE model_version = :live_version
+                    GROUP BY ticker
+                ) latest ON s.ticker = latest.ticker AND s.score_date = latest.max_date
+                WHERE s.model_version = :live_version_join
+                ORDER BY s.ticker ASC
+            ');
+            $stmt->execute([
+                ':live_version'      => $this->liveModelVersion,
+                ':live_version_join' => $this->liveModelVersion,
+            ]);
+            return $stmt->fetchAll() ?: [];
+        }
+
         $stmt = $this->db->prepare('
             SELECT s.*
             FROM cvs_snapshots s

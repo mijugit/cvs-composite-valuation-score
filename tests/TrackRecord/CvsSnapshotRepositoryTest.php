@@ -476,6 +476,56 @@ class CvsSnapshotRepositoryTest extends TestCase
         $this->assertSame('→ NEUTRALNIE', $byVersion['3.1']['reco_swing']);
     }
 
+    // ------------------------------------------------------------------
+    // Hotfix (2026-06-08): findAllLatest() must filter out shadow rows
+    // ------------------------------------------------------------------
+    //
+    // Regression coverage for the screener/dashboard duplicate-listing bug:
+    // since 3.0 and 3.1 legitimately coexist for the same (ticker, score_date)
+    // (see test_save_3_0_and_3_1_coexist_for_same_ticker_and_day above), an
+    // unfiltered "latest per ticker" read returns BOTH rows — both satisfy
+    // MAX(score_date) — doubling user-facing listings (screener table, dashboard
+    // watchlist chip map). findAllLatest($liveModelVersion) must restrict to the
+    // production-facing model only; shadow rows are an internal preview.
+
+    public function test_find_all_latest_with_live_version_excludes_shadow_row(): void
+    {
+        [$repo, ] = $this->makeVersionedRepo();
+
+        $base   = $this->passResult('AAPL');
+        $base['swing']['cvs'] = 74.0;
+
+        $shadow = $this->passResult('AAPL');
+        $shadow['swing']['cvs'] = 62.0; // shadow carries overlay-penalised scores
+
+        $repo->save('AAPL', $base,   185.50, 'Technology', null, '3.0');
+        $repo->save('AAPL', $shadow, 185.50, 'Technology', null, '3.1');
+
+        $rows = $repo->findAllLatest('3.0');
+
+        $this->assertCount(1, $rows, 'shadow (3.1) row must not surface in the live "latest" read');
+        $this->assertSame('3.0', $rows[0]['model_version']);
+        $this->assertEquals(74.0, $rows[0]['cvs_swing'], 'must be the live-model row, not the shadow row');
+    }
+
+    public function test_find_all_latest_without_live_version_returns_both_rows_legacy_behaviour(): void
+    {
+        // Documents the pre-fix behaviour for backward-compat callers that
+        // explicitly opt out of version filtering (pass null) — e.g. tests or
+        // call sites predating the shadow-persistence feature. New user-facing
+        // call sites (AnalysisController::dashboard, ScreenerRepository) MUST
+        // pass the live model_version; this test exists only to document the
+        // unfiltered fallback, not to endorse it as user-facing behaviour.
+        [$repo, ] = $this->makeVersionedRepo();
+
+        $repo->save('AAPL', $this->passResult('AAPL'), 185.50, 'Technology', null, '3.0');
+        $repo->save('AAPL', $this->passResult('AAPL'), 185.50, 'Technology', null, '3.1');
+
+        $rows = $repo->findAllLatest();
+
+        $this->assertCount(2, $rows, 'unfiltered read legitimately sees both same-day rows (3.0 + 3.1)');
+    }
+
     public function test_save_pair_is_idempotent_no_duplicate_rows_on_double_run(): void
     {
         [$repo, $pdo] = $this->makeVersionedRepo();

@@ -30,15 +30,20 @@ class AnalysisController
     private WatchlistRepository  $watchlist;
     private HistoryRepository    $history;
     private int                  $maxHistory;
+    private string               $modelVersion;
 
     public function __construct()
     {
-        $config           = require dirname(__DIR__, 2) . '/config/cvs-weights.php';
-        $this->model      = new CVSModel($config);
-        $this->fetcher    = new FinancialDataFetcher($config['data_source']);
-        $this->watchlist  = new WatchlistRepository();
-        $this->history    = new HistoryRepository();
-        $this->maxHistory = $config['data_source']['max_history'] ?? 20;
+        $config             = require dirname(__DIR__, 2) . '/config/cvs-weights.php';
+        $this->model        = new CVSModel($config);
+        $this->fetcher      = new FinancialDataFetcher($config['data_source']);
+        $this->watchlist    = new WatchlistRepository();
+        $this->history      = new HistoryRepository();
+        $this->maxHistory   = $config['data_source']['max_history'] ?? 20;
+        // Hotfix (2026-06-08): live model_version, used to filter out
+        // cvs-overlay-penalties shadow rows (3.1) from "latest snapshot" reads —
+        // see CvsSnapshotRepository::findAllLatest().
+        $this->modelVersion = (string) ($config['model_version'] ?? '');
     }
 
     // ------------------------------------------------------------------
@@ -58,7 +63,7 @@ class AnalysisController
         $watchlistRecos = [];
         if (!empty($watchlist)) {
             $snapshotRepo = new CvsSnapshotRepository();
-            foreach ($snapshotRepo->findAllLatest() as $row) {
+            foreach ($snapshotRepo->findAllLatest($this->modelVersion) as $row) {
                 $t = strtoupper((string) ($row['ticker'] ?? ''));
                 if (in_array($t, $watchlist, true) && isset($row['reco_swing'])) {
                     $watchlistRecos[$t] = (string) $row['reco_swing'];

@@ -170,10 +170,41 @@ class CvsSnapshotRepository
     /**
      * Most recent snapshot per ticker across all tickers (for screener S-03).
      *
+     * Hotfix (2026-06-08): since `cvs-overlay-penalties` (p4, shadow persistence,
+     * SHA 9530a10) started writing a second "shadow" row per (ticker, score_date)
+     * under model_version 3.1 — alongside the live 3.0 row, both sharing the same
+     * score_date — the unfiltered MAX(score_date) join returns BOTH rows for the
+     * same day, doubling results downstream (dashboard chip map, screener listing).
+     * Pass the live `model_version` (config/cvs-weights.php → model_version) to
+     * restrict "latest" to the production-facing model only; shadow rows are an
+     * internal preview and must never surface in user-facing "latest" reads.
+     * Optional + nullable for backward compatibility (existing tests / callers
+     * that don't care about shadow rows, e.g. pre-shadow-persistence snapshots).
+     *
      * @return array<int, array<string, mixed>>
      */
-    public function findAllLatest(): array
+    public function findAllLatest(?string $liveModelVersion = null): array
     {
+        if ($liveModelVersion !== null) {
+            $stmt = $this->db->prepare('
+                SELECT s.*
+                FROM cvs_snapshots s
+                INNER JOIN (
+                    SELECT ticker, MAX(score_date) AS max_date
+                    FROM cvs_snapshots
+                    WHERE model_version = :live_version
+                    GROUP BY ticker
+                ) latest ON s.ticker = latest.ticker AND s.score_date = latest.max_date
+                WHERE s.model_version = :live_version_join
+                ORDER BY s.ticker ASC
+            ');
+            $stmt->execute([
+                ':live_version'      => $liveModelVersion,
+                ':live_version_join' => $liveModelVersion,
+            ]);
+            return $stmt->fetchAll() ?: [];
+        }
+
         $stmt = $this->db->prepare('
             SELECT s.*
             FROM cvs_snapshots s
