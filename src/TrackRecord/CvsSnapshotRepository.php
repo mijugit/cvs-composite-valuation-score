@@ -119,8 +119,14 @@ class CvsSnapshotRepository
                         gate_failures     = :gate_failures,
                         pillar_scores     = :pillar_scores
                     WHERE ticker = :ticker AND score_date = :score_date
+                      AND (model_version = :model_version_match
+                           OR (model_version IS NULL AND :model_version_match IS NULL))
                 ');
-                $upd->execute($params);
+                // Distinct placeholder for the WHERE-clause match (NULL-safe, MySQL/SQLite
+                // portable — MySQL has no general `col IS value`; `<=>` is MySQL-only).
+                // A separate name avoids relying on duplicate-named-parameter binding,
+                // which is not uniformly supported across PDO drivers.
+                $upd->execute($params + [':model_version_match' => $modelVersion]);
             } catch (PDOException $ue) {
                 error_log(sprintf('CvsSnapshotRepository::update failed for %s: %s', $ticker, $ue->getMessage()));
             }
