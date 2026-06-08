@@ -265,6 +265,39 @@
                 </div>
                 <?php endif; ?>
 
+                <?php
+                // Phase 5 (slice 2) — earnings-timing badge (FR-010). Always present,
+                // independent of overlays/earnings_guard flags (badge ≠ guard
+                // separation, FR-017) — a sibling block to the shadow preview chip
+                // above, deliberately NOT nested inside `$overlay !== null`.
+                if (($et = $result['earnings_timing'] ?? null) !== null && $et['state'] !== null):
+                    $etState  = (string) $et['state'];
+                    $etDaysTo = $et['days_to']    ?? null;
+                    $etDaysSi = $et['days_since'] ?? null;
+
+                    $etPillClass = match ($etState) {
+                        'before'     => 'signal-pill--momentum',
+                        'in_transit' => 'signal-pill--watchlist',
+                        'after'      => 'signal-pill--neutral',
+                        default      => 'signal-pill--neutral',
+                    };
+
+                    $etDni = static function (?int $n): string {
+                        return $n === 1 ? 'dzień' : 'dni';
+                    };
+
+                    $etLabel = match ($etState) {
+                        'before'     => sprintf('📅 Wyniki za %d %s', (int) $etDaysTo, $etDni((int) $etDaysTo)),
+                        'in_transit' => '📅 W oknie wyników',
+                        'after'      => sprintf('📅 Wyniki %d %s temu', (int) $etDaysSi, $etDni((int) $etDaysSi)),
+                        default      => '📅 Wyniki',
+                    };
+                ?>
+                <span class="signal-pill <?= htmlspecialchars($etPillClass) ?>" style="margin-top:.6rem;display:inline-block;">
+                    <?= htmlspecialchars($etLabel) ?>
+                </span>
+                <?php endif; ?>
+
                 <!-- Radar + Price chart side-by-side -->
                 <div class="radar-price-row">
                     <div class="detail-radar-wrapper">

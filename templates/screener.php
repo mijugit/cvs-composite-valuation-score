@@ -45,6 +45,20 @@ $signalChip = static function (?string $sig): string {
         default     => '<span style="color:var(--c-muted);">—</span>',
     };
 };
+
+// Phase 5 (slice 2) — earnings-timing chip (FR-008/FR-010), reading the persisted
+// columns from migration 015 (earnings_state/days_to_earnings/days_since_earnings).
+// `default` (state NULL — pre-migration snapshot or no calendar coverage) renders
+// `—`, consistent with $signalChip's no-signal convention.
+$earningsChip = static function (?string $state, ?int $daysTo, ?int $daysSince): string {
+    $dni = static fn (?int $n): string => $n === 1 ? 'dzień' : 'dni';
+    return match ($state) {
+        'before'     => '<span class="signal-pill signal-pill--momentum">📅 za ' . (int) $daysTo . ' ' . $dni((int) $daysTo) . '</span>',
+        'in_transit' => '<span class="signal-pill signal-pill--watchlist">📅 w oknie</span>',
+        'after'      => '<span class="signal-pill signal-pill--neutral">📅 ' . (int) $daysSince . ' ' . $dni((int) $daysSince) . ' temu</span>',
+        default      => '<span style="color:var(--c-muted);">—</span>',
+    };
+};
 ?>
 
 <div style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:.5rem;">
@@ -139,6 +153,7 @@ $signalChip = static function (?string $sig): string {
                 <th><?= $sortLink('fund',  'CVS Fund') ?></th>
                 <th>Rekomendacja</th>
                 <th>Sygnał</th>
+                <th>Wyniki</th>
                 <th>Sektor</th>
                 <th>Cena</th>
                 <th><?= $sortLink('date', 'Data') ?></th>
@@ -174,6 +189,11 @@ $signalChip = static function (?string $sig): string {
             <td><strong style="color:var(--c-fund);"><?= $fund ?></strong></td>
             <td style="font-size:var(--text-sm);<?= $recoColor ?>"><?= $reco ?></td>
             <td><?= $signalChip($row['golden_signal'] ?? null) ?></td>
+            <td><?= $earningsChip(
+                $row['earnings_state']      ?? null,
+                isset($row['days_to_earnings'])    ? (int) $row['days_to_earnings']    : null,
+                isset($row['days_since_earnings']) ? (int) $row['days_since_earnings'] : null
+            ) ?></td>
             <td style="font-size:var(--text-sm);color:var(--c-muted);"><?= $sec ?></td>
             <td style="font-size:var(--text-sm);"><?= $price ?></td>
             <td style="font-size:var(--text-xs);color:var(--c-muted);"><?= $date ?></td>
