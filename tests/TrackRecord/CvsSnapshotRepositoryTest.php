@@ -254,15 +254,155 @@ class CvsSnapshotRepositoryTest extends TestCase
         $this->assertNull($row['model_version']);
     }
 
-    public function test_upsert_updates_industry_and_version(): void
+    public function test_upsert_updates_industry_when_model_version_unchanged(): void
     {
+        // Phase 5 (slice 1) adaptation: model_version is now part of a snapshot's
+        // *identity* (it differentiates the base 3.0 row from the 3.1 shadow row —
+        // see the widened-key tests below). A same-day rerun that keeps the version
+        // constant but resolves richer industry data must still update in place —
+        // that's the realistic "second run of the day" scenario this test guards.
+        // (Changing model_version itself is no longer an in-place metadata edit —
+        // it now identifies a distinct snapshot row; see the NULL-safe WHERE match
+        // in CvsSnapshotRepository::save()'s UPDATE fallback.)
         $repo = $this->makeRepo();
-        $repo->save('AAPL', $this->passResult('AAPL'), 150.0, 'Technology', null, null);
+        $repo->save('AAPL', $this->passResult('AAPL'), 150.0, 'Technology', null, '3.0');
         $repo->save('AAPL', $this->passResult('AAPL'), 152.0, 'Technology', 'Consumer Electronics', '3.0');
 
         $row = $repo->findLatestByTicker('AAPL');
         $this->assertNotNull($row);
         $this->assertSame('Consumer Electronics', $row['industry']);
         $this->assertSame('3.0', $row['model_version']);
+    }
+
+    // ------------------------------------------------------------------
+    // Phase 5 (slice 1): shadow persistence — widened key
+    // (ticker, score_date, model_version), per migration 014
+    // ------------------------------------------------------------------
+
+    /**
+     * Builds a repo against the *post-migration-014* schema — UNIQUE widened to
+     * (ticker, score_date, model_version) — so a 3.0 row and a 3.1 shadow row
+     * can coexist for the same (ticker, score_date). Returns the PDO alongside
+     * the repo so tests can inspect raw row counts (the repo's read API only
+     * surfaces the latest row per ticker/day, not per version).
+     *
+     * @return array{0: CvsSnapshotRepository, 1: PDO}
+     */
+    private function makeVersionedRepo(): array
+    {
+        $pdo = new PDO('sqlite::memory:');
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+        $pdo->exec('
+            CREATE TABLE cvs_snapshots (
+                id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticker             TEXT    NOT NULL,
+                sector             TEXT    NULL,
+                industry           TEXT    NULL,
+                model_version      TEXT    NULL,
+                score_date         TEXT    NOT NULL,
+                scored_at          TEXT    NOT NULL,
+                price_at_snapshot  REAL    NULL,
+                cvs_swing          REAL    NULL,
+                cvs_fund           REAL    NULL,
+                reco_swing         TEXT    NULL,
+                reco_fund          TEXT    NULL,
+                golden_signal      TEXT    NULL,
+                quality_gate       INTEGER NOT NULL DEFAULT 0,
+                gate_failures      TEXT    NULL,
+                pillar_scores      TEXT    NULL,
+                UNIQUE (ticker, score_date, model_version)
+            )
+        ');
+
+        return [new CvsSnapshotRepository($pdo), $pdo];
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function rowsForTicker(PDO $pdo, string $ticker): array
+    {
+        $stmt = $pdo->prepare(
+            'SELECT model_version, cvs_swing, cvs_fund, reco_swing
+             FROM cvs_snapshots WHERE ticker = ? ORDER BY model_version ASC'
+        );
+        $stmt->execute([$ticker]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function test_save_3_0_and_3_1_coexist_for_same_ticker_and_day(): void
+    {
+        [$repo, $pdo] = $this->makeVersionedRepo();
+
+        $base = $this->passResult('AAPL');
+        $base['swing']['cvs'] = 74.0;
+
+        $shadow = $this->passResult('AAPL');
+        $shadow['swing']['cvs']       = 62.0; // shadow carries overlay-penalised scores
+        $shadow['fundamental']['cvs'] = 58.0;
+        $shadow['swing']['recommendation'] = '→ NEUTRALNIE';
+
+        $repo->save('AAPL', $base,   185.50, 'Technology', null, '3.0');
+        $repo->save('AAPL', $shadow, 185.50, 'Technology', null, '3.1');
+
+        $rows = $this->rowsForTicker($pdo, 'AAPL');
+        $this->assertCount(2, $rows, 'base (3.0) and shadow (3.1) rows must coexist — no collision');
+
+        $byVersion = array_column($rows, null, 'model_version');
+        $this->assertArrayHasKey('3.0', $byVersion);
+        $this->assertArrayHasKey('3.1', $byVersion);
+        $this->assertEquals(74.0, $byVersion['3.0']['cvs_swing']);
+        $this->assertEquals(62.0, $byVersion['3.1']['cvs_swing']);
+        $this->assertEquals(58.0, $byVersion['3.1']['cvs_fund']);
+        $this->assertSame('→ NEUTRALNIE', $byVersion['3.1']['reco_swing']);
+    }
+
+    public function test_save_pair_is_idempotent_no_duplicate_rows_on_double_run(): void
+    {
+        [$repo, $pdo] = $this->makeVersionedRepo();
+
+        $base   = $this->passResult('MSFT');
+        $shadow = $this->passResult('MSFT');
+        $shadow['swing']['cvs'] = 60.0;
+
+        // First rescore run — writes the 3.0/3.1 pair.
+        $repo->save('MSFT', $base,   400.0, 'Technology', null, '3.0');
+        $repo->save('MSFT', $shadow, 400.0, 'Technology', null, '3.1');
+
+        // Second run, same day, fresher numbers — must update in place, not duplicate.
+        $base2   = $this->passResult('MSFT');
+        $base2['swing']['cvs'] = 76.0;
+        $shadow2 = $this->passResult('MSFT');
+        $shadow2['swing']['cvs'] = 64.0;
+
+        $repo->save('MSFT', $base2,   402.0, 'Technology', null, '3.0');
+        $repo->save('MSFT', $shadow2, 402.0, 'Technology', null, '3.1');
+
+        $rows = $this->rowsForTicker($pdo, 'MSFT');
+        $this->assertCount(2, $rows, 'double-run must not create duplicate (ticker, score_date, model_version) rows');
+
+        $byVersion = array_column($rows, null, 'model_version');
+        $this->assertEquals(76.0, $byVersion['3.0']['cvs_swing'], 'base row must reflect the second run, not a duplicate of the first');
+        $this->assertEquals(64.0, $byVersion['3.1']['cvs_swing'], 'shadow row must reflect the second run, not a duplicate of the first');
+    }
+
+    public function test_save_versioned_update_does_not_cross_contaminate_rows(): void
+    {
+        // Guards the NULL-safe model_version match in the UPDATE fallback: updating
+        // the 3.1 row must not also overwrite (or be confused with) the 3.0 row.
+        [$repo, $pdo] = $this->makeVersionedRepo();
+
+        $repo->save('GOOG', $this->passResult('GOOG'), 170.0, 'Technology', null, '3.0');
+        $repo->save('GOOG', $this->passResult('GOOG'), 170.0, 'Technology', null, '3.1');
+
+        $shadowUpdate = $this->passResult('GOOG');
+        $shadowUpdate['swing']['cvs'] = 55.0;
+        $repo->save('GOOG', $shadowUpdate, 171.0, 'Technology', null, '3.1');
+
+        $rows      = $this->rowsForTicker($pdo, 'GOOG');
+        $byVersion = array_column($rows, null, 'model_version');
+
+        $this->assertCount(2, $rows);
+        $this->assertEquals(74.0, $byVersion['3.0']['cvs_swing'], 'base (3.0) row must remain untouched by the shadow-row update');
+        $this->assertEquals(55.0, $byVersion['3.1']['cvs_swing'], 'shadow (3.1) row must reflect its own update');
     }
 }

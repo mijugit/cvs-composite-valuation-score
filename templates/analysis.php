@@ -231,6 +231,40 @@
                     </div>
                 </div>
 
+                <?php
+                // Phase 5 (slice 1) — shadow model_version (3.1) preview chip.
+                // Shown alongside the headline 3.0 scores above; never replaces them
+                // (guardrail FR-016 — displayed reco stays at 3.0 until recalibration).
+                $overlay = $result['overlay'] ?? null;
+                if ($overlay !== null):
+                    $ovPenalties = $overlay['penalties'] ?? [];
+                    $ovCoverage  = $overlay['coverage']  ?? [];
+                    $ovTotal     = (float) ($ovPenalties['total']    ?? 0.0);
+                    $ovRevision  = (float) ($ovPenalties['revision'] ?? 0.0);
+                    $ovTarget    = (float) ($ovPenalties['target']   ?? 0.0);
+                    $ovVersion   = (string) ($overlay['shadow_version'] ?? '3.1');
+
+                    $ovMissing = [];
+                    if (!empty($ovCoverage['missing_eps_trend'])) $ovMissing[] = 'rewizja';
+                    if (!empty($ovCoverage['missing_target']))    $ovMissing[] = 'target';
+                ?>
+                <div class="overlay-preview-chip"
+                     style="margin-top:.6rem;padding:.5rem .75rem;border-radius:6px;
+                            font-size:.8rem;line-height:1.5;color:var(--c-muted);
+                            background:rgba(255,255,255,.04);">
+                    <strong style="color:var(--c-text);">Podgląd <?= htmlspecialchars($ovVersion) ?>:</strong>
+                    <?= htmlspecialchars(number_format($ovTotal, 1)) ?> pkt
+                    (rewizja <?= htmlspecialchars(number_format($ovRevision, 1)) ?> /
+                     target <?= htmlspecialchars(number_format($ovTarget, 1)) ?>)
+                    <?php if ($ovMissing !== []): ?>
+                        <span style="opacity:.75;"> — brak danych: <?= htmlspecialchars(implode('/', $ovMissing)) ?></span>
+                    <?php endif; ?>
+                    <span style="display:block;margin-top:.15rem;opacity:.65;">
+                        Tryb cieniowy (eksperymentalny) — oficjalna rekomendacja pozostaje wg modelu 3.0 powyżej.
+                    </span>
+                </div>
+                <?php endif; ?>
+
                 <!-- Radar + Price chart side-by-side -->
                 <div class="radar-price-row">
                     <div class="detail-radar-wrapper">

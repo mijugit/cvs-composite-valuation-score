@@ -359,6 +359,214 @@ class CVSModelTest extends TestCase
     }
 
     // ------------------------------------------------------------------
+    // Overlay penalties (Phase 5, slice 1) — golden reproduction of sim_overlay.php
+    //
+    // These fixtures are 1:1 transcriptions of the MU/STX/AVGO cases validated in
+    // sim_overlay.php (real researched financials from the 2026-06-05 crash week).
+    // The empty in-memory peer_medians table (see setUp()) makes MedianResolver
+    // fall back to cold-start/static benchmarks — identical to sim_overlay.php's
+    // legacy-mode ValuationPillar — so absolute pillar scores match the sim 1:1.
+    //
+    // Expected numbers below were captured by running `php sim_overlay.php`.
+    // ------------------------------------------------------------------
+
+    private const SPY_CLOSES = [500, 510, 520, 530, 545, 555, 565, 575, 585, 595, 600, 605, 608];
+
+    /** Micron — overlay B (target gate) fires; overlay A no-op (rising estimates). */
+    private function muFinancials(): array
+    {
+        return $this->baseFinancials([
+            'sector'                => 'Technology',
+            'current_price'         => 864.01,
+            'shares_outstanding'    => 1.13e9,
+            'free_cash_flow'        => 10.28e9,
+            'operating_cash_flow'   => 18.0e9,
+            'ebitda'                => 36.80e9,
+            'total_debt'            => 10.80e9,
+            'total_equity'          => 50.0e9,  // D/E ≈ 0.22x — clears the gate (override default 5M)
+            'cash'                  => 14.59e9,
+            'revenue'               => 58.12e9,
+            'gross_margins'         => 0.5844,
+            'trailing_eps'          => 21.26,
+            'forward_eps'           => 24.00,
+            'revenue_growth'        => 0.40,
+            'monthly_closes'        => [400, 440, 490, 540, 590, 650, 710, 760, 810, 850, 880, 900, 905],
+            'spy_closes'            => self::SPY_CLOSES,
+            // Phase 5 overlay inputs — eps_revision_90d=+0.08 (rising; A=no-op);
+            // upside = (739.48 - 864.01) / 864.01 ≈ -0.1441 (price above target; B fires)
+            'eps_revision_pct'      => +0.08,
+            'analyst_target_upside' => (739.48 - 864.01) / 864.01,
+        ]);
+    }
+
+    /** Seagate — both overlays effectively no-op (estimates ~stable, price ~at target). */
+    private function stxFinancials(): array
+    {
+        return $this->baseFinancials([
+            'sector'                => 'Technology',
+            'current_price'         => 847.47,
+            'shares_outstanding'    => 0.22625e9,
+            'free_cash_flow'        => 2.41e9,
+            'operating_cash_flow'   => 3.0e9,
+            'ebitda'                => 3.51e9,
+            'total_debt'            => 4.18e9,
+            'total_equity'          => 2.0e9,   // D/E ≈ 2.09x — clears the gate (override default 5M)
+            'cash'                  => 1.15e9,
+            'revenue'               => 11.01e9,
+            'gross_margins'         => 0.4157,
+            'trailing_eps'          => 10.56,
+            'forward_eps'           => 21.90,
+            'revenue_growth'        => 0.30,
+            'monthly_closes'        => [300, 340, 390, 450, 510, 570, 630, 690, 740, 790, 830, 860, 872],
+            'spy_closes'            => self::SPY_CLOSES,
+            // eps_revision_90d=+0.03 (≈stable; A=no-op);
+            // upside = (829.05 - 847.47) / 847.47 ≈ -0.0217 (small B penalty)
+            'eps_revision_pct'      => +0.03,
+            'analyst_target_upside' => (829.05 - 847.47) / 847.47,
+        ]);
+    }
+
+    /** Broadcom — real opportunity: both overlays no-op (rising estimates + deep positive upside). */
+    private function avgoFinancials(): array
+    {
+        return $this->baseFinancials([
+            'sector'                => 'Technology',
+            'current_price'         => 385.73,
+            'shares_outstanding'    => 4.73e9,
+            'free_cash_flow'        => 32.76e9,
+            'operating_cash_flow'   => 38.0e9,
+            'ebitda'                => 41.95e9,
+            'total_debt'            => 64.91e9,
+            'total_equity'          => 70.0e9,  // D/E ≈ 0.93x — clears the gate (override default 5M)
+            'cash'                  => 19.63e9,
+            'revenue'               => 75.47e9,
+            'gross_margins'         => 0.7628,
+            'trailing_eps'          => 6.01,
+            'forward_eps'           => 8.00,
+            'revenue_growth'        => 0.20,
+            'monthly_closes'        => [230, 250, 275, 300, 330, 360, 390, 415, 435, 450, 460, 465, 452],
+            'spy_closes'            => self::SPY_CLOSES,
+            // eps_revision_90d=+0.06 (rising; A=no-op);
+            // upside = (510.62 - 385.73) / 385.73 ≈ +0.3238 (positive — B never rewards, no-op)
+            'eps_revision_pct'      => +0.06,
+            'analyst_target_upside' => (510.62 - 385.73) / 385.73,
+        ]);
+    }
+
+    public function test_overlay_golden_mu_target_gate_fires_base_unchanged(): void
+    {
+        $result = $this->model()->calculate('MU', $this->muFinancials());
+        $this->assertTrue($result->qualityGatePassed);
+
+        // Base (3.0) — sim baseline: swing=39.6 REDUKUJ, fund=31.5 REDUKUJ — untouched by overlays.
+        $this->assertSame(39.6, $result->swingCvs);
+        $this->assertSame(31.5, $result->fundamentalCvs);
+        $this->assertSame('⬇ REDUKUJ', $result->swingRecommendation);
+        $this->assertSame('⬇ REDUKUJ', $result->fundamentalRecommendation);
+
+        // Shadow (3.1) — sim final: revision=0 (rising estimates), target=-8.6 (price > target)
+        // → swing 39.6-8.6=31.0 REDUKUJ, fund 31.5-8.6=22.9 UNIKAJ.
+        $overlay = $result->overlay;
+        $this->assertNotNull($overlay);
+        $this->assertSame('3.1', $overlay['shadow_version']);
+        $this->assertSame(0.0,  $overlay['penalties']['revision']);
+        $this->assertEqualsWithDelta(-8.6, $overlay['penalties']['target'], 0.05);
+        $this->assertEqualsWithDelta(-8.6, $overlay['penalties']['total'],  0.05);
+        $this->assertEqualsWithDelta(31.0, $overlay['swing'], 0.05);
+        $this->assertEqualsWithDelta(22.9, $overlay['fund'],  0.05);
+        $this->assertSame('⬇ REDUKUJ',  $overlay['swing_reco']);
+        $this->assertSame('⬇⬇ UNIKAJ', $overlay['fund_reco']);
+        $this->assertFalse($overlay['coverage']['missing_eps_trend']);
+        $this->assertFalse($overlay['coverage']['missing_target']);
+    }
+
+    public function test_overlay_golden_stx_small_target_gate_penalty_base_unchanged(): void
+    {
+        $result = $this->model()->calculate('STX', $this->stxFinancials());
+        $this->assertTrue($result->qualityGatePassed);
+
+        // Base (3.0) — sim baseline: swing=47.8 NEUTRALNIE, fund=40.3 REDUKUJ — untouched.
+        $this->assertSame(47.8, $result->swingCvs);
+        $this->assertSame(40.3, $result->fundamentalCvs);
+        $this->assertSame('→ NEUTRALNIE', $result->swingRecommendation);
+        $this->assertSame('⬇ REDUKUJ',    $result->fundamentalRecommendation);
+
+        // Shadow (3.1) — sim final: revision=0, target≈-1.3 → swing 46.5 NEUTRALNIE, fund 39.0 REDUKUJ.
+        $overlay = $result->overlay;
+        $this->assertNotNull($overlay);
+        $this->assertSame(0.0, $overlay['penalties']['revision']);
+        $this->assertEqualsWithDelta(-1.3, $overlay['penalties']['target'], 0.05);
+        $this->assertEqualsWithDelta(46.5, $overlay['swing'], 0.05);
+        $this->assertEqualsWithDelta(39.0, $overlay['fund'],  0.05);
+        $this->assertSame('→ NEUTRALNIE', $overlay['swing_reco']);
+        $this->assertSame('⬇ REDUKUJ',    $overlay['fund_reco']);
+    }
+
+    public function test_overlay_golden_avgo_real_opportunity_untouched_by_overlays(): void
+    {
+        $result = $this->model()->calculate('AVGO', $this->avgoFinancials());
+        $this->assertTrue($result->qualityGatePassed);
+
+        // Base (3.0) — sim baseline: swing=55.4 NEUTRALNIE, fund=63.2 AKUMULUJ.
+        $this->assertSame(55.4, $result->swingCvs);
+        $this->assertSame(63.2, $result->fundamentalCvs);
+
+        // Shadow (3.1) — both overlays no-op (rising estimates + deep positive upside):
+        // proves the design doesn't punish a real opportunity. 3.1 == 3.0 exactly.
+        $overlay = $result->overlay;
+        $this->assertNotNull($overlay);
+        $this->assertSame(0.0, $overlay['penalties']['revision']);
+        $this->assertSame(0.0, $overlay['penalties']['target']);
+        $this->assertSame(0.0, $overlay['penalties']['total']);
+        $this->assertSame($result->swingCvs,       $overlay['swing']);
+        $this->assertSame($result->fundamentalCvs, $overlay['fund']);
+        $this->assertSame($result->swingRecommendation,       $overlay['swing_reco']);
+        $this->assertSame($result->fundamentalRecommendation, $overlay['fund_reco']);
+    }
+
+    public function test_overlay_is_null_when_overlays_disabled_in_config(): void
+    {
+        $config             = $this->config;
+        $config['overlays'] = ['enabled' => false] + $config['overlays'];
+
+        $model  = new CVSModel($config, $this->peerRepo);
+        $result = $model->calculate('MU', $this->muFinancials());
+
+        $this->assertTrue($result->qualityGatePassed);
+        $this->assertNull($result->overlay);
+        // Base fields (3.0) remain fully populated regardless of the overlay switch.
+        $this->assertSame(39.6, $result->swingCvs);
+    }
+
+    public function test_overlay_marks_coverage_flags_when_inputs_are_missing(): void
+    {
+        $financials = $this->muFinancials();
+        unset($financials['eps_revision_pct'], $financials['analyst_target_upside']);
+
+        $result  = $this->model()->calculate('MU', $financials);
+        $overlay = $result->overlay;
+
+        $this->assertNotNull($overlay);
+        $this->assertTrue($overlay['coverage']['missing_eps_trend']);
+        $this->assertTrue($overlay['coverage']['missing_target']);
+        // No inputs → no penalties → 3.1 collapses to 3.0.
+        $this->assertSame(0.0, $overlay['penalties']['total']);
+        $this->assertSame($result->swingCvs,       $overlay['swing']);
+        $this->assertSame($result->fundamentalCvs, $overlay['fund']);
+    }
+
+    public function test_overlay_calculation_is_deterministic(): void
+    {
+        $financials = $this->muFinancials();
+
+        $r1 = $this->model()->calculate('MU', $financials);
+        $r2 = $this->model()->calculate('MU', $financials);
+
+        $this->assertSame($r1->toArray(), $r2->toArray());
+        $this->assertSame($r1->overlay, $r2->overlay);
+    }
+
+    // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
 

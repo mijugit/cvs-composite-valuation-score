@@ -17,6 +17,24 @@ return [
     // FR-010: never hardcode this in business logic — always read from here.
     'model_version' => '3.0',
 
+    // --- Overlay penalties (Phase 5, slice 1) ---
+    // Two deterministic post-aggregation penalties applied on top of the base CVS,
+    // computed in SHADOW mode under shadow_version (displayed recommendation stays at
+    // model_version until the recalibration slice — guardrail FR-016).
+    //
+    //   Overlay A (revision): trap = clamp((valScore-50)/50, 0, 1);
+    //                         penalty = max(-cap, slope * eps_revision_pct * trap)   [eps_revision_pct < 0 only]
+    //   Overlay B (target):   penalty = max(-cap, analyst_target_upside * slope)     [upside < 0 only]
+    //
+    // Default slope/cap values are illustrative (from sim_overlay.php) — finalised in
+    // the recalibration slice. FR-010: never hardcode in business logic; always read here.
+    'overlays' => [
+        'enabled'        => true,
+        'shadow_version' => '3.1',
+        'revision'       => ['slope' => 120.0, 'cap' => 18.0],
+        'target_gate'    => ['slope' => 60.0,  'cap' => 18.0],
+    ],
+
     // --- Peer-group configuration (Phase 3) ---
     // Controls empirical subsector median lookups in MedianResolver.
     //

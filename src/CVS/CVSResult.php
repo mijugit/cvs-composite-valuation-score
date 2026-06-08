@@ -35,6 +35,19 @@ class CVSResult
     /** @var array{source: string, bucket: string} */
     public readonly array   $valuationReference;
 
+    // Phase 5 (slice 1): shadow overlay block (model_version shadow_version).
+    // null when overlays disabled or quality gate failed. Additive — base fields above are unchanged.
+    /**
+     * @var array{
+     *   shadow_version: string,
+     *   swing: float, fund: float,
+     *   swing_reco: string, fund_reco: string,
+     *   penalties: array{revision: float, target: float, total: float},
+     *   coverage: array{missing_eps_trend: bool, missing_target: bool}
+     * }|null
+     */
+    public readonly ?array  $overlay;
+
     /**
      * @param bool                 $qualityGatePassed
      * @param string               $ticker
@@ -59,6 +72,7 @@ class CVSResult
         string  $modelVersion        = '',
         ?string $industry            = null,
         array   $valuationReference  = ['source' => 'cold_start', 'bucket' => ''],
+        ?array  $overlay             = null,
     ) {
         $this->qualityGatePassed         = $qualityGatePassed;
         $this->ticker                    = $ticker;
@@ -72,6 +86,7 @@ class CVSResult
         $this->modelVersion              = $modelVersion;
         $this->industry                  = $industry;
         $this->valuationReference        = $valuationReference;
+        $this->overlay                   = $overlay;
     }
 
     // ------------------------------------------------------------------
@@ -95,6 +110,7 @@ class CVSResult
         string  $modelVersion        = '',
         ?string $industry            = null,
         array   $valuationReference  = ['source' => 'cold_start', 'bucket' => ''],
+        ?array  $overlay             = null,
     ): self {
         $goldenSignal = self::computeGoldenSignal($swingCvs, $fundamentalCvs, $config);
 
@@ -111,6 +127,7 @@ class CVSResult
             modelVersion:              $modelVersion,
             industry:                  $industry,
             valuationReference:        $valuationReference,
+            overlay:                   $overlay,
         );
     }
 
@@ -186,6 +203,7 @@ class CVSResult
             'model_version'       => $this->modelVersion,
             'industry'            => $this->industry,
             'valuation_reference' => $this->valuationReference,
+            'overlay'             => $this->overlay,
             // Legal disclaimer — must accompany every CVS result (PRD FR-009).
             'disclaimer'          => 'Wyniki CVS to hipoteza modelu analitycznego, nie rekomendacja inwestycyjna. Inwestuj świadomie.',
         ];

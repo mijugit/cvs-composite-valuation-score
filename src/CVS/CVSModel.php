@@ -136,6 +136,13 @@ class CVSModel
             'bucket'       => $this->valuation->lastBucketKey(),
         ];
 
+        // Step 6 — Overlay penalties (Phase 5, slice 1): SHADOW model_version (3.1).
+        // Deterministic post-aggregation penalties layered on top of the base (3.0)
+        // scores. Computed in parallel and carried separately — base fields above
+        // are entirely unaffected (guardrail FR-016: displayed reco stays at 3.0
+        // until the recalibration slice).
+        $overlay = $this->computeOverlay($valScore, $swingCvs, $fundCvs, $financials);
+
         return CVSResult::passed(
             ticker:                    $ticker,
             swingCvs:                  $swingCvs,
@@ -153,7 +160,62 @@ class CVSModel
             industry:                  is_string($financials['industry'] ?? null)
                                          ? (string) $financials['industry'] : null,
             valuationReference:        $valuationReference,
+            overlay:                   $overlay,
         );
+    }
+
+    // ------------------------------------------------------------------
+    // Overlay penalties (Phase 5, slice 1 — shadow model_version)
+    // ------------------------------------------------------------------
+
+    /**
+     * Build the shadow overlay block (model_version 3.1), or null when overlays
+     * are disabled. Pure function of the base scores + normalised financials —
+     * deterministic, no I/O (FR-010).
+     *
+     * @param array<string, mixed> $financials
+     * @return array{
+     *   shadow_version: string,
+     *   swing: float, fund: float,
+     *   swing_reco: string, fund_reco: string,
+     *   penalties: array{revision: float, target: float, total: float},
+     *   coverage: array{missing_eps_trend: bool, missing_target: bool}
+     * }|null
+     */
+    private function computeOverlay(float $valScore, float $swingCvs, float $fundCvs, array $financials): ?array
+    {
+        $cfg = $this->config['overlays'] ?? [];
+
+        if (empty($cfg['enabled'])) {
+            return null;
+        }
+
+        $rev    = is_numeric($financials['eps_revision_pct']      ?? null) ? (float) $financials['eps_revision_pct']      : null;
+        $upside = is_numeric($financials['analyst_target_upside'] ?? null) ? (float) $financials['analyst_target_upside'] : null;
+
+        $revPenalty    = OverlayPenalties::revision($valScore, $rev, $cfg);
+        $targetPenalty = OverlayPenalties::targetGate($upside, $cfg);
+        $totalPenalty  = round($revPenalty + $targetPenalty, 1);
+
+        $shadowSwing = (float) min(100.0, max(0.0, $swingCvs + $totalPenalty));
+        $shadowFund  = (float) min(100.0, max(0.0, $fundCvs  + $totalPenalty));
+
+        return [
+            'shadow_version' => (string) ($cfg['shadow_version'] ?? ''),
+            'swing'          => $shadowSwing,
+            'fund'           => $shadowFund,
+            'swing_reco'     => $this->mapToLabel((int) round($shadowSwing)),
+            'fund_reco'      => $this->mapToLabel((int) round($shadowFund)),
+            'penalties'      => [
+                'revision' => $revPenalty,
+                'target'   => $targetPenalty,
+                'total'    => $totalPenalty,
+            ],
+            'coverage'       => [
+                'missing_eps_trend' => $rev    === null,
+                'missing_target'    => $upside === null,
+            ],
+        ];
     }
 
     // ------------------------------------------------------------------
