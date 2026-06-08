@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace CVS\Api;
 
+use CVS\Forecast\EarningsCalendarParser;
 use CVS\Forecast\EarningsTrendParser;
 use CVS\Forecast\ForecastParser;
+use DateTimeImmutable;
 
 /**
  * Yahoo Finance data fetcher — free public API (no API key required).
@@ -51,6 +53,7 @@ class FinancialDataFetcher
         'cashflowStatementHistory',
         'recommendationTrend',
         'earningsTrend',
+        'calendarEvents',
     ];
 
     /** @param array<string, mixed> $config  The 'data_source' section from cvs-weights.php */
@@ -94,7 +97,13 @@ class FinancialDataFetcher
         $closes    = $this->fetchChartData($ticker, '3y');
         $spyCloses = $this->fetchSpyCloses();
 
-        $normalised = $this->normalise($raw, $closes, $spyCloses);
+        // Phase 5 (slice 2) — fetch-time reference date, determined ONCE here
+        // and handed down to normalise()/EarningsCalendarParser. This is the
+        // determinism seam (FR-015): "now" is an injected input, not computed
+        // inside the parsing/scoring layers — keeps them pure and offline-testable.
+        $referenceDate = new DateTimeImmutable();
+
+        $normalised = $this->normalise($raw, $closes, $spyCloses, $referenceDate);
 
         if ($normalised === null) {
             return null;
@@ -337,9 +346,10 @@ class FinancialDataFetcher
      * @param array<string, mixed> $raw
      * @param float[]              $closes     Monthly closes for the ticker (oldest first)
      * @param float[]              $spyCloses  Monthly SPY closes (oldest first)
+     * @param  DateTimeImmutable $referenceDate  Fetch-time "now", injected (Phase 5 slice 2 — determinism seam)
      * @return array<string, mixed>|null
      */
-    private function normalise(array $raw, array $closes, array $spyCloses): ?array
+    private function normalise(array $raw, array $closes, array $spyCloses, DateTimeImmutable $referenceDate): ?array
     {
         $ap   = $raw['assetProfile']            ?? [];
         $fin  = $raw['financialData']           ?? [];
@@ -362,6 +372,10 @@ class FinancialDataFetcher
         $forecast            = ForecastParser::parse($raw, $currentPrice);
         $epsRevisionPct      = EarningsTrendParser::revisionPct($raw);
         $analystTargetUpside = $forecast['targets']['upside'];
+
+        // Phase 5 (slice 2) — earnings-timing inputs (days since/to earnings),
+        // computed once against the injected fetch-time reference date.
+        $earningsTiming = EarningsCalendarParser::parse($raw, $referenceDate);
 
         // Revenue history — newest last.
         $revenueHistory = [];
@@ -481,6 +495,16 @@ class FinancialDataFetcher
             // analyst_target_upside: (mean target - price) / price, fraction; null = no analyst coverage.
             'eps_revision_pct'           => $epsRevisionPct,
             'analyst_target_upside'      => $analystTargetUpside,
+
+            // Phase 5 (slice 2) — earnings-timing inputs (shadow + badge, FR-006/007).
+            // days_since_earnings: whole days since defaultKeyStatistics.mostRecentQuarter; null = no data.
+            // days_to_earnings:    whole days to calendarEvents.earnings.earningsDate (first/earliest if a
+            //                      range); MAY BE NEGATIVE (calendar date passed but mostRecentQuarter
+            //                      hasn't caught up yet — a deliberate 'in_transit' signal); null = no data.
+            // Both computed once at fetch-time against an injected reference date — deterministic inputs,
+            // never recomputed inside scoring (FR-015).
+            'days_since_earnings'        => $earningsTiming['days_since_earnings'],
+            'days_to_earnings'           => $earningsTiming['days_to_earnings'],
         ];
     }
 }
