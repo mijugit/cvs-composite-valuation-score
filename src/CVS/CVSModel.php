@@ -143,6 +143,12 @@ class CVSModel
         // until the recalibration slice).
         $overlay = $this->computeOverlay($valScore, $swingCvs, $fundCvs, $financials);
 
+        // Step 7 — Earnings-timing badge (Phase 5, slice 2): always-present, additive
+        // (FR-006/FR-007/FR-010). Independent of overlays/earnings_guard.enabled — the
+        // badge must work for every user, those flags gate only the shadow penalty
+        // inside computeOverlay() above (FR-017, see Critical Implementation Details).
+        $earningsTiming = $this->computeEarningsTiming($financials);
+
         return CVSResult::passed(
             ticker:                    $ticker,
             swingCvs:                  $swingCvs,
@@ -161,7 +167,46 @@ class CVSModel
                                          ? (string) $financials['industry'] : null,
             valuationReference:        $valuationReference,
             overlay:                   $overlay,
+            earningsTiming:            $earningsTiming,
         );
+    }
+
+    // ------------------------------------------------------------------
+    // Earnings-timing badge (Phase 5, slice 2 — always present, additive)
+    // ------------------------------------------------------------------
+
+    /**
+     * Build the always-present earnings-timing badge block, or null when the
+     * ticker has no earnings-calendar coverage at all (`days_since_earnings`
+     * AND `days_to_earnings` both missing). Pure function of the pre-computed,
+     * fetch-time-injected day-counts + `earnings_guard.window_sessions` —
+     * deterministic, no I/O, no `date()`/`time()` (FR-015).
+     *
+     * Deliberately independent of `earnings_guard.enabled` / `overlays.enabled` —
+     * the badge (FR-010) must render for every user; those flags gate only the
+     * shadow tempering penalty in computeOverlay() (FR-017, additive guardrail).
+     *
+     * @param array<string, mixed> $financials
+     * @return array{days_since: ?int, days_to: ?int, state: ?string, guard_active: bool}|null
+     */
+    private function computeEarningsTiming(array $financials): ?array
+    {
+        $daysSince = is_int($financials['days_since_earnings'] ?? null) ? $financials['days_since_earnings'] : null;
+        $daysTo    = is_int($financials['days_to_earnings']    ?? null) ? $financials['days_to_earnings']    : null;
+
+        if ($daysSince === null && $daysTo === null) {
+            return null;
+        }
+
+        $windowSessions = (int) ($this->config['earnings_guard']['window_sessions'] ?? 0);
+        $state          = EarningsGuard::state($daysTo, $daysSince, $windowSessions);
+
+        return [
+            'days_since'   => $daysSince,
+            'days_to'      => $daysTo,
+            'state'        => $state,
+            'guard_active' => $state !== null,
+        ];
     }
 
     // ------------------------------------------------------------------
@@ -178,8 +223,8 @@ class CVSModel
      *   shadow_version: string,
      *   swing: float, fund: float,
      *   swing_reco: string, fund_reco: string,
-     *   penalties: array{revision: float, target: float, total: float},
-     *   coverage: array{missing_eps_trend: bool, missing_target: bool}
+     *   penalties: array{revision: float, target: float, earnings_guard: float, total: float},
+     *   coverage: array{missing_eps_trend: bool, missing_target: bool, missing_earnings_calendar: bool}
      * }|null
      */
     private function computeOverlay(float $valScore, float $swingCvs, float $fundCvs, array $financials): ?array
@@ -193,9 +238,17 @@ class CVSModel
         $rev    = is_numeric($financials['eps_revision_pct']      ?? null) ? (float) $financials['eps_revision_pct']      : null;
         $upside = is_numeric($financials['analyst_target_upside'] ?? null) ? (float) $financials['analyst_target_upside'] : null;
 
-        $revPenalty    = OverlayPenalties::revision($valScore, $rev, $cfg);
+        // Phase 5, slice 2: earnings-proximity guard penalty (additive, third
+        // shadow-penalty input alongside revision/target — see EarningsGuard).
+        // Gated by earnings_guard.enabled (shadow-only switch — the always-present
+        // `earnings_timing` badge above is computed independently of this flag).
+        $daysSince = is_int($financials['days_since_earnings'] ?? null) ? $financials['days_since_earnings'] : null;
+        $daysTo    = is_int($financials['days_to_earnings']    ?? null) ? $financials['days_to_earnings']    : null;
+
+        $revPenalty   = OverlayPenalties::revision($valScore, $rev, $cfg);
         $targetPenalty = OverlayPenalties::targetGate($upside, $cfg);
-        $totalPenalty  = round($revPenalty + $targetPenalty, 1);
+        $guardPenalty  = EarningsGuard::penalty($daysTo, $daysSince, $this->config['earnings_guard'] ?? []);
+        $totalPenalty  = round($revPenalty + $targetPenalty + $guardPenalty, 1);
 
         $shadowSwing = (float) min(100.0, max(0.0, $swingCvs + $totalPenalty));
         $shadowFund  = (float) min(100.0, max(0.0, $fundCvs  + $totalPenalty));
@@ -207,13 +260,15 @@ class CVSModel
             'swing_reco'     => $this->mapToLabel((int) round($shadowSwing)),
             'fund_reco'      => $this->mapToLabel((int) round($shadowFund)),
             'penalties'      => [
-                'revision' => $revPenalty,
-                'target'   => $targetPenalty,
-                'total'    => $totalPenalty,
+                'revision'       => $revPenalty,
+                'target'         => $targetPenalty,
+                'earnings_guard' => $guardPenalty,
+                'total'          => $totalPenalty,
             ],
             'coverage'       => [
-                'missing_eps_trend' => $rev    === null,
-                'missing_target'    => $upside === null,
+                'missing_eps_trend'         => $rev    === null,
+                'missing_target'            => $upside === null,
+                'missing_earnings_calendar' => ($daysTo === null && $daysSince === null),
             ],
         ];
     }

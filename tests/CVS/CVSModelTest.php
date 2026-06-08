@@ -567,6 +567,176 @@ class CVSModelTest extends TestCase
     }
 
     // ------------------------------------------------------------------
+    // Earnings-timing badge (Phase 5, slice 2 — always present, additive)
+    // ------------------------------------------------------------------
+
+    public function test_earnings_timing_is_null_when_calendar_coverage_is_missing(): void
+    {
+        $financials = $this->baseFinancials(); // no days_since_earnings / days_to_earnings keys
+
+        $result = $this->model()->calculate('TST', $financials);
+
+        $this->assertTrue($result->qualityGatePassed);
+        $this->assertNull($result->earningsTiming);
+        $this->assertNull($result->toArray()['earnings_timing']);
+    }
+
+    public function test_earnings_timing_reports_before_state_within_window(): void
+    {
+        $financials = $this->baseFinancials([
+            'days_since_earnings' => 60,
+            'days_to_earnings'    => 3,
+        ]);
+
+        $result  = $this->model()->calculate('TST', $financials);
+        $timing  = $result->earningsTiming;
+
+        $this->assertNotNull($timing);
+        $this->assertSame(60,      $timing['days_since']);
+        $this->assertSame(3,       $timing['days_to']);
+        $this->assertSame('before', $timing['state']);
+        $this->assertTrue($timing['guard_active']);
+    }
+
+    public function test_earnings_timing_reports_after_state_within_window(): void
+    {
+        $financials = $this->baseFinancials([
+            'days_since_earnings' => 1,
+            'days_to_earnings'    => 89,
+        ]);
+
+        $timing = $this->model()->calculate('TST', $financials)->earningsTiming;
+
+        $this->assertNotNull($timing);
+        $this->assertSame('after', $timing['state']);
+        $this->assertTrue($timing['guard_active']);
+    }
+
+    public function test_earnings_timing_reports_in_transit_state_on_calendar_lag(): void
+    {
+        $financials = $this->baseFinancials([
+            'days_since_earnings' => 1,
+            'days_to_earnings'    => -2,
+        ]);
+
+        $timing = $this->model()->calculate('TST', $financials)->earningsTiming;
+
+        $this->assertNotNull($timing);
+        $this->assertSame('in_transit', $timing['state']);
+        $this->assertTrue($timing['guard_active']);
+    }
+
+    public function test_earnings_timing_reports_null_state_outside_window_with_inactive_guard(): void
+    {
+        $financials = $this->baseFinancials([
+            'days_since_earnings' => 60,
+            'days_to_earnings'    => 30,
+        ]);
+
+        $timing = $this->model()->calculate('TST', $financials)->earningsTiming;
+
+        $this->assertNotNull($timing);
+        $this->assertNull($timing['state']);
+        $this->assertFalse($timing['guard_active']);
+    }
+
+    public function test_earnings_timing_is_present_regardless_of_overlay_and_guard_flags(): void
+    {
+        $config                     = $this->config;
+        $config['overlays']         = ['enabled' => false] + $config['overlays'];
+        $config['earnings_guard']   = ['enabled' => false] + $config['earnings_guard'];
+
+        $financials = $this->baseFinancials([
+            'days_since_earnings' => 60,
+            'days_to_earnings'    => 2,
+        ]);
+
+        $result = (new CVSModel($config, $this->peerRepo))->calculate('TST', $financials);
+
+        // FR-010/FR-017: the badge is independent of the shadow-mode flags above —
+        // both overlays AND earnings_guard are disabled, yet the badge still renders.
+        $this->assertNull($result->overlay);
+        $timing = $result->earningsTiming;
+        $this->assertNotNull($timing);
+        $this->assertSame('before', $timing['state']);
+        $this->assertTrue($timing['guard_active']);
+    }
+
+    public function test_earnings_timing_calculation_is_deterministic(): void
+    {
+        $financials = $this->baseFinancials([
+            'days_since_earnings' => 2,
+            'days_to_earnings'    => 88,
+        ]);
+
+        $r1 = $this->model()->calculate('TST', $financials);
+        $r2 = $this->model()->calculate('TST', $financials);
+
+        $this->assertSame($r1->earningsTiming, $r2->earningsTiming);
+        $this->assertSame($r1->toArray(), $r2->toArray());
+    }
+
+    // ------------------------------------------------------------------
+    // Earnings guard penalty — wired into the shadow overlay (Phase 5, slice 2)
+    // ------------------------------------------------------------------
+
+    public function test_overlay_earnings_guard_penalty_is_added_to_shadow_total(): void
+    {
+        $financials = $this->muFinancials();
+        // MU baseline shadow total is target-only (-8.6, see golden test above).
+        // Add a near-term earnings date → guard penalty layers on top, additively.
+        $financials['days_since_earnings'] = 60;
+        $financials['days_to_earnings']    = 0; // proximity = 1.0 → penalty = -10.0 (cfg default)
+
+        $overlay = $this->model()->calculate('MU', $financials)->overlay;
+
+        $this->assertNotNull($overlay);
+        $this->assertEqualsWithDelta(-10.0, $overlay['penalties']['earnings_guard'], 0.05);
+        // total = revision(0) + target(-8.6) + earnings_guard(-10.0), capped per-component not jointly.
+        $this->assertEqualsWithDelta(-18.6, $overlay['penalties']['total'], 0.05);
+        $this->assertFalse($overlay['coverage']['missing_earnings_calendar']);
+    }
+
+    public function test_overlay_earnings_guard_penalty_is_zero_outside_window(): void
+    {
+        $financials = $this->muFinancials();
+        $financials['days_since_earnings'] = 60;
+        $financials['days_to_earnings']    = 90;
+
+        $overlay = $this->model()->calculate('MU', $financials)->overlay;
+
+        $this->assertNotNull($overlay);
+        $this->assertSame(0.0, $overlay['penalties']['earnings_guard']);
+    }
+
+    public function test_overlay_marks_missing_earnings_calendar_coverage(): void
+    {
+        // MU fixture carries no days_since_earnings/days_to_earnings (pre-Phase-5-slice-2 shape).
+        $overlay = $this->model()->calculate('MU', $this->muFinancials())->overlay;
+
+        $this->assertNotNull($overlay);
+        $this->assertTrue($overlay['coverage']['missing_earnings_calendar']);
+        $this->assertSame(0.0, $overlay['penalties']['earnings_guard']);
+    }
+
+    public function test_overlay_earnings_guard_penalty_is_zero_when_guard_disabled_in_config(): void
+    {
+        $config                   = $this->config;
+        $config['earnings_guard'] = ['enabled' => false] + $config['earnings_guard'];
+
+        $financials = $this->muFinancials();
+        $financials['days_since_earnings'] = 60;
+        $financials['days_to_earnings']    = 0;
+
+        $overlay = (new CVSModel($config, $this->peerRepo))->calculate('MU', $financials)->overlay;
+
+        $this->assertNotNull($overlay);
+        $this->assertSame(0.0, $overlay['penalties']['earnings_guard']);
+        // Shadow falls back to revision+target only (-8.6) — base 3.0 still untouched.
+        $this->assertEqualsWithDelta(-8.6, $overlay['penalties']['total'], 0.05);
+    }
+
+    // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
 

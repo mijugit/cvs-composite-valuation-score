@@ -42,11 +42,21 @@ class CVSResult
      *   shadow_version: string,
      *   swing: float, fund: float,
      *   swing_reco: string, fund_reco: string,
-     *   penalties: array{revision: float, target: float, total: float},
-     *   coverage: array{missing_eps_trend: bool, missing_target: bool}
+     *   penalties: array{revision: float, target: float, earnings_guard: float, total: float},
+     *   coverage: array{missing_eps_trend: bool, missing_target: bool, missing_earnings_calendar: bool}
      * }|null
      */
     public readonly ?array  $overlay;
+
+    // Phase 5 (slice 2): always-present earnings-timing badge (FR-006/FR-007/FR-010).
+    // Separate, sibling field to `overlay` — NOT nested inside it — so the badge
+    // works for every user regardless of `overlays.enabled`/`earnings_guard.enabled`
+    // (those flags gate only the shadow-mode tempering penalty). null when the
+    // ticker has no earnings-calendar coverage at all, or quality gate failed.
+    /**
+     * @var array{days_since: ?int, days_to: ?int, state: ?string, guard_active: bool}|null
+     */
+    public readonly ?array  $earningsTiming;
 
     /**
      * @param bool                 $qualityGatePassed
@@ -73,6 +83,7 @@ class CVSResult
         ?string $industry            = null,
         array   $valuationReference  = ['source' => 'cold_start', 'bucket' => ''],
         ?array  $overlay             = null,
+        ?array  $earningsTiming      = null,
     ) {
         $this->qualityGatePassed         = $qualityGatePassed;
         $this->ticker                    = $ticker;
@@ -87,6 +98,7 @@ class CVSResult
         $this->industry                  = $industry;
         $this->valuationReference        = $valuationReference;
         $this->overlay                   = $overlay;
+        $this->earningsTiming            = $earningsTiming;
     }
 
     // ------------------------------------------------------------------
@@ -111,6 +123,7 @@ class CVSResult
         ?string $industry            = null,
         array   $valuationReference  = ['source' => 'cold_start', 'bucket' => ''],
         ?array  $overlay             = null,
+        ?array  $earningsTiming      = null,
     ): self {
         $goldenSignal = self::computeGoldenSignal($swingCvs, $fundamentalCvs, $config);
 
@@ -128,6 +141,7 @@ class CVSResult
             industry:                  $industry,
             valuationReference:        $valuationReference,
             overlay:                   $overlay,
+            earningsTiming:            $earningsTiming,
         );
     }
 
@@ -204,6 +218,7 @@ class CVSResult
             'industry'            => $this->industry,
             'valuation_reference' => $this->valuationReference,
             'overlay'             => $this->overlay,
+            'earnings_timing'     => $this->earningsTiming,
             // Legal disclaimer — must accompany every CVS result (PRD FR-009).
             'disclaimer'          => 'Wyniki CVS to hipoteza modelu analitycznego, nie rekomendacja inwestycyjna. Inwestuj świadomie.',
         ];

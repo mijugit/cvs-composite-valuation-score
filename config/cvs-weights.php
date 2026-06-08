@@ -35,6 +35,31 @@ return [
         'target_gate'    => ['slope' => 60.0,  'cap' => 18.0],
     ],
 
+    // --- Earnings-proximity guard (Phase 5, slice 2) ---
+    // Deterministic tempering penalty applied near a company's earnings date —
+    // momentum-driven conversion is less trustworthy in the ~K-session window
+    // around an earnings event (volatility spikes, gap risk). Computed from
+    // days_since_earnings/days_to_earnings (injected at fetch-time — FR-015
+    // determinism seam, see EarningsCalendarParser) and added to the shadow
+    // overlay's penalties.total alongside revision/target (Phase 5, slice 1).
+    //
+    //   proximity = max(0, (window_sessions - nearest_in_window_days) / window_sessions) ∈ [0, 1]
+    //   penalty   = round(max(-cap, -slope * proximity), 1)
+    //
+    // window_sessions (K): symmetric before/after window in sessions (OQ-1 decision: K=5).
+    // Default slope/cap are illustrative — finalised in the recalibration slice,
+    // deliberately gentler than overlays.{revision,target_gate} (this tempers, it
+    // doesn't punish). FR-010: never hardcode in business logic; always read here.
+    //
+    // Also drives the always-present `earnings_timing` badge in CVSResult (FR-010) —
+    // `enabled` here gates ONLY the shadow penalty, never the badge (FR-017: the
+    // badge must work for every user regardless of overlay/shadow-mode flags).
+    'earnings_guard' => [
+        'enabled'         => true,
+        'window_sessions' => 5,
+        'penalty'         => ['slope' => 10.0, 'cap' => 10.0],
+    ],
+
     // --- Peer-group configuration (Phase 3) ---
     // Controls empirical subsector median lookups in MedianResolver.
     //
