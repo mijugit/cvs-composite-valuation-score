@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CVS\Api;
 
+use CVS\Forecast\EarningsTrendParser;
 use CVS\Forecast\ForecastParser;
 
 /**
@@ -49,6 +50,7 @@ class FinancialDataFetcher
         'balanceSheetHistory',
         'cashflowStatementHistory',
         'recommendationTrend',
+        'earningsTrend',
     ];
 
     /** @param array<string, mixed> $config  The 'data_source' section from cvs-weights.php */
@@ -356,6 +358,11 @@ class FinancialDataFetcher
             return null; // Cannot continue without a price.
         }
 
+        // Phase 5 (slice 1) — overlay signal inputs.
+        $forecast            = ForecastParser::parse($raw, $currentPrice);
+        $epsRevisionPct      = EarningsTrendParser::revisionPct($raw);
+        $analystTargetUpside = $forecast['targets']['upside'];
+
         // Revenue history — newest last.
         $revenueHistory = [];
         foreach (array_reverse($is) as $stmt) {
@@ -467,7 +474,13 @@ class FinancialDataFetcher
             'spy_closes'                 => $spyCloses,
 
             // Analyst forecast (S-09) — price targets + recommendation breakdown/trend.
-            'forecast'                   => ForecastParser::parse($raw, $currentPrice),
+            'forecast'                   => $forecast,
+
+            // Phase 5 (slice 1) — overlay signal inputs (shadow model_version 3.1).
+            // eps_revision_pct:      +1q EPS estimate revision, fraction (e.g. -0.13 = -13%); null = no coverage/data.
+            // analyst_target_upside: (mean target - price) / price, fraction; null = no analyst coverage.
+            'eps_revision_pct'           => $epsRevisionPct,
+            'analyst_target_upside'      => $analystTargetUpside,
         ];
     }
 }
