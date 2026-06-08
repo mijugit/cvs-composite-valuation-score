@@ -30,6 +30,10 @@ class CvsSnapshotRepositoryTest extends TestCase
                 sector             TEXT    NULL,
                 industry           TEXT    NULL,
                 model_version      TEXT    NULL,
+                days_since_earnings   INTEGER NULL,
+                days_to_earnings      INTEGER NULL,
+                earnings_state        TEXT    NULL,
+                earnings_guard_active INTEGER NULL,
                 score_date         TEXT    NOT NULL,
                 scored_at          TEXT    NOT NULL,
                 price_at_snapshot  REAL    NULL,
@@ -275,6 +279,118 @@ class CvsSnapshotRepositoryTest extends TestCase
     }
 
     // ------------------------------------------------------------------
+    // Phase 5 (slice 2): earnings-timing markers (FR-008, migration 015)
+    // ------------------------------------------------------------------
+
+    public function test_save_persists_earnings_timing_round_trip(): void
+    {
+        $repo   = $this->makeRepo();
+        $result = $this->passResult('AAPL');
+        $result['earnings_timing'] = [
+            'days_since'   => 1,
+            'days_to'      => null,
+            'state'        => 'after',
+            'guard_active' => true,
+        ];
+        $repo->save('AAPL', $result);
+
+        $row = $repo->findLatestByTicker('AAPL');
+        $this->assertNotNull($row);
+        $this->assertSame(1, (int) $row['days_since_earnings']);
+        $this->assertNull($row['days_to_earnings']);
+        $this->assertSame('after', $row['earnings_state']);
+        $this->assertSame(1, (int) $row['earnings_guard_active']);
+    }
+
+    public function test_save_persists_negative_days_to_earnings(): void
+    {
+        // days_to may be NEGATIVE (Yahoo calendar/data-lag signal — 'in_transit').
+        $repo   = $this->makeRepo();
+        $result = $this->passResult('MU');
+        $result['earnings_timing'] = [
+            'days_since'   => 1,
+            'days_to'      => -2,
+            'state'        => 'in_transit',
+            'guard_active' => true,
+        ];
+        $repo->save('MU', $result);
+
+        $row = $repo->findLatestByTicker('MU');
+        $this->assertNotNull($row);
+        $this->assertSame(-2, (int) $row['days_to_earnings']);
+        $this->assertSame('in_transit', $row['earnings_state']);
+    }
+
+    public function test_save_updates_earnings_timing_idempotently(): void
+    {
+        $repo = $this->makeRepo();
+
+        $first = $this->passResult('AAPL');
+        $first['earnings_timing'] = [
+            'days_since'   => null,
+            'days_to'      => 4,
+            'state'        => 'before',
+            'guard_active' => true,
+        ];
+        $repo->save('AAPL', $first);
+
+        // Same-day rerun, one session later — the badge has moved on.
+        $second = $this->passResult('AAPL');
+        $second['earnings_timing'] = [
+            'days_since'   => null,
+            'days_to'      => 3,
+            'state'        => 'before',
+            'guard_active' => true,
+        ];
+        $repo->save('AAPL', $second);
+
+        $row = $repo->findLatestByTicker('AAPL');
+        $this->assertNotNull($row);
+        $this->assertSame(3, (int) $row['days_to_earnings']);
+        $this->assertNull($row['days_since_earnings']);
+        $this->assertSame('before', $row['earnings_state']);
+    }
+
+    public function test_save_persists_null_earnings_timing_when_absent(): void
+    {
+        // Quality-gate failures (and tickers with no `calendarEvents` coverage)
+        // carry no `earnings_timing` block at all — must persist as NULL, not error.
+        $repo = $this->makeRepo();
+        $repo->save('XYZ', $this->failResult('XYZ'));
+
+        $row = $repo->findLatestByTicker('XYZ');
+        $this->assertNotNull($row);
+        $this->assertNull($row['days_since_earnings']);
+        $this->assertNull($row['days_to_earnings']);
+        $this->assertNull($row['earnings_state']);
+        $this->assertNull($row['earnings_guard_active']);
+    }
+
+    public function test_save_persists_null_guard_active_when_no_calendar_coverage(): void
+    {
+        // CVSModel::computeEarningsTiming() returns a block with state === null
+        // (and guard_active === false) when both day-counts are missing — but
+        // CVSResult::$earningsTiming itself is null only absent calendar coverage
+        // entirely. Guard against accidental int-cast surprises on `false`.
+        $repo   = $this->makeRepo();
+        $result = $this->passResult('NFLX');
+        $result['earnings_timing'] = [
+            'days_since'   => null,
+            'days_to'      => null,
+            'state'        => null,
+            'guard_active' => false,
+        ];
+        $repo->save('NFLX', $result);
+
+        $row = $repo->findLatestByTicker('NFLX');
+        $this->assertNotNull($row);
+        $this->assertNull($row['days_since_earnings']);
+        $this->assertNull($row['days_to_earnings']);
+        $this->assertNull($row['earnings_state']);
+        $this->assertSame(0, (int) $row['earnings_guard_active']);
+    }
+
+    // ------------------------------------------------------------------
     // Phase 5 (slice 1): shadow persistence — widened key
     // (ticker, score_date, model_version), per migration 014
     // ------------------------------------------------------------------
@@ -300,6 +416,10 @@ class CvsSnapshotRepositoryTest extends TestCase
                 sector             TEXT    NULL,
                 industry           TEXT    NULL,
                 model_version      TEXT    NULL,
+                days_since_earnings   INTEGER NULL,
+                days_to_earnings      INTEGER NULL,
+                earnings_state        TEXT    NULL,
+                earnings_guard_active INTEGER NULL,
                 score_date         TEXT    NOT NULL,
                 scored_at          TEXT    NOT NULL,
                 price_at_snapshot  REAL    NULL,

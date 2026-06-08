@@ -62,22 +62,31 @@ class CvsSnapshotRepository
         $gf    = isset($result['gate_failures']) ? json_encode($result['gate_failures']) : null;
         $ps    = isset($result['pillar_scores'])  ? json_encode($result['pillar_scores'])  : null;
 
+        // Phase 5 (slice 2): earnings-timing markers (FR-008) — additive, mirrors the
+        // always-present CVSResult::$earningsTiming block (null when the ticker has
+        // no `calendarEvents` coverage at all, or quality gate failed; see EarningsGuard).
+        $et = $result['earnings_timing'] ?? [];
+
         $params = [
-            ':ticker'            => $ticker,
-            ':sector'            => $sector,
-            ':industry'          => $industry,
-            ':model_version'     => $modelVersion,
-            ':score_date'        => $scoreDate,
-            ':scored_at'         => $scoredAt,
-            ':price_at_snapshot' => $priceAtSnapshot,
-            ':cvs_swing'         => isset($swing['cvs']) ? (float) $swing['cvs'] : null,
-            ':cvs_fund'          => isset($fund['cvs'])  ? (float) $fund['cvs']  : null,
-            ':reco_swing'        => $swing['recommendation'] ?? null,
-            ':reco_fund'         => $fund['recommendation']  ?? null,
-            ':golden_signal'     => $gs !== '' ? $gs : null,
-            ':quality_gate'      => $gate,
-            ':gate_failures'     => $gf,
-            ':pillar_scores'     => $ps,
+            ':ticker'                => $ticker,
+            ':sector'                => $sector,
+            ':industry'              => $industry,
+            ':model_version'         => $modelVersion,
+            ':score_date'            => $scoreDate,
+            ':scored_at'             => $scoredAt,
+            ':price_at_snapshot'     => $priceAtSnapshot,
+            ':cvs_swing'             => isset($swing['cvs']) ? (float) $swing['cvs'] : null,
+            ':cvs_fund'              => isset($fund['cvs'])  ? (float) $fund['cvs']  : null,
+            ':reco_swing'            => $swing['recommendation'] ?? null,
+            ':reco_fund'             => $fund['recommendation']  ?? null,
+            ':golden_signal'         => $gs !== '' ? $gs : null,
+            ':quality_gate'          => $gate,
+            ':gate_failures'         => $gf,
+            ':pillar_scores'         => $ps,
+            ':days_since_earnings'   => isset($et['days_since']) ? (int) $et['days_since'] : null,
+            ':days_to_earnings'      => isset($et['days_to'])    ? (int) $et['days_to']    : null,
+            ':earnings_state'        => $et['state'] ?? null,
+            ':earnings_guard_active' => isset($et['guard_active']) ? (int) $et['guard_active'] : null,
         ];
 
         try {
@@ -85,11 +94,13 @@ class CvsSnapshotRepository
                 INSERT INTO cvs_snapshots
                     (ticker, sector, industry, model_version, score_date, scored_at,
                      price_at_snapshot, cvs_swing, cvs_fund, reco_swing, reco_fund,
-                     golden_signal, quality_gate, gate_failures, pillar_scores)
+                     golden_signal, quality_gate, gate_failures, pillar_scores,
+                     days_since_earnings, days_to_earnings, earnings_state, earnings_guard_active)
                 VALUES
                     (:ticker, :sector, :industry, :model_version, :score_date, :scored_at,
                      :price_at_snapshot, :cvs_swing, :cvs_fund, :reco_swing, :reco_fund,
-                     :golden_signal, :quality_gate, :gate_failures, :pillar_scores)
+                     :golden_signal, :quality_gate, :gate_failures, :pillar_scores,
+                     :days_since_earnings, :days_to_earnings, :earnings_state, :earnings_guard_active)
             ');
             $stmt->execute($params);
         } catch (PDOException $e) {
@@ -105,19 +116,23 @@ class CvsSnapshotRepository
             try {
                 $upd = $this->db->prepare('
                     UPDATE cvs_snapshots
-                    SET sector            = :sector,
-                        industry          = :industry,
-                        model_version     = :model_version,
-                        scored_at         = :scored_at,
-                        price_at_snapshot = :price_at_snapshot,
-                        cvs_swing         = :cvs_swing,
-                        cvs_fund          = :cvs_fund,
-                        reco_swing        = :reco_swing,
-                        reco_fund         = :reco_fund,
-                        golden_signal     = :golden_signal,
-                        quality_gate      = :quality_gate,
-                        gate_failures     = :gate_failures,
-                        pillar_scores     = :pillar_scores
+                    SET sector                = :sector,
+                        industry              = :industry,
+                        model_version         = :model_version,
+                        scored_at             = :scored_at,
+                        price_at_snapshot     = :price_at_snapshot,
+                        cvs_swing             = :cvs_swing,
+                        cvs_fund              = :cvs_fund,
+                        reco_swing            = :reco_swing,
+                        reco_fund             = :reco_fund,
+                        golden_signal         = :golden_signal,
+                        quality_gate          = :quality_gate,
+                        gate_failures         = :gate_failures,
+                        pillar_scores         = :pillar_scores,
+                        days_since_earnings   = :days_since_earnings,
+                        days_to_earnings      = :days_to_earnings,
+                        earnings_state        = :earnings_state,
+                        earnings_guard_active = :earnings_guard_active
                     WHERE ticker = :ticker AND score_date = :score_date
                       AND (model_version = :model_version_match
                            OR (model_version IS NULL AND :model_version_match IS NULL))
