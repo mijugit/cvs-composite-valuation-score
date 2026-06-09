@@ -14,8 +14,8 @@ $asset = static function (string $path): string {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CVS — Composite Valuation Score</title>
-    <link rel="icon" type="image/png" sizes="64x64" href="/images/favicon.png">
-    <link rel="shortcut icon" href="/images/favicon.png">
+    <link rel="icon" type="image/x-icon" href="<?= $asset('/images/favicon.ico') ?>">
+    <link rel="shortcut icon" href="<?= $asset('/images/favicon.ico') ?>">
     <meta name="csrf-token" content="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
     <link rel="stylesheet" href="<?= $asset('/css/tokens.css') ?>">
     <link rel="stylesheet" href="<?= $asset('/css/components.css') ?>">
