@@ -125,10 +125,20 @@ Change ID: `cvs-scoring-refinement` (nowa iteracja po 3.1)
 
 ## Infrastruktura CI/CD ✅ dodana (2026-06-09)
 
-GitHub Actions — `main` branch:
-- PHP 8.2, composer install
-- `vendor/bin/phpunit` (340 testów)
-- `composer stan` (PHPStan level 6)
+Change ID: `ci-cd-pipeline` — [context/changes/ci-cd-pipeline/](../changes/ci-cd-pipeline/)
+
+GitHub Actions pipeline na każdy push/PR do `main`:
+
+| Krok | Narzędzie | Blokuje? |
+|------|-----------|---------|
+| PHP 8.2 setup | shivammathur/setup-php | tak |
+| composer install | Composer (z lock) | tak |
+| testy jednostkowe | PHPUnit 11 — 340 testów | tak |
+| statyczna analiza | PHPStan level 6 | tak |
+| audit CVE | composer audit | nie (sygnalizuje) |
+
+**CI bez CD** — deploy pozostaje ręczny przez `/MiJu-CF-Deploy`.
+Powód: CF brak deploy API, brak stagingu, ryzyko automatycznego deployu na produkcję.
 
 ---
 
