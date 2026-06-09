@@ -14,6 +14,7 @@
     /* --- Text --- */
     --c-text:  #dce8f5;
     --c-muted: #5a7595;
+    --c-text-muted: var(--c-muted);   /* alias — some templates/components reference this name */
 
     /* --- Interactive (blue) --- */
     --c-primary: #4090e0;
