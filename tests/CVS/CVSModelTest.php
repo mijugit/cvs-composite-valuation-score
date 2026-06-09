@@ -744,6 +744,122 @@ class CVSModelTest extends TestCase
      * Build a minimal set of financials that passes the Quality Gate
      * and provides sensible inputs for all pillars.
      *
+    // ------------------------------------------------------------------
+    // FR-011: FCF normalization — trough and stability
+    // ------------------------------------------------------------------
+
+    /**
+     * MU-style trough capex: trailing FCF depressed by HBM capex, but analyst
+     * EPS estimates show strong recovery. forward_fcf_est should raise the
+     * valuation score by using the analyst-projected FCF as denominator.
+     *
+     * Fixture design:
+     *   shares = 1.1B, fcf = 500M → fcf_per_share ≈ 0.45
+     *   trailing_eps = 1.0 → ratio = 0.45 ∈ [0.3, 3.0] → normalization applies
+     *   forward_eps  = 8.0 → +700% EPS (base effect) → growthPct from revenue_growth=50%
+     *   forward_fcf_est = 8.0 × 500M / 1.0 = 4 000M (8.5× trailing FCF)
+     */
+    public function test_valuation_score_improves_for_trough_fcf_company(): void
+    {
+        $cfg = $this->config;
+        $cfg['peer_group']['enabled'] = false; // deterministic legacy benchmarks
+
+        $fcf         = 500_000_000.0;
+        $trailingEps = 1.0;
+        $forwardEps  = 8.0;
+        $shares      = 1_100_000_000.0;
+
+        $financials = $this->baseFinancials([
+            'current_price'       => 100.0,
+            'shares_outstanding'  => $shares,
+            'total_debt'          => 10_000_000_000.0,
+            'total_equity'        => 50_000_000_000.0,
+            'cash'                =>    500_000_000.0,
+            'current_assets'      => 30_000_000_000.0,
+            'current_liabilities' => 10_000_000_000.0,
+            'revenue'             => 25_000_000_000.0,
+            'gross_profit'        => 14_000_000_000.0,
+            'gross_margins'       => 0.55,
+            'free_cash_flow'      => $fcf,
+            'trailing_eps'        => $trailingEps,
+            'forward_eps'         => $forwardEps,
+            'revenue_growth'      => 0.50,
+            'forward_fcf_est'     => $forwardEps * ($fcf / $trailingEps), // 4 000M
+        ]);
+
+        $modelOn = new CVSModel($cfg, $this->peerRepo);
+
+        $cfgOff = $cfg;
+        $cfgOff['valuation']['use_forward_fcf_estimate'] = false;
+        $modelOff = new CVSModel($cfgOff, $this->peerRepo);
+
+        $resultOn  = $modelOn->calculate('MU', $financials);
+        $resultOff = $modelOff->calculate('MU', $financials);
+
+        $this->assertNotNull($resultOn,  'QualityGate should pass for MU fixture');
+        $this->assertNotNull($resultOff, 'QualityGate should pass for MU fixture (flag off)');
+
+        $scoreOn  = (float) $resultOn->toArray()['pillar_scores']['valuation'];
+        $scoreOff = (float) $resultOff->toArray()['pillar_scores']['valuation'];
+
+        // Normalization must produce a higher (less expensive) valuation score
+        $this->assertGreaterThan($scoreOff, $scoreOn,
+            "With forward_fcf_est (4B vs trailing 500M): score should improve. Got ON=$scoreOn OFF=$scoreOff");
+    }
+
+    /**
+     * Healthy company with moderate FCF growth: forward_fcf_est ≈ trailing × (1+g),
+     * so using it instead of trailing × (1+g)^2 causes only a small (~5%) denominator
+     * difference. The resulting score change must be ≤ 5 points.
+     *
+     * Fixture design:
+     *   shares = 150K, fcf = 1.5M → fcf_per_share = 10.0
+     *   trailing_eps = 6.0 → ratio = 10/6 ≈ 1.67 ∈ [0.3, 3.0] → normalization applies
+     *   forward_eps  = 6.3 (+5%) → no base effect; forward_fcf_est = 1.575M
+     *   Old formula:  1.5M × (1.05)^2 = 1.654M
+     *   New formula:  1.575M  (5% smaller denominator → score Δ < 5 pts)
+     */
+    public function test_valuation_score_stable_for_healthy_fcf_company(): void
+    {
+        $cfg = $this->config;
+        $cfg['peer_group']['enabled'] = false;
+
+        $fcf         = 1_500_000.0;
+        $trailingEps = 6.0;
+        $forwardEps  = 6.3; // +5% — moderate, predictable
+        $shares      = 150_000.0;
+
+        $financials = $this->baseFinancials([
+            'shares_outstanding' => $shares,
+            'free_cash_flow'     => $fcf,
+            'trailing_eps'       => $trailingEps,
+            'forward_eps'        => $forwardEps,
+            'revenue_growth'     => 0.05,
+            'forward_fcf_est'    => $forwardEps * ($fcf / $trailingEps), // 1 575 000
+        ]);
+
+        $modelOn = new CVSModel($cfg, $this->peerRepo);
+
+        $cfgOff = $cfg;
+        $cfgOff['valuation']['use_forward_fcf_estimate'] = false;
+        $modelOff = new CVSModel($cfgOff, $this->peerRepo);
+
+        $resultOn  = $modelOn->calculate('STABLE', $financials);
+        $resultOff = $modelOff->calculate('STABLE', $financials);
+
+        $this->assertNotNull($resultOn,  'QualityGate should pass for healthy fixture');
+        $this->assertNotNull($resultOff, 'QualityGate should pass for healthy fixture (flag off)');
+
+        $scoreOn  = (float) $resultOn->toArray()['pillar_scores']['valuation'];
+        $scoreOff = (float) $resultOff->toArray()['pillar_scores']['valuation'];
+
+        $this->assertLessThanOrEqual(5.0, abs($scoreOn - $scoreOff),
+            "Score change for healthy company should be <= 5 pts. Got ON=$scoreOn OFF=$scoreOff, diff=" . abs($scoreOn - $scoreOff));
+    }
+
+    // ------------------------------------------------------------------
+
+    /**
      * @param array<string, mixed> $overrides
      * @return array<string, mixed>
      */

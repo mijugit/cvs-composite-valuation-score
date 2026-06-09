@@ -150,6 +150,60 @@ class ValuationMetricsTest extends TestCase
         $this->assertNull(ValuationMetrics::forwardEvFcf($f, 10.0));
     }
 
+    // FR-011: forward FCF estimate as denominator
+
+    public function test_forward_ev_fcf_uses_estimate_when_provided(): void
+    {
+        // EV = 100 × 1M = 100M, free_cash_flow = 1M
+        // Without estimate: forwardFcf = 1M × (1.10)^2 = 1.21M → ratio ≈ 82.6
+        // With fwdFcfEst = 2M (larger → cheaper): ratio = 100M/2M = 50 < 82.6
+        $f = $this->base([
+            'current_price'      => 100.0,
+            'shares_outstanding' => 1_000_000.0,
+            'total_debt'         => 0.0,
+            'cash'               => 0.0,
+            'free_cash_flow'     => 1_000_000.0,
+        ]);
+        $withoutEst = ValuationMetrics::forwardEvFcf($f, 10.0);
+        $withEst    = ValuationMetrics::forwardEvFcf($f, 10.0, 2_000_000.0);
+
+        $this->assertNotNull($withoutEst);
+        $this->assertNotNull($withEst);
+        // Higher forward_fcf_est denominator → lower EV/FCF → company scores cheaper
+        $this->assertLessThan($withoutEst, $withEst);
+    }
+
+    public function test_forward_ev_fcf_falls_back_when_estimate_is_null(): void
+    {
+        $f = $this->base([
+            'current_price'      => 100.0,
+            'shares_outstanding' => 1_000_000.0,
+            'total_debt'         => 0.0,
+            'cash'               => 0.0,
+            'free_cash_flow'     => 1_000_000.0,
+        ]);
+        // Explicit null must produce same result as omitting the argument entirely
+        $implicit = ValuationMetrics::forwardEvFcf($f, 10.0);
+        $explicit = ValuationMetrics::forwardEvFcf($f, 10.0, null);
+
+        $this->assertNotNull($implicit);
+        $this->assertEqualsWithDelta($implicit, $explicit, 0.0001);
+    }
+
+    public function test_forward_ev_fcf_returns_null_when_estimate_zero_or_negative(): void
+    {
+        $f = $this->base([
+            'current_price'      => 100.0,
+            'shares_outstanding' => 1_000_000.0,
+            'total_debt'         => 0.0,
+            'cash'               => 0.0,
+            'free_cash_flow'     => 1_000_000.0,
+        ]);
+        // Zero or negative estimate → denominator invalid → null
+        $this->assertNull(ValuationMetrics::forwardEvFcf($f, 10.0, 0.0));
+        $this->assertNull(ValuationMetrics::forwardEvFcf($f, 10.0, -100_000.0));
+    }
+
     // ------------------------------------------------------------------
     // forwardEvSalesAdjusted
     // ------------------------------------------------------------------
