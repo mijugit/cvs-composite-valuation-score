@@ -32,6 +32,21 @@ body {
 a { color: var(--c-primary); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
+/* Accessibility: a clear keyboard-focus ring on all interactive elements, and a
+   subtler tap highlight on touch devices. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+    outline: 2px solid var(--c-primary);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+}
+button, a { -webkit-tap-highlight-color: rgba(64, 144, 224, .2); }
+
 /* --- Layout ----------------------------------------------- */
 .container { max-width: 960px; margin: 0 auto; padding: 0 1.25rem; }
 
@@ -924,6 +939,9 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
     /* Detail heading: title above the action links */
     .analysis-detail__heading { gap: .5rem; }
     .analysis-detail__heading h1 { flex: 1 1 100%; }
+
+    /* Auth box: less wasted vertical space, tighter padding on phones */
+    .auth-box { margin: 1.5rem auto; padding: 1.5rem; }
 }
 
 /* --- Small phones --------------------------------------------- */

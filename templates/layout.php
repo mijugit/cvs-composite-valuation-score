@@ -1,3 +1,13 @@
+<?php
+/**
+ * Cache-busting helper: appends ?v=<filemtime> to a public asset path so browsers
+ * pick up CSS/JS changes immediately after a deploy instead of serving a stale copy.
+ */
+$asset = static function (string $path): string {
+    $full = dirname(__DIR__) . '/public' . $path;
+    return is_file($full) ? $path . '?v=' . filemtime($full) : $path;
+};
+?>
 <!DOCTYPE html>
 <html lang="pl">
 <head>
@@ -7,9 +17,9 @@
     <link rel="icon" type="image/png" sizes="64x64" href="/images/favicon.png">
     <link rel="shortcut icon" href="/images/favicon.png">
     <meta name="csrf-token" content="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
-    <link rel="stylesheet" href="/css/tokens.css">
-    <link rel="stylesheet" href="/css/components.css">
-    <link rel="stylesheet" href="/css/app.css">
+    <link rel="stylesheet" href="<?= $asset('/css/tokens.css') ?>">
+    <link rel="stylesheet" href="<?= $asset('/css/components.css') ?>">
+    <link rel="stylesheet" href="<?= $asset('/css/app.css') ?>">
 </head>
 <body>
 <header class="site-header">
@@ -65,6 +75,6 @@
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
-<script src="/js/app.js"></script>
+<script src="<?= $asset('/js/app.js') ?>"></script>
 </body>
 </html>
