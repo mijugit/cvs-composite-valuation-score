@@ -135,13 +135,18 @@ class CvsSnapshotRepository
                         earnings_guard_active = :earnings_guard_active
                     WHERE ticker = :ticker AND score_date = :score_date
                       AND (model_version = :model_version_match
-                           OR (model_version IS NULL AND :model_version_match IS NULL))
+                           OR (model_version IS NULL AND :model_version_match_null IS NULL))
                 ');
-                // Distinct placeholder for the WHERE-clause match (NULL-safe, MySQL/SQLite
-                // portable — MySQL has no general `col IS value`; `<=>` is MySQL-only).
-                // A separate name avoids relying on duplicate-named-parameter binding,
-                // which is not uniformly supported across PDO drivers.
-                $upd->execute($params + [':model_version_match' => $modelVersion]);
+                // Two distinct placeholder names for :model_version_match because the
+                // name appears twice in the WHERE clause (equality check + NULL-safe
+                // fallback).  PDO MySQL with emulated prepares OFF converts named
+                // params to positional `?`; a duplicated name produces two `?`s but
+                // only one bound value → SQLSTATE[HY093].  Using a separate name for
+                // each occurrence is the portable fix (works on MySQL and SQLite).
+                $upd->execute($params + [
+                    ':model_version_match'      => $modelVersion,
+                    ':model_version_match_null' => $modelVersion,
+                ]);
             } catch (PDOException $ue) {
                 error_log(sprintf('CvsSnapshotRepository::update failed for %s: %s', $ticker, $ue->getMessage()));
             }
