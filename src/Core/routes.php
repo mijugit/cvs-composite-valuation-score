@@ -56,6 +56,14 @@ $router->get('/analysis/{ticker}',     fn($req) => $analysis->show($req));
 $router->post('/watchlist/toggle',     fn($req) => $watchlist->toggle($req));
 
 // ------------------------------------------------------------------
+// Model documentation (public)
+// ------------------------------------------------------------------
+
+$router->get('/model', function ($req) {
+    \CVS\Core\Response::view('model');
+});
+
+// ------------------------------------------------------------------
 // Styleguide (F-01)
 // ------------------------------------------------------------------
 
