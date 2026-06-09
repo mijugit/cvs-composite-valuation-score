@@ -30,3 +30,7 @@ jobs:
 
       - name: Run PHPStan (level 6)
         run: composer stan
+
+      - name: Audit dependencies for known CVEs
+        run: composer audit
+        continue-on-error: true
