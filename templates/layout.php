@@ -17,7 +17,12 @@
         <a class="site-logo" href="/dashboard">CVS</a>
         <span class="site-tagline">Composite Valuation Score</span>
         <?php if (!empty($_SESSION['user_id'])): ?>
-        <nav class="site-nav">
+        <button class="nav-toggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="site-nav">
+            <span class="nav-toggle__bar"></span>
+            <span class="nav-toggle__bar"></span>
+            <span class="nav-toggle__bar"></span>
+        </button>
+        <nav class="site-nav" id="site-nav">
             <a href="/dashboard">Panel</a>
             <a href="/screener">Screener</a>
             <a href="/track-record">Track Record</a>

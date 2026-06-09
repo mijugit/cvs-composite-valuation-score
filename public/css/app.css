@@ -778,14 +778,163 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
     transition: opacity .3s;
 }
 
-/* --- Responsive ------------------------------------------- */
+/* --- Hamburger toggle (hidden on desktop, shown ≤768px) ---- */
+.nav-toggle {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    width: 42px;
+    height: 42px;
+    padding: 9px;
+    margin-left: auto;
+    background: transparent;
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+}
+.nav-toggle__bar {
+    display: block;
+    width: 100%;
+    height: 2px;
+    background: var(--c-text);
+    border-radius: 2px;
+    transition: transform .2s ease, opacity .2s ease;
+}
+/* Animate to an X when the panel is open */
+.nav-toggle[aria-expanded="true"] .nav-toggle__bar:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+.nav-toggle[aria-expanded="true"] .nav-toggle__bar:nth-child(2) { opacity: 0; }
+.nav-toggle[aria-expanded="true"] .nav-toggle__bar:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+
+/* ============================================================
+   Responsive — mobile-first overrides
+   ============================================================ */
+
+/* --- Tablet & phone: collapse navigation into a toggle panel --- */
+@media (max-width: 768px) {
+    .site-header { position: relative; }
+    .site-header .container { flex-wrap: wrap; gap: .75rem; }
+    .site-tagline { display: none; }
+
+    .nav-toggle { display: flex; }
+
+    .site-nav {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        background: var(--c-surface);
+        border-bottom: 1px solid var(--c-border);
+        box-shadow: var(--shadow);
+        padding: .4rem 0;
+        font-size: 1rem;
+        z-index: 150;
+    }
+    .site-nav--open { display: flex; }
+
+    .site-nav > a {
+        padding: .8rem 1.25rem;
+        border-radius: 0;
+    }
+    .site-nav > a:hover { background: rgba(255,255,255,.05); text-decoration: none; }
+
+    /* Admin submenu flattens inline within the stacked nav */
+    .admin-menu { width: 100%; }
+    .admin-menu__trigger {
+        width: 100%;
+        justify-content: space-between;
+        border: none;
+        border-top: 1px solid var(--c-border);
+        border-radius: 0;
+        padding: .8rem 1.25rem;
+        font-size: 1rem;
+        color: var(--c-text);
+        pointer-events: none;            /* sub-links are always visible on mobile */
+    }
+    .admin-menu__caret { display: none; }
+    .admin-menu__dropdown,
+    .admin-menu:hover .admin-menu__dropdown,
+    .admin-menu:focus-within .admin-menu__dropdown {
+        display: block;
+        position: static;
+        min-width: 0;
+        margin: 0;
+        padding: 0;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        background: rgba(0,0,0,.22);
+    }
+    .admin-menu__dropdown li a { padding: .65rem 1.25rem .65rem 2rem; }
+}
+
+/* --- General small-screen spacing & layout ---------------- */
+@media (max-width: 768px) {
+    .site-main { padding: 1.25rem 0; }
+    .container { padding: 0 1rem; }
+    .card { padding: 1.15rem; }
+    h1 { font-size: 1.6rem; }
+
+    /* Wide tables scroll horizontally instead of overflowing the viewport */
+    .pillar-table,
+    .history-table,
+    .raw-table,
+    .mode-table,
+    .edge-table {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        white-space: nowrap;
+    }
+
+    /* Detail page: radar + price chart stack full-width */
+    .radar-price-row { gap: 1rem; }
+    .detail-radar-wrapper { flex: 0 0 100%; max-width: 100%; }
+    .price-chart-compact { min-width: 100%; }
+
+    /* Consensus rows: tighten fixed label column */
+    .consensus-bar__label { flex: 0 0 84px; font-size: .75rem; }
+    .consensus-bar__count { flex: 0 0 24px; }
+
+    /* Screener / filter forms: each control takes a full row, easy to tap */
+    form[action="/screener"] .form-group,
+    form[action="/screener"] > div {
+        flex: 1 1 100% !important;
+        min-width: 0 !important;
+    }
+    form[action="/screener"] select,
+    form[action="/screener"] input { width: 100%; }
+}
+
+/* --- Phones --------------------------------------------------- */
 @media (max-width: 600px) {
     .cvs-number { font-size: 1.75rem; }
     .results-grid { grid-template-columns: 1fr; }
+
+    /* Stacked forms: primary action spans full width for easy tapping */
+    .form .btn { width: 100%; }
+
+    .dual-cvs-header { gap: .6rem; }
+    .dual-cvs-header .score-tile { min-width: calc(50% - .3rem); }
+
+    /* Detail heading: title above the action links */
+    .analysis-detail__heading { gap: .5rem; }
+    .analysis-detail__heading h1 { flex: 1 1 100%; }
 }
 
-@media (max-width: 375px) {
+/* --- Small phones --------------------------------------------- */
+@media (max-width: 420px) {
     .result-card__scores { gap: .25rem; }
     .score-badge { padding: .3rem .2rem; }
     .score-badge__value { font-size: .95rem; }
+
+    .dual-cvs-header { flex-direction: column; }
+    .dual-cvs-header .score-tile { min-width: 100%; }
+
+    .ai-modal__inner,
+    .company-modal__inner { padding: 1.5rem 1.25rem; max-width: calc(100vw - 2rem); }
 }
