@@ -145,7 +145,7 @@ MAIL_SMTP_PORT=587
 MAIL_SMTP_USER=
 MAIL_SMTP_PASS=
 MAIL_SMTP_ENCRYPTION=tls
-MAIL_FROM_EMAIL=noreply@timeflow.fun
+MAIL_FROM_EMAIL=noreply@example.com
 MAIL_FROM_NAME=CVS Composite Valuation Score
 MAIL_ADMIN_EMAIL=admin@example.com
 ```
@@ -189,12 +189,12 @@ maila przez SSH, potwierdzenie że mail dotarł.
 **File:** `.env` na serwerze CF (przez SSH printf)
 
 **Intent:** Dodać prawdziwe SMTP credentials z panelu CF. Dane z:
-CF panel → Serwer WWW → Konta email → (wybierz/stwórz konto noreply@timeflow.fun).
+CF panel → Serwer WWW → Konta email → (wybierz/stwórz konto noreply@example.com).
 
 **Contract:** Zaktualizować .env na CF przez SSH `printf` (bez BOM):
 ```
-MAIL_SMTP_HOST=<z panelu CF, np. mail.timeflow.fun lub smtp.cyberfolks.pl>
-MAIL_SMTP_USER=noreply@timeflow.fun
+MAIL_SMTP_HOST=<z panelu CF, np. <mail-host> lub smtp.cyberfolks.pl>
+MAIL_SMTP_USER=noreply@example.com
 MAIL_SMTP_PASS=<hasło z panelu CF>
 ```
 Pozostałe zmienne (PORT, ENCRYPTION, FROM_*, ADMIN_EMAIL) z defaultów.
@@ -242,7 +242,7 @@ var_dump(\$svc->sendToAdmin('Test CVS Mail', '<p>Test wysylki maili z CVS.</p>')
 
 1. Po deploy + .env CF: uruchom snippet SSH powyżej
 2. Sprawdź inbox `admin@example.com` — mail z tematem "Test CVS Mail"
-3. Sprawdź spam — jeśli tam, może być problem z SPF/DKIM dla noreply@timeflow.fun
+3. Sprawdź spam — jeśli tam, może być problem z SPF/DKIM dla noreply@example.com
 
 ## Performance Considerations
 
@@ -286,4 +286,4 @@ Brak zmian DB. Rollback: usunąć phpmailer z composer.json + src/Mail/ + config
 
 #### Manual
 - [x] 2.3 SSH test-send → bool(true)
-- [x] 2.4 Mail dotarł na blog@timeflow.fun (2026-06-02 10:22)
+- [x] 2.4 Mail dotarł na admin@example.com (2026-06-02 10:22)

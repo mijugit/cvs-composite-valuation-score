@@ -64,9 +64,9 @@ MailService::sendToAdmin(subject, html)
 
 ## Open Risks & Assumptions
 
-- SMTP credentials CF (host/user/pass dla noreply@timeflow.fun) muszą być
+- SMTP credentials CF (host/user/pass dla noreply@example.com) muszą być
   pobrane z panelu CF przed Fazą 2.
-- Jeśli SPF/DKIM dla noreply@timeflow.fun nie jest skonfigurowane,
+- Jeśli SPF/DKIM dla noreply@example.com nie jest skonfigurowane,
   mail może trafić do spamu — do sprawdzenia po wysłaniu.
 
 ## Success Criteria (Summary)

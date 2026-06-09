@@ -1,4 +1,4 @@
-# S-05: Formularz prośby o kod PRO — Implementation Plan
+﻿# S-05: Formularz prośby o kod PRO — Implementation Plan
 
 ## Overview
 
@@ -193,7 +193,7 @@ muszą pozostać zielone.
 2. Wejdź na `/analysis/AAPL`, kliknij „Wprowadź kod PRO"
 3. W modalu powinna pojawić się sekcja prośby
 4. Wypełnij pola i kliknij „Wyślij"
-5. Sprawdź inbox admina (`blog@timeflow.fun`) — mail z prośbą
+5. Sprawdź inbox admina (`admin@example.com`) — mail z prośbą
 6. Odśwież stronę, kliknij znów modal — pokaż „✓ Prośba wysłana"
 
 ## Performance Considerations

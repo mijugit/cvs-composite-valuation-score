@@ -1,4 +1,4 @@
-# S-04: Alerty watchlisty — Implementation Plan
+﻿# S-04: Alerty watchlisty — Implementation Plan
 
 ## Overview
 
@@ -347,7 +347,7 @@ i przekaż do widoku dashboardu.
 3. Uruchom rescore manualnie przez SSH
 4. Sprawdź `alert_sent` — czy wiersz bez zmiany (first-time: NULL → current = alert)
 5. Uruchom rescore ponownie → `cron_rescore.txt` bez "alert sent" (brak zmiany)
-6. Sprawdź inbox `blog@timeflow.fun` czy jest mail alertowy
+6. Sprawdź inbox `admin@example.com` czy jest mail alertowy
 
 ## Performance Considerations
 
