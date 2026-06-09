@@ -99,12 +99,22 @@ class ValuationMetrics
      * Projects FCF two years forward using growth rate, then divides EV.
      * Returns null when any required input is absent or EV cannot be computed.
      *
+     * FR-011: when $fwdFcfEst is provided (analyst-derived forward FCF, computed in
+     * FinancialDataFetcher::normalise() as forward_eps × fcf/trailing_eps), it is used
+     * directly as the denominator — forward_eps is already a 1-year forward estimate so
+     * no additional (1+g)² projection is applied. When null, falls back to the original
+     * trailing_fcf × (1+g)² formula (pre-normalization behaviour preserved).
+     *
      * @param array<string, mixed> $financials
      * @param float                $growthPct   Forward growth rate in % (already capped to max_growth)
+     * @param float|null           $fwdFcfEst   Analyst forward FCF estimate (FR-011); null = use growth formula
      * @return float|null
      */
-    public static function forwardEvFcf(array $financials, float $growthPct): ?float
-    {
+    public static function forwardEvFcf(
+        array  $financials,
+        float  $growthPct,
+        ?float $fwdFcfEst = null
+    ): ?float {
         $ev  = self::enterpriseValue($financials);
         $fcf = $financials['free_cash_flow'] ?? null;
 
@@ -112,7 +122,11 @@ class ValuationMetrics
             return null;
         }
 
-        $forwardFcf = (float) $fcf * ((1.0 + $growthPct / 100.0) ** 2);
+        // FR-011: use analyst forward FCF estimate when provided (ValuationPillar applies
+        // bounds check before passing); otherwise fall back to trailing_fcf × (1+g)².
+        $forwardFcf = ($fwdFcfEst !== null)
+            ? $fwdFcfEst
+            : (float) $fcf * ((1.0 + $growthPct / 100.0) ** 2);
 
         return $forwardFcf > 0 ? $ev / $forwardFcf : null;
     }

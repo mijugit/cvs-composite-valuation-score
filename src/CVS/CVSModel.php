@@ -56,14 +56,18 @@ class CVSModel
                 modelVersion:   (string) ($config['model_version'] ?? '3.0'),
             );
             $this->valuation = new ValuationPillar(
-                benchmarks:   $config['benchmarks'] ?? [],
-                resolver:     $resolver,
-                anchorBlend:  (string) ($peerConfig['anchor_blend']  ?? 'min'),
-                anchorWeight: (float)  ($peerConfig['anchor_weight'] ?? 0.3),
+                benchmarks:      $config['benchmarks'] ?? [],
+                resolver:        $resolver,
+                anchorBlend:     (string) ($peerConfig['anchor_blend']  ?? 'min'),
+                anchorWeight:    (float)  ($peerConfig['anchor_weight'] ?? 0.3),
+                valuationConfig: $config['valuation'] ?? [],
             );
         } else {
             // Legacy / peer_group disabled — static benchmarks only.
-            $this->valuation = new ValuationPillar($config['benchmarks'] ?? []);
+            $this->valuation = new ValuationPillar(
+                benchmarks:      $config['benchmarks'] ?? [],
+                valuationConfig: $config['valuation'] ?? [],
+            );
         }
 
         // Momentum pillar is constructed with swing config (cap/divisor are shared).
