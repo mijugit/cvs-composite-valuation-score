@@ -27,4 +27,5 @@
     </form>
 
     <p class="auth-switch">Masz już konto? <a href="/login">Zaloguj się</a></p>
+    <p class="auth-switch">Ciekawi Cię metodologia? <a href="/model">Jak działa model CVS →</a></p>
 </section>
