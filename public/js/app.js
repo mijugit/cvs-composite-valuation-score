@@ -8,6 +8,40 @@
  * Communicates with POST /analysis (JSON response).
  */
 
+/**
+ * Mobile navigation toggle (hamburger). Runs on every page — independent of
+ * the dashboard logic below, which early-returns when there is no analysis form.
+ */
+(function () {
+    'use strict';
+
+    const toggle = document.querySelector('.nav-toggle');
+    const nav    = document.getElementById('site-nav');
+    if (!toggle || !nav) return;
+
+    function close() {
+        nav.classList.remove('site-nav--open');
+        toggle.setAttribute('aria-expanded', 'false');
+    }
+
+    toggle.addEventListener('click', function (e) {
+        e.stopPropagation();
+        const open = nav.classList.toggle('site-nav--open');
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+
+    // Tapping a real navigation link closes the panel (but not the admin sub-trigger).
+    nav.addEventListener('click', function (e) {
+        if (e.target.closest('a')) close();
+    });
+
+    // Tapping outside the open panel closes it.
+    document.addEventListener('click', function (e) {
+        if (!nav.classList.contains('site-nav--open')) return;
+        if (!nav.contains(e.target) && !toggle.contains(e.target)) close();
+    });
+})();
+
 (function () {
     'use strict';
 
