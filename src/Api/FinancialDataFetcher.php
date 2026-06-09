@@ -467,6 +467,19 @@ class FinancialDataFetcher
             'free_cash_flow_adjusted'    => $fcfAdjusted,
             'operating_cash_flow'        => $opCf,
 
+            // FCF normalization estimate (FR-011) — computed unconditionally when inputs are
+            // available; ValuationPillar decides whether to use it (bounds + feature flag).
+            // Derives analyst-forward FCF: forward_eps × (fcfEffective / trailing_eps).
+            // Uses $fcfEffective (capex-adjusted) for denominator parity with free_cash_flow.
+            'forward_fcf_est' => (static function () use ($fcfEffective, $ks, $v): ?float {
+                if ($fcfEffective === null || $fcfEffective <= 0.0) return null;
+                $forwardEps  = $v($ks['forwardEps']  ?? []);
+                $trailingEps = $v($ks['trailingEps'] ?? []);
+                if ($forwardEps === null) return null;
+                if ($trailingEps === null || $trailingEps <= 0.0) return null;
+                return $forwardEps * ($fcfEffective / $trailingEps);
+            })(),
+
             // Quality ratios
             'return_on_equity'           => $v($fin['returnOnEquity'] ?? []),
 

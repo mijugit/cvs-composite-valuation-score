@@ -60,6 +60,27 @@ return [
         'penalty'         => ['slope' => 10.0, 'cap' => 10.0],
     ],
 
+    // --- Valuation pillar — FCF normalization (Phase 5 plaster 3, FR-011) ---
+    // Controls the forward-FCF-estimate path in ValuationPillar.
+    //
+    // use_forward_fcf_estimate: when true, ValuationPillar uses
+    //   forward_fcf_est = forward_eps × (trailing_fcf / trailing_eps)
+    //   as the EV/FCF denominator instead of trailing_fcf × (1+g)².
+    //   This corrects trough-capex distortions (e.g. MU during HBM build-out)
+    //   where trailing FCF is depressed but analyst EPS estimates show recovery.
+    //   Set false to fall back to the pre-normalization formula everywhere.
+    //
+    // fcf_to_eps_ratio_min/max: bounds on the trailing FCF/EPS conversion ratio.
+    //   If free_cash_flow / trailing_eps falls outside [min, max], the estimate
+    //   is discarded and the formula falls back to trailing_fcf × (1+g)².
+    //   Prevents pathological cases (near-zero EPS, outlier capex ratios).
+    //   FR-010: never hardcode these bounds in business logic; always read here.
+    'valuation' => [
+        'use_forward_fcf_estimate' => true,
+        'fcf_to_eps_ratio_min'     => 0.3,   // below → ratio too small, skip estimate
+        'fcf_to_eps_ratio_max'     => 3.0,   // above → ratio too large, skip estimate
+    ],
+
     // --- Peer-group configuration (Phase 3) ---
     // Controls empirical subsector median lookups in MedianResolver.
     //
