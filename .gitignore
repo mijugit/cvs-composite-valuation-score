@@ -22,6 +22,5 @@ Thumbs.db
 # Claude Code project settings
 .claude/
 
-# 10x Dev workflow context — internal planning docs, infrastructure details
-# (PRD, tech-stack decisions, infra.md with server details — not for public repo)
-context/
+# deployment/ — never commit (db_pass in plaintext)
+deployment/
