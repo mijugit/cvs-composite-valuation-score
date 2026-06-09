@@ -1,4 +1,4 @@
-# Admin: Panel Odświeżania Sektorów — Implementation Plan
+﻿# Admin: Panel Odświeżania Sektorów — Implementation Plan
 
 ## Overview
 
@@ -142,7 +142,7 @@ Dwa małe zmiany: `AuthController::login()` zapisuje `is_admin` do `$_SESSION` p
 
 #### Manual Verification
 
-- Zaloguj jako `admin@amjsystem.eu` → w nawigacji widoczne "Panel PRO" i "Sektory"
+- Zaloguj jako `admin@example.com` → w nawigacji widoczne "Panel PRO" i "Sektory"
 - Zaloguj jako zwykły user → linki admin niewidoczne
 - Wyloguj jako admin → linki znikają, kolejne logowanie jako admin → linki wracają
 
@@ -211,7 +211,7 @@ Implementacja: dwa osobne selecty (jeden per `level`) lub jeden z GROUP_CONCAT �
 - `requireAdmin()`
 - Waliduj CSRF: `$request->verifyCsrf()`
 - Pobierz `$sector = $request->input('sector')` — sanitize przez `strip_tags()` + weryfikacja że istnieje w batch_schedule (whitelist check — krytyczne dla exec() injection prevention)
-- Construct command: `$cmd = '/usr/local/bin/php84 ' . ROOT_PATH . '/bin/refresh_peer_medians.php --sector=' . escapeshellarg($sector) . ' >> /home/amjsystem/cron_rescore.txt 2>&1'`
+- Construct command: `$cmd = '/usr/local/bin/php84 ' . ROOT_PATH . '/bin/refresh_peer_medians.php --sector=' . escapeshellarg($sector) . ' >> /home/<cf-user>/cron_rescore.txt 2>&1'`
 - `exec($cmd . ' &')` — fire and forget
 - Zwróć `Response::json(['ok' => true, 'message' => "Odświeżanie $sector uruchomiono"])`
 - Jeśli exec() wyłączone (sprawdź `function_exists('exec')`): zwróć JSON z błędem `exec_disabled`
@@ -254,7 +254,7 @@ Jeśli `exec` na liście `disable_functions` → plan wymaga alternatywy (np. ta
 - SSH: `php84 -r "echo ini_get('disable_functions');"` — `exec` NIE jest na liście (prerequisite dla całej fazy)
 - GET `/admin/sectors` jako admin → strona się ładuje (nawet bez pełnego stylu)
 - POST `/admin/sectors/refresh` z `{sector: "Technology"}` przez curl/Postman → JSON `{ok: true}`
-- W logu `/home/amjsystem/cron_rescore.txt` pojawia się nowy wpis po kilku sekundach
+- W logu `/home/<cf-user>/cron_rescore.txt` pojawia się nowy wpis po kilku sekundach
 
 ---
 
@@ -388,7 +388,7 @@ Brak — analogicznie do innych kontrolerów admina (ProController nie ma integr
 3. Otwórz `/admin/sectors` → sprawdź tabelę
 4. Kliknij accordion na zaindeksowanym sektorze → sprawdź podsektory
 5. Kliknij Odśwież na niezaindeksowanym sektorze → sprawdź toast
-6. Sprawdź log: `tail -f /home/amjsystem/cron_rescore.txt` przez SSH
+6. Sprawdź log: `tail -f /home/<cf-user>/cron_rescore.txt` przez SSH
 7. Po zakończeniu refresh → sprawdź DB: `SELECT * FROM peer_medians WHERE bucket_key='Technology' LIMIT 5`
 8. Odśwież `/admin/sectors` → sprawdź że sektor zmienił status
 
@@ -456,7 +456,7 @@ Jedyna zmiana infrastrukturalna: po deployments odświeżyć sesję admina (wylo
 - [x] 3.4 SSH: exec() NIE na liście disable_functions — b2d7952
 - [x] 3.5 GET `/admin/sectors` jako admin → 200, strona się ładuje — b2d7952
 - [x] 3.6 POST `/admin/sectors/refresh` z `{sector: "Technology"}` → JSON `{ok: true}` — b2d7952
-- [x] 3.7 Log `/home/amjsystem/cron_rescore.txt` — nowy wpis po kilku sekundach — b2d7952
+- [x] 3.7 Log `/home/<cf-user>/cron_rescore.txt` — nowy wpis po kilku sekundach — b2d7952
 
 ### Phase 4: Template + JS
 

@@ -1,4 +1,4 @@
-# F-05: Dostęp PRO — Implementation Plan
+﻿# F-05: Dostęp PRO — Implementation Plan
 
 ## Overview
 
@@ -170,7 +170,7 @@ do istniejącej tablicy konfiguracyjnej.
 - `SHOW COLUMNS FROM users LIKE 'is_admin'` — kolumna istnieje
 - `SHOW CREATE TABLE pro_codes` — tabela istnieje z UNIQUE KEY na code
 - `SHOW CREATE TABLE ai_usage_log` — tabela istnieje z indeksem user_date
-- Seed: `UPDATE users SET is_admin = 1 WHERE email = 'admin@amjsystem.eu'` na CF
+- Seed: `UPDATE users SET is_admin = 1 WHERE email = 'admin@example.com'` na CF
 
 ---
 
@@ -364,7 +364,7 @@ przekazać do `Response::view('analysis', [..., 'canGenerateAi' => $gate->canGen
 
 ### Manual Testing Steps
 
-1. Zrób migracje na CF: 005, 006, 007; `UPDATE users SET is_admin = 1 WHERE email = 'admin@amjsystem.eu'`
+1. Zrób migracje na CF: 005, 006, 007; `UPDATE users SET is_admin = 1 WHERE email = 'admin@example.com'`
 2. Zaloguj jako admin → `/admin/pro` → dodaj globalny kod (np. `CVS-BETA-2026`)
 3. Zaloguj jako zwykły user → `/analysis/AAPL` → potwierdź `$canGenerateAi = false`
 4. Wróć jako admin → upewnij się `/admin/pro` widzi kod jako aktywny
@@ -409,7 +409,7 @@ Wszystkie migracje addytywne. Rollback:
 #### Manual
 - [x] 1.3 Migracje 005/006/007 wykonane na CF, tabele istnieją
 - [x] 1.4 Kolumna `is_admin` na tabeli `users` — widoczna w SHOW COLUMNS
-- [x] 1.5 Seed: `admin@amjsystem.eu` ma `is_admin = 1` na CF
+- [x] 1.5 Seed: `admin@example.com` ma `is_admin = 1` na CF
 
 ### Phase 2: ProRepository + AiUsageRepository + ProGate
 

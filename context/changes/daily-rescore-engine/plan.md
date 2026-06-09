@@ -1,4 +1,4 @@
-# F-04: Dzienny silnik re-scoringu + snapshoty CVS — Implementation Plan
+﻿# F-04: Dzienny silnik re-scoringu + snapshoty CVS — Implementation Plan
 
 ## Overview
 
@@ -74,7 +74,7 @@ Jedna linia `$_SESSION = [];` przed pierwszym `fetch()` w `bin/rescore.php` rozw
 to bez dotykania klasy fetchera.
 
 **Cron + PHP CLI na Cyber_Folks:** Domyślny `php` w cronie CF to 7.4. Ścieżka
-absolutna `/usr/local/bin/php84 /home/amjsystem/sites/cvs.timeflow.fun/bin/rescore.php`
+absolutna `/usr/local/bin/php84 /home/<cf-user>/sites/cvs.timeflow.fun/bin/rescore.php`
 jest konieczna. Typ crona: „Ścieżka" (bez max_execution_time, kluczowe dla batcha).
 
 **`ON DUPLICATE KEY UPDATE` zamiast INSERT IGNORE:** INSERT IGNORE cicho
@@ -267,13 +267,13 @@ Wdróż zmiany na CF, uruchom migrację, skonfiguruj 2 cron joby i zweryfikuj
 **SSH command:**
 ```bash
 mysql -h <DB_HOST> -u <DB_USER> -p'<DB_PASS>' <DB_NAME> \
-  < /home/amjsystem/sites/cvs.timeflow.fun/database/migrations/004_create_cvs_snapshots.sql
+  < /home/<cf-user>/sites/cvs.timeflow.fun/database/migrations/004_create_cvs_snapshots.sql
 ```
 
 #### 2. Test manualny CLI na CF
 
 ```bash
-/usr/local/bin/php84 /home/amjsystem/sites/cvs.timeflow.fun/bin/rescore.php
+/usr/local/bin/php84 /home/<cf-user>/sites/cvs.timeflow.fun/bin/rescore.php
 ```
 
 Oczekiwany output w logach: `rescore: done. success=N failed=M`.
@@ -285,9 +285,9 @@ Typ: **Ścieżka**, PHP: `/usr/local/bin/php84`.
 
 Dwa joby:
 - **Rano (po otwarciu NYSE ~9:30 EST = 15:30 CET):**
-  `0 15 * * 1-5  /usr/local/bin/php84 /home/amjsystem/sites/cvs.timeflow.fun/bin/rescore.php`
+  `0 15 * * 1-5  /usr/local/bin/php84 /home/<cf-user>/sites/cvs.timeflow.fun/bin/rescore.php`
 - **Wieczór (po zamknięciu NYSE ~16:00 EST = 22:00 CET):**
-  `0 22 * * 1-5  /usr/local/bin/php84 /home/amjsystem/sites/cvs.timeflow.fun/bin/rescore.php`
+  `0 22 * * 1-5  /usr/local/bin/php84 /home/<cf-user>/sites/cvs.timeflow.fun/bin/rescore.php`
 
 (Tylko dni robocze, pon–pt.)
 

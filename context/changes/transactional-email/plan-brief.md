@@ -1,4 +1,4 @@
-# F-03: Serwis maili transakcyjnych — Plan Brief
+﻿# F-03: Serwis maili transakcyjnych — Plan Brief
 
 > Full plan: `context/changes/transactional-email/plan.md`
 
@@ -16,7 +16,7 @@ Sprawdzony wzorzec istnieje w C:\python\blog\api\mailer.php (działa na CF/timef
 ## Desired End State
 
 `MailService::send()` i `::sendToAdmin()` działają na CF, mail testowy dociera
-na admin@amjsystem.eu. Brak SMTP → graceful false + error_log, bez wyjątków
+na admin@example.com. Brak SMTP → graceful false + error_log, bez wyjątków
 propagujących do HTTP.
 
 ## Key Decisions Made
@@ -73,4 +73,4 @@ MailService::sendToAdmin(subject, html)
 
 - `MailService::send()` bez SMTP → false (test jednostkowy zielony).
 - `sendToAdmin('Test', '<p>Test</p>')` na CF → bool(true).
-- Mail widoczny w inbox admin@amjsystem.eu.
+- Mail widoczny w inbox admin@example.com.

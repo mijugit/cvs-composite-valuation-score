@@ -1,4 +1,4 @@
-# F-03: Serwis maili transakcyjnych — Implementation Plan
+﻿# F-03: Serwis maili transakcyjnych — Implementation Plan
 
 ## Overview
 
@@ -27,7 +27,7 @@ false, nigdy wyjątek propagujący do HTTP. Fundament pod S-04 i S-05.
 - `config/mail.php` czyta SMTP config z `$_ENV`.
 - `.env` (lokalne + CF) ma komplet zmiennych `MAIL_*`.
 - PHPUnit + PHPStan zielone.
-- Mail testowy wysłany na `admin@amjsystem.eu` przez SSH.
+- Mail testowy wysłany na `admin@example.com` przez SSH.
 
 ### Key Discoveries
 
@@ -147,7 +147,7 @@ MAIL_SMTP_PASS=
 MAIL_SMTP_ENCRYPTION=tls
 MAIL_FROM_EMAIL=noreply@timeflow.fun
 MAIL_FROM_NAME=CVS Composite Valuation Score
-MAIL_ADMIN_EMAIL=admin@amjsystem.eu
+MAIL_ADMIN_EMAIL=admin@example.com
 ```
 Na CF: uzupełnić MAIL_SMTP_HOST, MAIL_SMTP_USER, MAIL_SMTP_PASS z panelu.
 
@@ -204,7 +204,7 @@ Pozostałe zmienne (PORT, ENCRYPTION, FROM_*, ADMIN_EMAIL) z defaultów.
 **Krok manualny:** Po deploy uruchomić test-send przez SSH:
 ```bash
 /usr/local/bin/php84 -r "
-define('ROOT_PATH', '/home/amjsystem/sites/cvs.timeflow.fun');
+define('ROOT_PATH', '/home/<cf-user>/sites/cvs.timeflow.fun');
 require ROOT_PATH . '/vendor/autoload.php';
 // Load .env
 foreach (file(ROOT_PATH . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as \$line) {
@@ -226,7 +226,7 @@ var_dump(\$svc->sendToAdmin('Test CVS Mail', '<p>Test wysylki maili z CVS.</p>')
 
 #### Manual Verification
 - SSH test-send → `bool(true)` (nie `false`)
-- Mail dotarł na `admin@amjsystem.eu` — widoczny w skrzynce
+- Mail dotarł na `admin@example.com` — widoczny w skrzynce
 
 ---
 
@@ -241,7 +241,7 @@ var_dump(\$svc->sendToAdmin('Test CVS Mail', '<p>Test wysylki maili z CVS.</p>')
 ### Manual Testing Steps
 
 1. Po deploy + .env CF: uruchom snippet SSH powyżej
-2. Sprawdź inbox `admin@amjsystem.eu` — mail z tematem "Test CVS Mail"
+2. Sprawdź inbox `admin@example.com` — mail z tematem "Test CVS Mail"
 3. Sprawdź spam — jeśli tam, może być problem z SPF/DKIM dla noreply@timeflow.fun
 
 ## Performance Considerations
