@@ -30,6 +30,7 @@ class CvsSnapshotRepositoryTest extends TestCase
                 sector             TEXT    NULL,
                 industry           TEXT    NULL,
                 model_version      TEXT    NULL,
+                origin             TEXT    NOT NULL DEFAULT \'rescore\',
                 days_since_earnings   INTEGER NULL,
                 days_to_earnings      INTEGER NULL,
                 earnings_state        TEXT    NULL,
@@ -396,11 +397,12 @@ class CvsSnapshotRepositoryTest extends TestCase
     // ------------------------------------------------------------------
 
     /**
-     * Builds a repo against the *post-migration-014* schema — UNIQUE widened to
-     * (ticker, score_date, model_version) — so a 3.0 row and a 3.1 shadow row
-     * can coexist for the same (ticker, score_date). Returns the PDO alongside
-     * the repo so tests can inspect raw row counts (the repo's read API only
-     * surfaces the latest row per ticker/day, not per version).
+     * Builds a repo against the *post-migration-016* schema — UNIQUE widened to
+     * (ticker, score_date, model_version, origin) — so a 3.0 row and a 3.1 shadow
+     * row can coexist for the same (ticker, score_date), and a 'rescore' row can
+     * coexist with a 'corpus' row for the same (ticker, score_date, model_version).
+     * Returns the PDO alongside the repo so tests can inspect raw row counts (the
+     * repo's read API only surfaces the latest row per ticker/day, not per version).
      *
      * @return array{0: CvsSnapshotRepository, 1: PDO}
      */
@@ -416,6 +418,7 @@ class CvsSnapshotRepositoryTest extends TestCase
                 sector             TEXT    NULL,
                 industry           TEXT    NULL,
                 model_version      TEXT    NULL,
+                origin             TEXT    NOT NULL DEFAULT \'rescore\',
                 days_since_earnings   INTEGER NULL,
                 days_to_earnings      INTEGER NULL,
                 earnings_state        TEXT    NULL,
@@ -431,7 +434,7 @@ class CvsSnapshotRepositoryTest extends TestCase
                 quality_gate       INTEGER NOT NULL DEFAULT 0,
                 gate_failures      TEXT    NULL,
                 pillar_scores      TEXT    NULL,
-                UNIQUE (ticker, score_date, model_version)
+                UNIQUE (ticker, score_date, model_version, origin)
             )
         ');
 
@@ -574,5 +577,76 @@ class CvsSnapshotRepositoryTest extends TestCase
         $this->assertCount(2, $rows);
         $this->assertEquals(74.0, $byVersion['3.0']['cvs_swing'], 'base (3.0) row must remain untouched by the shadow-row update');
         $this->assertEquals(55.0, $byVersion['3.1']['cvs_swing'], 'shadow (3.1) row must reflect its own update');
+    }
+
+    // ------------------------------------------------------------------
+    // Phase 7 (slice 1): origin layer — rescore vs corpus, per migration 016
+    // ------------------------------------------------------------------
+
+    /** @return array<int, array<string, mixed>> */
+    private function rowsWithOrigin(PDO $pdo, string $ticker): array
+    {
+        $stmt = $pdo->prepare(
+            'SELECT model_version, origin, cvs_swing, price_at_snapshot
+             FROM cvs_snapshots WHERE ticker = ? ORDER BY origin ASC'
+        );
+        $stmt->execute([$ticker]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function test_save_defaults_to_rescore_origin_backward_compat(): void
+    {
+        // Existing callers (bin/rescore.php) don't pass origin — must stamp 'rescore'.
+        [$repo, $pdo] = $this->makeVersionedRepo();
+        $repo->save('AAPL', $this->passResult('AAPL'), 185.50, 'Technology', null, '3.0');
+
+        $rows = $this->rowsWithOrigin($pdo, 'AAPL');
+        $this->assertCount(1, $rows);
+        $this->assertSame(CvsSnapshotRepository::ORIGIN_RESCORE, $rows[0]['origin']);
+    }
+
+    public function test_save_rescore_and_corpus_coexist_same_day_and_version(): void
+    {
+        // A watchlist ticker that also sits in the crawled sector gets BOTH rows
+        // for the same (ticker, score_date, model_version) — by design (FR-003).
+        [$repo, $pdo] = $this->makeVersionedRepo();
+
+        $userFacing = $this->passResult('AAPL');
+        $userFacing['swing']['cvs'] = 74.0;
+
+        $corpus = $this->passResult('AAPL');
+        $corpus['swing']['cvs'] = 73.5; // crawl ran at a different time of day
+
+        $repo->save('AAPL', $userFacing, 185.50, 'Technology', null, '3.0', CvsSnapshotRepository::ORIGIN_RESCORE);
+        $repo->save('AAPL', $corpus,     184.90, 'Technology', null, '3.0', CvsSnapshotRepository::ORIGIN_CORPUS);
+
+        $rows = $this->rowsWithOrigin($pdo, 'AAPL');
+        $this->assertCount(2, $rows, 'rescore and corpus rows must coexist — no collision under the 4-column UNIQUE');
+
+        $byOrigin = array_column($rows, null, 'origin');
+        $this->assertEquals(73.5, $byOrigin[CvsSnapshotRepository::ORIGIN_CORPUS]['cvs_swing']);
+        $this->assertEquals(74.0, $byOrigin[CvsSnapshotRepository::ORIGIN_RESCORE]['cvs_swing']);
+    }
+
+    public function test_save_corpus_rerun_updates_corpus_without_touching_rescore_row(): void
+    {
+        // Guards the origin match in the UPDATE fallback's WHERE: a same-day corpus
+        // re-run must update the corpus row in place — never the rescore row.
+        [$repo, $pdo] = $this->makeVersionedRepo();
+
+        $repo->save('MSFT', $this->passResult('MSFT'), 400.0, 'Technology', null, '3.0', CvsSnapshotRepository::ORIGIN_RESCORE);
+        $repo->save('MSFT', $this->passResult('MSFT'), 400.0, 'Technology', null, '3.0', CvsSnapshotRepository::ORIGIN_CORPUS);
+
+        $corpusRerun = $this->passResult('MSFT');
+        $corpusRerun['swing']['cvs'] = 71.0;
+        $repo->save('MSFT', $corpusRerun, 401.0, 'Technology', null, '3.0', CvsSnapshotRepository::ORIGIN_CORPUS);
+
+        $rows = $this->rowsWithOrigin($pdo, 'MSFT');
+        $this->assertCount(2, $rows, 'corpus re-run must update in place, not duplicate');
+
+        $byOrigin = array_column($rows, null, 'origin');
+        $this->assertEquals(71.0, $byOrigin[CvsSnapshotRepository::ORIGIN_CORPUS]['cvs_swing'], 'corpus row must reflect the re-run');
+        $this->assertEquals(74.0, $byOrigin[CvsSnapshotRepository::ORIGIN_RESCORE]['cvs_swing'], 'rescore row must remain untouched by the corpus re-run');
+        $this->assertEquals(400.0, (float) $byOrigin[CvsSnapshotRepository::ORIGIN_RESCORE]['price_at_snapshot'], 'rescore price must remain from its own write');
     }
 }
