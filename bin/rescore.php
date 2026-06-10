@@ -53,45 +53,18 @@ use CVS\Auth\UserRepository;
 use CVS\CVS\CVSModel;
 use CVS\Mail\MailService;
 use CVS\TrackRecord\CvsSnapshotRepository;
+use CVS\TrackRecord\SnapshotWriter;
 use CVS\Watchlist\WatchlistRepository;
 
-/**
- * Build a CVSResult::toArray()-shaped payload from the shadow overlay block,
- * suitable for persistence as a parallel snapshot row (model_version = shadow_version).
- *
- * Phase 5 (slice 1) — shadow mode (FR-016/FR-019): only swing/fund scores and
- * recommendations differ from the base row; quality gate, golden signal, gate
- * failures and pillar scores carry over unchanged — the overlay is a deterministic
- * post-aggregation penalty layered on top of the base scores, it never re-runs
- * the gate or re-scores pillars (CVSModel::computeOverlay()).
- *
- * @param array<string, mixed> $overlay CVSResult->overlay block (non-null — caller checks)
- * @param array<string, mixed> $base    CVSResult::toArray() of the base (3.0) result
- * @return array<string, mixed>
- */
-function overlayShadowResultArray(array $overlay, array $base): array
-{
-    return [
-        'ticker'        => $base['ticker']        ?? null,
-        'quality_gate'  => $base['quality_gate']  ?? false,
-        'swing'         => [
-            'cvs'            => $overlay['swing']      ?? null,
-            'recommendation' => $overlay['swing_reco'] ?? null,
-        ],
-        'fundamental'   => [
-            'cvs'            => $overlay['fund']      ?? null,
-            'recommendation' => $overlay['fund_reco'] ?? null,
-        ],
-        'golden_signal' => $base['golden_signal'] ?? null,
-        'gate_failures' => $base['gate_failures'] ?? [],
-        'pillar_scores' => $base['pillar_scores'] ?? null,
-    ];
-}
-
 $watchlist   = new WatchlistRepository();
-$fetcher     = new FinancialDataFetcher($config);
+// FinancialDataFetcher expects the data_source sub-array, not the full config
+// (constructor reads max_tickers/cache_ttl/timeout_seconds at top level — passing
+// the full config silently fell back to hardcoded defaults; plan-review F2).
+$fetcher     = new FinancialDataFetcher($config['data_source']);
 $model       = new CVSModel($config);
-$snapshots   = new CvsSnapshotRepository();
+// Phase 7 (slice 1): base + shadow dual-write extracted into the shared
+// SnapshotWriter (FR-002) — same logic, now reused by the peer-median crawl.
+$writer      = new SnapshotWriter();
 
 $mailConfig  = require ROOT_PATH . '/config/mail.php';
 $alertSvc    = new AlertService(
@@ -119,28 +92,14 @@ foreach ($tickers as $ticker) {
         continue;
     }
 
-    $result       = $model->calculate($ticker, $financials);
-    $price        = isset($financials['current_price']) ? (float)  $financials['current_price'] : null;
-    $sector       = isset($financials['sector'])        ? (string) $financials['sector']        : null;
-    $industry     = isset($financials['industry'])      ? (string) $financials['industry']      : null;
-    $modelVersion = $result->modelVersion !== '' ? $result->modelVersion : null;
-    $resultArray  = $result->toArray();
-    $snapshots->save($ticker, $resultArray, $price, $sector, $industry, $modelVersion);
+    $result   = $model->calculate($ticker, $financials);
+    $price    = isset($financials['current_price']) ? (float)  $financials['current_price'] : null;
+    $sector   = isset($financials['sector'])        ? (string) $financials['sector']        : null;
+    $industry = isset($financials['industry'])      ? (string) $financials['industry']      : null;
 
-    // Phase 5 (slice 1): persist the shadow row (model_version 3.1) alongside the
-    // base row — shadow mode (FR-016/FR-019). Computed in parallel; the headline
-    // recommendation and the base 3.0 snapshot above are entirely unaffected.
-    $overlay = $result->overlay;
-    if ($overlay !== null && (string) ($overlay['shadow_version'] ?? '') !== '') {
-        $snapshots->save(
-            $ticker,
-            overlayShadowResultArray($overlay, $resultArray),
-            $price,
-            $sector,
-            $industry,
-            (string) $overlay['shadow_version']
-        );
-    }
+    // Base (3.0) + shadow (3.1) rows in one call — shadow mode (FR-016/FR-019)
+    // unchanged: headline recommendation and base snapshot are unaffected.
+    $writer->persist($result, $price, $sector, $industry, CvsSnapshotRepository::ORIGIN_RESCORE);
 
     // S-04: check for state change and notify watching users.
     $alerted = $alertSvc->checkAndNotify($ticker, $result->toArray());
