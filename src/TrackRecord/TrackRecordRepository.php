@@ -45,6 +45,12 @@ class TrackRecordRepository
 
         $versionFilter = $modelVersion !== null ? 'AND old.model_version = ?' : '';
         $latestVersionFilter = $modelVersion !== null ? 'AND model_version = ?' : '';
+        // Phase 7 (slice 1, FR-003): both join sides hard-filter to ORIGIN_RESCORE —
+        // corpus rows share live model_version values, so without this filter the
+        // full-universe corpus would inflate hit-rate statistics with tickers no
+        // user ever watched. Interpolated class constant (not user input) to keep
+        // the positional-parameter ordering of the dynamic version filters intact.
+        $o = CvsSnapshotRepository::ORIGIN_RESCORE;
 
         $stmt = $this->db->prepare("
             SELECT
@@ -69,12 +75,14 @@ class TrackRecordRepository
                 FROM cvs_snapshots
                 WHERE score_date >= ?
                   AND price_at_snapshot IS NOT NULL
+                  AND origin = '{$o}'
                   {$latestVersionFilter}
                 GROUP BY ticker
             ) latest ON latest.ticker = old.ticker
             WHERE old.score_date <= ?
               AND old.price_at_snapshot IS NOT NULL
               AND old.quality_gate = 1
+              AND old.origin = '{$o}'
               {$versionFilter}
             ORDER BY old.ticker ASC, old.score_date ASC
         ");
@@ -104,6 +112,8 @@ class TrackRecordRepository
 
         $versionFilter = $modelVersion !== null ? 'AND old.model_version = ?' : '';
         $latestVersionFilter = $modelVersion !== null ? 'AND model_version = ?' : '';
+        // Phase 7 (slice 1, FR-003): see getEvaluations() — same origin guard.
+        $o = CvsSnapshotRepository::ORIGIN_RESCORE;
 
         $stmt = $this->db->prepare("
             SELECT
@@ -129,6 +139,7 @@ class TrackRecordRepository
                 WHERE score_date >= ?
                   AND price_at_snapshot IS NOT NULL
                   AND ticker = ?
+                  AND origin = '{$o}'
                   {$latestVersionFilter}
                 GROUP BY ticker
             ) latest ON latest.ticker = old.ticker
@@ -136,6 +147,7 @@ class TrackRecordRepository
               AND old.score_date <= ?
               AND old.price_at_snapshot IS NOT NULL
               AND old.quality_gate = 1
+              AND old.origin = '{$o}'
               {$versionFilter}
             ORDER BY old.score_date ASC
         ");
@@ -161,15 +173,18 @@ class TrackRecordRepository
      */
     public function getAllForTicker(string $ticker): array
     {
+        // Phase 7 (slice 1, FR-003): history chart shows the user-facing series
+        // only — weekly corpus points would pollute the daily rescore line.
         $stmt = $this->db->prepare('
             SELECT ticker, score_date, cvs_swing, cvs_fund,
                    reco_swing, reco_fund, golden_signal,
                    price_at_snapshot, quality_gate
             FROM cvs_snapshots
             WHERE ticker = ?
+              AND origin = ?
             ORDER BY score_date ASC
         ');
-        $stmt->execute([strtoupper($ticker)]);
+        $stmt->execute([strtoupper($ticker), CvsSnapshotRepository::ORIGIN_RESCORE]);
         return $stmt->fetchAll() ?: [];
     }
 

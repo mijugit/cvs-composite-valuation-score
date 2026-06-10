@@ -649,4 +649,49 @@ class CvsSnapshotRepositoryTest extends TestCase
         $this->assertEquals(74.0, $byOrigin[CvsSnapshotRepository::ORIGIN_RESCORE]['cvs_swing'], 'rescore row must remain untouched by the corpus re-run');
         $this->assertEquals(400.0, (float) $byOrigin[CvsSnapshotRepository::ORIGIN_RESCORE]['price_at_snapshot'], 'rescore price must remain from its own write');
     }
+
+    // ------------------------------------------------------------------
+    // Phase 7 (slice 1, FR-003): read-path isolation — every user-facing
+    // finder must exclude corpus rows (they share live model_version values,
+    // so version filtering alone does NOT keep them out)
+    // ------------------------------------------------------------------
+
+    public function test_find_all_latest_excludes_corpus_rows_in_both_branches(): void
+    {
+        [$repo, ] = $this->makeVersionedRepo();
+
+        $repo->save('AAPL', $this->passResult('AAPL'), 185.0, 'Technology', null, '3.0', CvsSnapshotRepository::ORIGIN_RESCORE);
+        // Corpus-only ticker under the SAME live version — the leak candidate.
+        $repo->save('CORP', $this->passResult('CORP'), 50.0, 'Energy', null, '3.0', CvsSnapshotRepository::ORIGIN_CORPUS);
+        // Corpus twin of the watchlist ticker, same day, same version.
+        $repo->save('AAPL', $this->passResult('AAPL'), 184.0, 'Technology', null, '3.0', CvsSnapshotRepository::ORIGIN_CORPUS);
+
+        $filtered = $repo->findAllLatest('3.0');
+        $this->assertSame(['AAPL'], array_column($filtered, 'ticker'), 'version-filtered branch must exclude corpus rows');
+
+        $unfiltered = $repo->findAllLatest();
+        $this->assertSame(['AAPL'], array_column($unfiltered, 'ticker'), 'unversioned branch must exclude corpus rows too');
+    }
+
+    public function test_find_latest_by_ticker_ignores_corpus_only_ticker(): void
+    {
+        [$repo, ] = $this->makeVersionedRepo();
+        $repo->save('CORP', $this->passResult('CORP'), 50.0, 'Energy', null, '3.0', CvsSnapshotRepository::ORIGIN_CORPUS);
+
+        $this->assertNull(
+            $repo->findLatestByTicker('CORP'),
+            'a ticker that exists only in the corpus must look nonexistent to user-facing reads (alerts S-04)'
+        );
+    }
+
+    public function test_find_by_ticker_since_excludes_corpus_rows(): void
+    {
+        [$repo, ] = $this->makeVersionedRepo();
+        $repo->save('AAPL', $this->passResult('AAPL'), 185.0, 'Technology', null, '3.0', CvsSnapshotRepository::ORIGIN_RESCORE);
+        $repo->save('AAPL', $this->passResult('AAPL'), 184.0, 'Technology', null, '3.0', CvsSnapshotRepository::ORIGIN_CORPUS);
+
+        $rows = $repo->findByTickerSince('AAPL', new DateTimeImmutable('yesterday'));
+        $this->assertCount(1, $rows, 'corpus twin must not double the history series');
+        $this->assertSame(CvsSnapshotRepository::ORIGIN_RESCORE, $rows[0]['origin']);
+    }
 }
