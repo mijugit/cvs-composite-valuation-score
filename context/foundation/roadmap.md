@@ -1,17 +1,17 @@
 ---
 project: CVS — Composite Valuation Score
-version: 5
+version: 6
 status: current
 created: 2026-05-29
-updated: 2026-06-09
+updated: 2026-06-10
 current_model_version: "3.0"
 next_model_version: "3.1"
 ---
 
 # Roadmap: CVS — Composite Valuation Score
 
-> Stan na 2026-06-09. Fazy 1–5 ukończone lub aktywne. Kolejna praca to Faza 5 plaster 3
-> (cvs-fcf-normalization, model_version 3.1 w pełni) i rekalibracja progów.
+> Stan na 2026-06-10. Fazy 1–6 ukończone (Faza 5 plastry 1–3 done; rekalibracja progów
+> przeniesiona do Fazy 7). Kolejna praca: Faza 7 (samostrojenie modelu — shape-notes.md).
 
 ## Vision
 
@@ -105,9 +105,9 @@ Change ID: `cvs-earnings-timing` (zarchiwizowany: `context/archive/2026-06-08-cv
 - Snapshoty wzbogacone o `days_since_earnings`, `days_to_earnings`, `earnings_state`, `earnings_guard_active`
 - UI: badge "wyniki za N dni" / "po wynikach N dni temu" na detalu i screenerze
 
-### Plaster 3 — Normalizacja FCF 🔄 w toku
+### Plaster 3 — Normalizacja FCF ✅ ukończony (2026-06-09)
 
-Change ID: `cvs-fcf-normalization`
+Change ID: `cvs-fcf-normalization` (zarchiwizowany: `context/archive/2026-06-09-cvs-fcf-normalization/`)
 
 - `ValuationPillar` używa forward FCF z estymat zamiast trailing FCF (FR-011)
 - Fix: trough-FCF cyklu inwestycyjnego (case MU) nie zawyża "drogości"
@@ -125,7 +125,7 @@ Change ID: `cvs-scoring-refinement` (nowa iteracja po 3.1)
 
 ## Infrastruktura CI/CD ✅ dodana (2026-06-09)
 
-Change ID: `ci-cd-pipeline` — [context/changes/ci-cd-pipeline/](../changes/ci-cd-pipeline/)
+Change ID: `ci-cd-pipeline` — [context/archive/2026-06-09-ci-cd-pipeline/](../archive/2026-06-09-ci-cd-pipeline/)
 
 GitHub Actions pipeline na każdy push/PR do `main`:
 
@@ -147,7 +147,6 @@ Powód: CF brak deploy API, brak stagingu, ryzyko automatycznego deployu na prod
 | Change ID                | Status       | Opis                                           |
 |--------------------------|--------------|------------------------------------------------|
 | cvs-overlay-penalties    | implemented  | Overlaye A+B, shadow rows model_version 3.1   |
-| cvs-fcf-normalization    | implemented  | Forward FCF w ValuationPillar (FR-011)        |
 | cvs-scoring-refinement   | in-progress  | Rekalibracja skali + Faza 4 refinements       |
 | admin-sector-refresh     | implemented  | Admin UI odświeżania median sektorowych       |
 

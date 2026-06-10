@@ -1,10 +1,10 @@
 ---
 change_id: ci-cd-pipeline
 title: GitHub Actions CI pipeline (CI bez CD)
-status: implemented
+status: archived
 created: 2026-06-09
-updated: 2026-06-09
-archived_at: null
+updated: 2026-06-10
+archived_at: "2026-06-10T06:26:20Z"
 ---
 
 ## Notes
