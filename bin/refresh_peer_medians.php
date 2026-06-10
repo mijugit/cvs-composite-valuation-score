@@ -53,9 +53,12 @@ $_SESSION = [];
 $config = require ROOT_PATH . '/config/cvs-weights.php';
 
 use CVS\Api\FinancialDataFetcher;
+use CVS\CVS\CVSModel;
 use CVS\CVS\Valuation\PeerMedianRepository;
 use CVS\CVS\Valuation\ValuationMetrics;
 use CVS\Core\Database;
+use CVS\TrackRecord\CorpusScorer;
+use CVS\TrackRecord\SnapshotWriter;
 
 // ------------------------------------------------------------------
 // Resolve which sectors to process today (or --sector=X override)
@@ -124,10 +127,13 @@ $fetcher      = new FinancialDataFetcher($config['data_source']);
 $modelVersion = $config['model_version'] ?? '3.0';
 $benchmarks   = $config['benchmarks'] ?? [];
 
-$totalSuccess = 0;
-$totalFailed  = 0;
-$totalSkipped = 0;
-$totalSaved   = 0;
+$totalSuccess      = 0;
+$totalFailed       = 0;
+$totalSkipped      = 0;
+$totalSaved        = 0;
+$totalScored       = 0; // Phase 7 (slice 1): corpus snapshots persisted (FR-001)
+$totalGateFailed   = 0; // Phase 7 (slice 1): skipped — quality gate failed (plan-review F1)
+$totalCorpusFailed = 0; // Phase 7 (slice 1): scoring/persist errors (skip-per-error)
 
 foreach ($todaysSectors as $targetSector) {
 
@@ -193,6 +199,31 @@ foreach ($todaysSectors as $targetSector) {
             $buckets['industry'][$industry]['_sector'] = $sector;
         }
 
+        // Phase 7 (slice 1): calibration-corpus snapshot piggyback (FR-001) —
+        // reuse the already-fetched $financials; zero extra Yahoo calls. Each
+        // target-sector ticker gets one corpus snapshot on its sector's day.
+        //
+        // Fresh DB connection per write: target-sector hits can be minutes apart
+        // (the loop fetches ALL tickers and skips non-target ones), which idles
+        // past CF's ~60-120 s wait_timeout — and CvsSnapshotRepository::save()
+        // swallows PDOExceptions, so a stale singleton would silently drop rows.
+        // Reconnect costs ~ms against a ~2 s Yahoo fetch. CVSModel is built after
+        // the reconnect so its MedianResolver also gets the fresh connection.
+        // Errors never break the crawl (skip-per-error, same as fetch failures).
+        try {
+            Database::reconnect();
+            $scorer  = new CorpusScorer(new CVSModel($config), new SnapshotWriter());
+            $written = $scorer->scoreAndPersist($ticker, $financials);
+            if ($written > 0) {
+                $totalScored++;
+            } else {
+                $totalGateFailed++;
+            }
+        } catch (\Throwable $e) {
+            error_log(sprintf('refresh_peer_medians: corpus snapshot failed for %s — %s', $ticker, $e->getMessage()));
+            $totalCorpusFailed++;
+        }
+
         $totalSuccess++;
     }
 
@@ -250,11 +281,14 @@ foreach ($todaysSectors as $targetSector) {
 }
 
 error_log(sprintf(
-    'refresh_peer_medians: done — fetched=%d failed=%d skipped=%d median_rows_saved=%d version=%s',
+    'refresh_peer_medians: done — fetched=%d failed=%d skipped=%d median_rows_saved=%d corpus_scored=%d corpus_gate_failed=%d corpus_errors=%d version=%s',
     $totalSuccess,
     $totalFailed,
     $totalSkipped,
     $totalSaved,
+    $totalScored,
+    $totalGateFailed,
+    $totalCorpusFailed,
     $modelVersion
 ));
 
