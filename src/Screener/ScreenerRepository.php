@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CVS\Screener;
 
 use CVS\Core\Database;
+use CVS\TrackRecord\CvsSnapshotRepository;
 use PDO;
 
 /**
@@ -107,7 +108,10 @@ class ScreenerRepository
      */
     public function getLastScoredAt(): ?string
     {
-        $stmt = $this->db->query('SELECT MAX(scored_at) FROM cvs_snapshots');
+        // Phase 7 (slice 1, FR-003): freshness reflects user-facing rescore runs
+        // only — corpus crawl timestamps must not masquerade as screener freshness.
+        $o    = CvsSnapshotRepository::ORIGIN_RESCORE;
+        $stmt = $this->db->query("SELECT MAX(scored_at) FROM cvs_snapshots WHERE origin = '{$o}'");
         if ($stmt === false) {
             return null;
         }
@@ -122,8 +126,12 @@ class ScreenerRepository
      */
     public function getDistinctSectors(): array
     {
+        // Phase 7 (slice 1, FR-003): the dropdown lists only sectors present in
+        // the user-facing population — corpus covers ~11 sectors of the full
+        // universe and would flood the filter with sectors no watchlist row has.
+        $o    = CvsSnapshotRepository::ORIGIN_RESCORE;
         $stmt = $this->db->query(
-            'SELECT DISTINCT sector FROM cvs_snapshots WHERE sector IS NOT NULL ORDER BY sector ASC'
+            "SELECT DISTINCT sector FROM cvs_snapshots WHERE sector IS NOT NULL AND origin = '{$o}' ORDER BY sector ASC"
         );
         if ($stmt === false) {
             return [];
@@ -142,19 +150,28 @@ class ScreenerRepository
      */
     private function findAllLatest(): array
     {
+        // Phase 7 (slice 1, FR-003): NOTE — this is the screener's OWN self-join,
+        // not a delegation to CvsSnapshotRepository::findAllLatest(); the origin
+        // filter must live here too. Corpus rows share live model_version values,
+        // so the version filter alone would NOT exclude them (same leak class as
+        // the 2026-06-08 shadow-row duplication hotfix).
+        $o = CvsSnapshotRepository::ORIGIN_RESCORE;
+
         if ($this->liveModelVersion !== null) {
-            $stmt = $this->db->prepare('
+            $stmt = $this->db->prepare("
                 SELECT s.*
                 FROM cvs_snapshots s
                 INNER JOIN (
                     SELECT ticker, MAX(score_date) AS max_date
                     FROM cvs_snapshots
                     WHERE model_version = :live_version
+                      AND origin = '{$o}'
                     GROUP BY ticker
                 ) latest ON s.ticker = latest.ticker AND s.score_date = latest.max_date
                 WHERE s.model_version = :live_version_join
+                  AND s.origin = '{$o}'
                 ORDER BY s.ticker ASC
-            ');
+            ");
             $stmt->execute([
                 ':live_version'      => $this->liveModelVersion,
                 ':live_version_join' => $this->liveModelVersion,
@@ -162,16 +179,18 @@ class ScreenerRepository
             return $stmt->fetchAll() ?: [];
         }
 
-        $stmt = $this->db->prepare('
+        $stmt = $this->db->prepare("
             SELECT s.*
             FROM cvs_snapshots s
             INNER JOIN (
                 SELECT ticker, MAX(score_date) AS max_date
                 FROM cvs_snapshots
+                WHERE origin = '{$o}'
                 GROUP BY ticker
             ) latest ON s.ticker = latest.ticker AND s.score_date = latest.max_date
+            WHERE s.origin = '{$o}'
             ORDER BY s.ticker ASC
-        ');
+        ");
         $stmt->execute();
         return $stmt->fetchAll() ?: [];
     }

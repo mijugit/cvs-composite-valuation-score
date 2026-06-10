@@ -20,6 +20,16 @@ use PDOException;
  */
 class CvsSnapshotRepository
 {
+    /**
+     * Snapshot origin layer (Phase 7, slice 1 — FR-003, migration 016).
+     * 'rescore' = user-facing rows written by bin/rescore.php (watchlist union);
+     * 'corpus'  = calibration-corpus rows piggybacked on the peer-median crawl.
+     * User-facing reads MUST filter to ORIGIN_RESCORE — corpus rows are an
+     * internal measurement layer and never surface in screener/track-record/UI.
+     */
+    public const ORIGIN_RESCORE = 'rescore';
+    public const ORIGIN_CORPUS  = 'corpus';
+
     private PDO $db;
 
     public function __construct(?PDO $db = null)
@@ -43,6 +53,9 @@ class CvsSnapshotRepository
      * @param string|null          $sector          Yahoo Finance sector (S-03 screener filter)
      * @param string|null          $industry        Yahoo Finance industry / sub-sector (Phase 3)
      * @param string|null          $modelVersion    CVS model version stamp (Phase 3)
+     * @param string               $origin          Snapshot origin: ORIGIN_RESCORE (user-facing,
+     *                                              default — backward compatible) or ORIGIN_CORPUS
+     *                                              (calibration layer, Phase 7 slice 1)
      */
     public function save(
         string  $ticker,
@@ -50,7 +63,8 @@ class CvsSnapshotRepository
         ?float  $priceAtSnapshot = null,
         ?string $sector          = null,
         ?string $industry        = null,
-        ?string $modelVersion    = null
+        ?string $modelVersion    = null,
+        string  $origin          = self::ORIGIN_RESCORE
     ): void {
         $scoreDate = (new DateTimeImmutable())->format('Y-m-d');
         $scoredAt  = (new DateTimeImmutable())->format('Y-m-d H:i:s');
@@ -72,6 +86,7 @@ class CvsSnapshotRepository
             ':sector'                => $sector,
             ':industry'              => $industry,
             ':model_version'         => $modelVersion,
+            ':origin'                => $origin,
             ':score_date'            => $scoreDate,
             ':scored_at'             => $scoredAt,
             ':price_at_snapshot'     => $priceAtSnapshot,
@@ -92,12 +107,12 @@ class CvsSnapshotRepository
         try {
             $stmt = $this->db->prepare('
                 INSERT INTO cvs_snapshots
-                    (ticker, sector, industry, model_version, score_date, scored_at,
+                    (ticker, sector, industry, model_version, origin, score_date, scored_at,
                      price_at_snapshot, cvs_swing, cvs_fund, reco_swing, reco_fund,
                      golden_signal, quality_gate, gate_failures, pillar_scores,
                      days_since_earnings, days_to_earnings, earnings_state, earnings_guard_active)
                 VALUES
-                    (:ticker, :sector, :industry, :model_version, :score_date, :scored_at,
+                    (:ticker, :sector, :industry, :model_version, :origin, :score_date, :scored_at,
                      :price_at_snapshot, :cvs_swing, :cvs_fund, :reco_swing, :reco_fund,
                      :golden_signal, :quality_gate, :gate_failures, :pillar_scores,
                      :days_since_earnings, :days_to_earnings, :earnings_state, :earnings_guard_active)
@@ -119,6 +134,7 @@ class CvsSnapshotRepository
                     SET sector                = :sector,
                         industry              = :industry,
                         model_version         = :model_version,
+                        origin                = :origin,
                         scored_at             = :scored_at,
                         price_at_snapshot     = :price_at_snapshot,
                         cvs_swing             = :cvs_swing,
@@ -136,6 +152,7 @@ class CvsSnapshotRepository
                     WHERE ticker = :ticker AND score_date = :score_date
                       AND (model_version = :model_version_match
                            OR (model_version IS NULL AND :model_version_match_null IS NULL))
+                      AND origin = :origin_match
                 ');
                 // Two distinct placeholder names for :model_version_match because the
                 // name appears twice in the WHERE clause (equality check + NULL-safe
@@ -143,9 +160,15 @@ class CvsSnapshotRepository
                 // params to positional `?`; a duplicated name produces two `?`s but
                 // only one bound value → SQLSTATE[HY093].  Using a separate name for
                 // each occurrence is the portable fix (works on MySQL and SQLite).
+                // :origin_match gets its own name for the same reason (origin already
+                // appears in SET as :origin); origin is NOT NULL so plain equality —
+                // no NULL-safe fallback needed. Matching origin here keeps a same-day
+                // corpus re-run from overwriting the rescore row (and vice versa) —
+                // origin is part of a snapshot's identity since migration 016.
                 $upd->execute($params + [
                     ':model_version_match'      => $modelVersion,
                     ':model_version_match_null' => $modelVersion,
+                    ':origin_match'             => $origin,
                 ]);
             } catch (PDOException $ue) {
                 error_log(sprintf('CvsSnapshotRepository::update failed for %s: %s', $ticker, $ue->getMessage()));
@@ -160,14 +183,18 @@ class CvsSnapshotRepository
     /**
      * Latest snapshot for a ticker (for alert state detection in S-04).
      *
+     * Phase 7 (slice 1, FR-003): hard-filtered to ORIGIN_RESCORE — corpus rows
+     * are a calibration-only measurement layer and never feed user-facing reads.
+     * The calibration pipeline (later slice) reads corpus rows via its own queries.
+     *
      * @return array<string, mixed>|null
      */
     public function findLatestByTicker(string $ticker): ?array
     {
         $stmt = $this->db->prepare(
-            'SELECT * FROM cvs_snapshots WHERE ticker = ? ORDER BY score_date DESC LIMIT 1'
+            'SELECT * FROM cvs_snapshots WHERE ticker = ? AND origin = ? ORDER BY score_date DESC LIMIT 1'
         );
-        $stmt->execute([$ticker]);
+        $stmt->execute([$ticker, self::ORIGIN_RESCORE]);
         $row = $stmt->fetch();
         return $row !== false ? $row : null;
     }
@@ -190,6 +217,11 @@ class CvsSnapshotRepository
      */
     public function findAllLatest(?string $liveModelVersion = null): array
     {
+        // Phase 7 (slice 1, FR-003): both branches hard-filter to ORIGIN_RESCORE —
+        // corpus rows share the same model_version values (3.0/3.1/…), so the
+        // version filter alone does NOT exclude them; without the origin filter
+        // the corpus would leak into user-facing "latest" reads (dashboard chips,
+        // screener) exactly like the 2026-06-08 shadow-row duplication bug.
         if ($liveModelVersion !== null) {
             $stmt = $this->db->prepare('
                 SELECT s.*
@@ -198,14 +230,18 @@ class CvsSnapshotRepository
                     SELECT ticker, MAX(score_date) AS max_date
                     FROM cvs_snapshots
                     WHERE model_version = :live_version
+                      AND origin = :origin
                     GROUP BY ticker
                 ) latest ON s.ticker = latest.ticker AND s.score_date = latest.max_date
                 WHERE s.model_version = :live_version_join
+                  AND s.origin = :origin_join
                 ORDER BY s.ticker ASC
             ');
             $stmt->execute([
                 ':live_version'      => $liveModelVersion,
                 ':live_version_join' => $liveModelVersion,
+                ':origin'            => self::ORIGIN_RESCORE,
+                ':origin_join'       => self::ORIGIN_RESCORE,
             ]);
             return $stmt->fetchAll() ?: [];
         }
@@ -216,11 +252,16 @@ class CvsSnapshotRepository
             INNER JOIN (
                 SELECT ticker, MAX(score_date) AS max_date
                 FROM cvs_snapshots
+                WHERE origin = :origin
                 GROUP BY ticker
             ) latest ON s.ticker = latest.ticker AND s.score_date = latest.max_date
+            WHERE s.origin = :origin_join
             ORDER BY s.ticker ASC
         ');
-        $stmt->execute();
+        $stmt->execute([
+            ':origin'      => self::ORIGIN_RESCORE,
+            ':origin_join' => self::ORIGIN_RESCORE,
+        ]);
         return $stmt->fetchAll() ?: [];
     }
 
@@ -233,10 +274,10 @@ class CvsSnapshotRepository
     {
         $stmt = $this->db->prepare(
             'SELECT * FROM cvs_snapshots
-             WHERE ticker = ? AND score_date >= ?
+             WHERE ticker = ? AND score_date >= ? AND origin = ?
              ORDER BY score_date ASC'
         );
-        $stmt->execute([$ticker, $since->format('Y-m-d')]);
+        $stmt->execute([$ticker, $since->format('Y-m-d'), self::ORIGIN_RESCORE]);
         return $stmt->fetchAll() ?: [];
     }
 }
