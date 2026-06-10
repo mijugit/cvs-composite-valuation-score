@@ -60,6 +60,57 @@ return [
         'penalty'         => ['slope' => 10.0, 'cap' => 10.0],
     ],
 
+    // --- Predictive signals (Phase 7, slice 2) — SHADOW model_version 3.2 ---
+    // Symmetric companion to the 3.1 penalty-only shadow: reuses the 3.1
+    // revision/target penalties, replaces the symmetric earnings_guard penalty
+    // with a directional PEAD guard, and layers three additional symmetric
+    // signals (revision breadth, 52w-high proximity, beat consistency).
+    //
+    // Kill-switch hierarchy (plan-review F3): 3.2 rides on top of the 3.1
+    // penalties, so `overlays.enabled = false` disables the entire shadow
+    // stack including 3.2 — `signals_32.enabled` only toggles 3.2 on top of
+    // an already-enabled 3.1.
+    //
+    //   PEAD guard (directional, post-earnings 'after'/'in_transit' only):
+    //     surprise > 0  -> pead.beat_bonus (default 0 = neutralise the 3.1 guard penalty)
+    //     surprise < 0  -> max(-cap, basePenalty * pead.miss_multiplier)  [cap = earnings_guard.penalty.cap]
+    //     surprise null or state 'before'/null -> basePenalty unchanged (parity with 3.1)
+    //
+    //   breadth:    clamp(breadth.weight * eps_revision_breadth, ±breadth.cap)
+    //   high_52w:   proximity = current_price / fifty_two_week_high
+    //               clamp(high_52w.weight * (proximity - high_52w.baseline) / (1 - high_52w.baseline),
+    //                     -high_52w.cap_down, +high_52w.cap_up)
+    //               (asymmetric caps — plan-review F4: the negative arm is steep near
+    //               baseline 0.85 and partially duplicates the Overlay A "trap" penalty,
+    //               so cap_down is set lower than cap_up)
+    //   consistency: clamp(consistency.weight * (eps_beat_count_4q - 2) / 2, ±consistency.cap)
+    //               (2/4 beats = neutral; weight defaults to 0 -> always 0.0, FR-008)
+    //
+    // Default values are illustrative — finalised in the recalibration slice.
+    // FR-010: never hardcode in business logic; always read from here.
+    'signals_32' => [
+        'enabled'        => true,
+        'shadow_version' => '3.2',
+        'pead' => [
+            'miss_multiplier' => 1.5,
+            'beat_bonus'      => 0.0,
+        ],
+        'breadth' => [
+            'weight' => 4.0,
+            'cap'    => 4.0,
+        ],
+        'high_52w' => [
+            'weight'   => 8.0,
+            'cap_up'   => 8.0,
+            'cap_down' => 4.0,
+            'baseline' => 0.85,
+        ],
+        'consistency' => [
+            'weight' => 0.0,
+            'cap'    => 4.0,
+        ],
+    ],
+
     // --- Valuation pillar — FCF normalization (Phase 5 plaster 3, FR-011) ---
     // Controls the forward-FCF-estimate path in ValuationPillar.
     //

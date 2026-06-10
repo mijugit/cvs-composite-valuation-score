@@ -48,6 +48,14 @@ class CVSResult
      */
     public readonly ?array  $overlay;
 
+    // Phase 7 (slice 2): list of all shadow blocks (3.1 + 3.2 today, future
+    // challengers without another contract change). `overlay` above remains
+    // an alias for backward compatibility (UI chip, SnapshotWriter, tests) —
+    // it resolves to the block whose shadow_version matches
+    // config['overlays']['shadow_version'] (3.1), or the first block.
+    /** @var array<int, array<string, mixed>> */
+    public readonly array $shadows;
+
     // Phase 5 (slice 2): always-present earnings-timing badge (FR-006/FR-007/FR-010).
     // Separate, sibling field to `overlay` — NOT nested inside it — so the badge
     // works for every user regardless of `overlays.enabled`/`earnings_guard.enabled`
@@ -83,6 +91,7 @@ class CVSResult
         ?string $industry            = null,
         array   $valuationReference  = ['source' => 'cold_start', 'bucket' => ''],
         ?array  $overlay             = null,
+        array   $shadows             = [],
         ?array  $earningsTiming      = null,
     ) {
         $this->qualityGatePassed         = $qualityGatePassed;
@@ -98,6 +107,7 @@ class CVSResult
         $this->industry                  = $industry;
         $this->valuationReference        = $valuationReference;
         $this->overlay                   = $overlay;
+        $this->shadows                   = $shadows;
         $this->earningsTiming            = $earningsTiming;
     }
 
@@ -123,9 +133,18 @@ class CVSResult
         ?string $industry            = null,
         array   $valuationReference  = ['source' => 'cold_start', 'bucket' => ''],
         ?array  $overlay             = null,
+        array   $shadows             = [],
         ?array  $earningsTiming      = null,
     ): self {
         $goldenSignal = self::computeGoldenSignal($swingCvs, $fundamentalCvs, $config);
+
+        // Backward compatibility (F5): callers passing a single legacy `overlay`
+        // block without `shadows` get it wrapped into a one-element list.
+        if ($shadows === [] && $overlay !== null) {
+            $shadows = [$overlay];
+        }
+
+        $resolvedOverlay = $overlay ?? self::deriveOverlay($shadows, $config);
 
         return new self(
             qualityGatePassed:         true,
@@ -140,9 +159,33 @@ class CVSResult
             modelVersion:              $modelVersion,
             industry:                  $industry,
             valuationReference:        $valuationReference,
-            overlay:                   $overlay,
+            overlay:                   $resolvedOverlay,
+            shadows:                   $shadows,
             earningsTiming:            $earningsTiming,
         );
+    }
+
+    /**
+     * Resolve the legacy `overlay` alias from the `shadows` list: prefer the
+     * block whose `shadow_version` matches `config['overlays']['shadow_version']`
+     * (3.1), falling back to the first block. null when `$shadows` is empty.
+     *
+     * @param array<int, array<string, mixed>> $shadows
+     * @param array<string, mixed>             $config
+     */
+    private static function deriveOverlay(array $shadows, array $config): ?array
+    {
+        $targetVersion = (string) ($config['overlays']['shadow_version'] ?? '');
+
+        if ($targetVersion !== '') {
+            foreach ($shadows as $shadow) {
+                if (is_array($shadow) && ($shadow['shadow_version'] ?? null) === $targetVersion) {
+                    return $shadow;
+                }
+            }
+        }
+
+        return $shadows[0] ?? null;
     }
 
     /**
@@ -218,6 +261,7 @@ class CVSResult
             'industry'            => $this->industry,
             'valuation_reference' => $this->valuationReference,
             'overlay'             => $this->overlay,
+            'shadows'             => $this->shadows,
             'earnings_timing'     => $this->earningsTiming,
             // Legal disclaimer — must accompany every CVS result (PRD FR-009).
             'disclaimer'          => 'Wyniki CVS to hipoteza modelu analitycznego, nie rekomendacja inwestycyjna. Inwestuj świadomie.',
