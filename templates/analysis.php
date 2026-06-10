@@ -266,6 +266,54 @@
                 <?php endif; ?>
 
                 <?php
+                // Phase 7 (slice 2) — shadow model_version (3.2) preview chip:
+                // 3.1 penalties + directional PEAD guard + symmetric signals
+                // (breadth/52w/consistency). Same guardrail as 3.1 above —
+                // headline reco stays at 3.0 (FR-020).
+                $shadow32 = null;
+                foreach (($result['shadows'] ?? []) as $shadowBlock) {
+                    if (($shadowBlock['shadow_version'] ?? '') === '3.2') {
+                        $shadow32 = $shadowBlock;
+                        break;
+                    }
+                }
+                if ($shadow32 !== null):
+                    $s32Penalties = $shadow32['penalties'] ?? [];
+                    $s32Signals   = $shadow32['signals']   ?? [];
+                    $s32Coverage  = $shadow32['coverage']  ?? [];
+                    $s32Adj       = $s32Signals['adjustments'] ?? [];
+                    $s32Total     = (float) ($s32Penalties['total']         ?? 0.0);
+                    $s32Pead      = (float) ($s32Penalties['earnings_guard'] ?? 0.0);
+                    $s32Breadth   = (float) ($s32Adj['breadth']    ?? 0.0);
+                    $s32High52w   = (float) ($s32Adj['high_52w']   ?? 0.0);
+                    $s32Consist   = (float) ($s32Adj['consistency'] ?? 0.0);
+
+                    $s32Missing = [];
+                    if (!empty($s32Coverage['missing_surprise']))    $s32Missing[] = 'zaskoczenie';
+                    if (!empty($s32Coverage['missing_breadth']))     $s32Missing[] = 'rewizje';
+                    if (!empty($s32Coverage['missing_52w']))         $s32Missing[] = '52w';
+                    if (!empty($s32Coverage['missing_consistency'])) $s32Missing[] = 'konsystencja';
+                ?>
+                <div class="overlay-preview-chip"
+                     style="margin-top:.6rem;padding:.5rem .75rem;border-radius:6px;
+                            font-size:.8rem;line-height:1.5;color:var(--c-muted);
+                            background:rgba(255,255,255,.04);">
+                    <strong style="color:var(--c-text);">Podgląd 3.2:</strong>
+                    <?= htmlspecialchars(number_format($s32Total, 1)) ?> pkt
+                    (PEAD <?= htmlspecialchars(number_format($s32Pead, 1)) ?> /
+                     rewizje <?= htmlspecialchars(number_format($s32Breadth, 1)) ?> /
+                     52w <?= htmlspecialchars(number_format($s32High52w, 1)) ?> /
+                     konsystencja <?= htmlspecialchars(number_format($s32Consist, 1)) ?>)
+                    <?php if ($s32Missing !== []): ?>
+                        <span style="opacity:.75;"> — brak danych: <?= htmlspecialchars(implode('/', $s32Missing)) ?></span>
+                    <?php endif; ?>
+                    <span style="display:block;margin-top:.15rem;opacity:.65;">
+                        Tryb cieniowy (eksperymentalny) — oficjalna rekomendacja pozostaje wg modelu 3.0 powyżej.
+                    </span>
+                </div>
+                <?php endif; ?>
+
+                <?php
                 // Phase 5 (slice 2) — earnings-timing badge (FR-010). Always present,
                 // independent of overlays/earnings_guard flags (badge ≠ guard
                 // separation, FR-017) — a sibling block to the shadow preview chip
