@@ -76,6 +76,10 @@ class CvsSnapshotRepository
         $gf    = isset($result['gate_failures']) ? json_encode($result['gate_failures']) : null;
         $ps    = isset($result['pillar_scores'])  ? json_encode($result['pillar_scores'])  : null;
 
+        // Phase 7 (slice 2): raw predictive-signal inputs (FR-022), shared across
+        // base/3.1/3.2 rows for the same ticker-day — see migration 017.
+        $sig   = isset($result['signals']) ? json_encode($result['signals']) : null;
+
         // Phase 5 (slice 2): earnings-timing markers (FR-008) — additive, mirrors the
         // always-present CVSResult::$earningsTiming block (null when the ticker has
         // no `calendarEvents` coverage at all, or quality gate failed; see EarningsGuard).
@@ -102,6 +106,7 @@ class CvsSnapshotRepository
             ':days_to_earnings'      => isset($et['days_to'])    ? (int) $et['days_to']    : null,
             ':earnings_state'        => $et['state'] ?? null,
             ':earnings_guard_active' => isset($et['guard_active']) ? (int) $et['guard_active'] : null,
+            ':signals'               => $sig,
         ];
 
         try {
@@ -109,12 +114,12 @@ class CvsSnapshotRepository
                 INSERT INTO cvs_snapshots
                     (ticker, sector, industry, model_version, origin, score_date, scored_at,
                      price_at_snapshot, cvs_swing, cvs_fund, reco_swing, reco_fund,
-                     golden_signal, quality_gate, gate_failures, pillar_scores,
+                     golden_signal, quality_gate, gate_failures, pillar_scores, signals,
                      days_since_earnings, days_to_earnings, earnings_state, earnings_guard_active)
                 VALUES
                     (:ticker, :sector, :industry, :model_version, :origin, :score_date, :scored_at,
                      :price_at_snapshot, :cvs_swing, :cvs_fund, :reco_swing, :reco_fund,
-                     :golden_signal, :quality_gate, :gate_failures, :pillar_scores,
+                     :golden_signal, :quality_gate, :gate_failures, :pillar_scores, :signals,
                      :days_since_earnings, :days_to_earnings, :earnings_state, :earnings_guard_active)
             ');
             $stmt->execute($params);
@@ -145,6 +150,7 @@ class CvsSnapshotRepository
                         quality_gate          = :quality_gate,
                         gate_failures         = :gate_failures,
                         pillar_scores         = :pillar_scores,
+                        signals               = :signals,
                         days_since_earnings   = :days_since_earnings,
                         days_to_earnings      = :days_to_earnings,
                         earnings_state        = :earnings_state,

@@ -48,6 +48,7 @@ class SnapshotWriterTest extends TestCase
                 quality_gate       INTEGER NOT NULL DEFAULT 0,
                 gate_failures      TEXT    NULL,
                 pillar_scores      TEXT    NULL,
+                signals            TEXT    NULL,
                 UNIQUE (ticker, score_date, model_version, origin)
             )
         ');
@@ -59,11 +60,35 @@ class SnapshotWriterTest extends TestCase
     private function rows(PDO $pdo, string $ticker): array
     {
         $stmt = $pdo->prepare(
-            'SELECT model_version, origin, cvs_swing, cvs_fund, reco_swing, quality_gate
+            'SELECT model_version, origin, cvs_swing, cvs_fund, reco_swing, quality_gate, signals
              FROM cvs_snapshots WHERE ticker = ? ORDER BY model_version ASC'
         );
         $stmt->execute([$ticker]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    /** @return array<string, mixed> 3.2 shadow block shaped like CVSModel::computeShadow32() output */
+    private function shadow32Block(): array
+    {
+        return [
+            'shadow_version' => '3.2',
+            'swing'          => 65.0,
+            'fund'           => 60.0,
+            'swing_reco'     => 'AKUMULUJ',
+            'fund_reco'      => 'NEUTRALNIE',
+            'penalties'      => ['revision' => -8.0, 'target' => -4.5, 'earnings_guard' => 0.0, 'total' => -8.5],
+            'signals'        => [
+                'surprise_pct'       => 0.05,
+                'breadth'            => 0.6,
+                'high_52w_proximity' => 0.9,
+                'beat_count_4q'      => 3,
+                'adjustments'        => ['pead_guard' => 0.0, 'breadth' => 2.4, 'high_52w' => 4.0, 'consistency' => 0.0, 'total' => 4.0],
+            ],
+            'coverage' => [
+                'missing_eps_trend' => false, 'missing_target' => false, 'missing_earnings_calendar' => false,
+                'missing_surprise' => false, 'missing_breadth' => false, 'missing_52w' => false, 'missing_consistency' => false,
+            ],
+        ];
     }
 
     /** @return array<string, mixed> Overlay block shaped like CVSModel::computeOverlay() output */
@@ -92,6 +117,60 @@ class SnapshotWriterTest extends TestCase
             modelVersion:              '3.0',
             overlay:                   $overlay,
         );
+    }
+
+    /** @param array<int, array<string, mixed>> $shadows */
+    private function passedResultWithShadows(string $ticker, array $shadows): CVSResult
+    {
+        return CVSResult::passed(
+            ticker:                    $ticker,
+            swingCvs:                  74.0,
+            fundamentalCvs:            68.0,
+            pillarScores:              ['valuation' => 70.0, 'momentum_swing' => 80.0, 'quality' => 60.0],
+            swingRecommendation:       'SILNE KUPUJ',
+            fundamentalRecommendation: 'AKUMULUJ',
+            modelVersion:              '3.0',
+            shadows:                   $shadows,
+        );
+    }
+
+    public function test_persist_writes_three_rows_for_31_and_32_shadows_with_signals(): void
+    {
+        [$writer, $pdo] = $this->makeWriter();
+
+        $written = $writer->persist(
+            $this->passedResultWithShadows('MU', [$this->overlayBlock(), $this->shadow32Block()]),
+            100.0,
+            'Technology',
+            'Semiconductors',
+            CvsSnapshotRepository::ORIGIN_RESCORE
+        );
+
+        $this->assertSame(3, $written);
+
+        $rows      = $this->rows($pdo, 'MU');
+        $byVersion = array_column($rows, null, 'model_version');
+
+        $this->assertCount(3, $rows);
+        $this->assertArrayHasKey('3.0', $byVersion);
+        $this->assertArrayHasKey('3.1', $byVersion);
+        $this->assertArrayHasKey('3.2', $byVersion);
+
+        $this->assertEquals(65.0, $byVersion['3.2']['cvs_swing']);
+        $this->assertEquals(60.0, $byVersion['3.2']['cvs_fund']);
+
+        foreach (['3.0', '3.1', '3.2'] as $version) {
+            $this->assertSame(
+                CvsSnapshotRepository::ORIGIN_RESCORE,
+                $byVersion[$version]['origin']
+            );
+            $this->assertNotNull($byVersion[$version]['signals'], "version $version must carry the shared signals JSON");
+
+            $signals = json_decode((string) $byVersion[$version]['signals'], true);
+            $this->assertSame(0.05, $signals['surprise_pct']);
+            $this->assertSame(0.6, $signals['breadth']);
+            $this->assertArrayNotHasKey('adjustments', $signals, 'raw signals strip the 3.2-specific adjustments');
+        }
     }
 
     public function test_persist_writes_base_and_shadow_rows_when_overlay_present(): void

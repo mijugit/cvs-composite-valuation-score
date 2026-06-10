@@ -25,7 +25,7 @@ class ScreenerRepositoryTest extends TestCase
                 cvs_swing REAL NULL, cvs_fund REAL NULL,
                 reco_swing TEXT NULL, reco_fund TEXT NULL,
                 golden_signal TEXT NULL, quality_gate INTEGER NOT NULL DEFAULT 0,
-                gate_failures TEXT NULL, pillar_scores TEXT NULL,
+                gate_failures TEXT NULL, pillar_scores TEXT NULL, signals TEXT NULL,
                 UNIQUE (ticker, score_date, model_version, origin)
             )
         ');
