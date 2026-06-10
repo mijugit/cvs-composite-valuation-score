@@ -128,4 +128,77 @@ class EarningsTrendParserTest extends TestCase
 
         $this->assertNull(EarningsTrendParser::revisionPct($raw));
     }
+
+    /** @return array<string, mixed> raw payload with a +1q row carrying the given epsRevisions. */
+    private function rawWithRevisions(?array $revisions): array
+    {
+        $row = ['period' => '+1q'];
+        if ($revisions !== null) {
+            $row['epsRevisions'] = $revisions;
+        }
+
+        return [
+            'earningsTrend' => [
+                'trend' => [
+                    ['period' => '0q', 'epsRevisions' => ['upLast30days' => $this->num(1.0), 'downLast30days' => $this->num(1.0)]],
+                    $row,
+                ],
+            ],
+        ];
+    }
+
+    public function test_breadth_positive_when_more_upgrades_than_downgrades(): void
+    {
+        $raw = $this->rawWithRevisions(['upLast30days' => $this->num(8.0), 'downLast30days' => $this->num(2.0)]);
+
+        // (8 - 2) / (8 + 2) = 0.6
+        $this->assertEqualsWithDelta(0.6, EarningsTrendParser::revisionBreadth($raw), 0.0001);
+    }
+
+    public function test_breadth_negative_when_more_downgrades_than_upgrades(): void
+    {
+        $raw = $this->rawWithRevisions(['upLast30days' => $this->num(1.0), 'downLast30days' => $this->num(4.0)]);
+
+        // (1 - 4) / (1 + 4) = -0.6
+        $this->assertEqualsWithDelta(-0.6, EarningsTrendParser::revisionBreadth($raw), 0.0001);
+    }
+
+    public function test_breadth_returns_null_when_denominator_zero(): void
+    {
+        $raw = $this->rawWithRevisions(['upLast30days' => $this->num(0.0), 'downLast30days' => $this->num(0.0)]);
+
+        $this->assertNull(EarningsTrendParser::revisionBreadth($raw));
+    }
+
+    public function test_breadth_returns_null_when_eps_revisions_missing(): void
+    {
+        $raw = $this->rawWithRevisions(null);
+
+        $this->assertNull(EarningsTrendParser::revisionBreadth($raw));
+    }
+
+    public function test_breadth_returns_null_when_plus1q_period_absent(): void
+    {
+        $raw = [
+            'earningsTrend' => [
+                'trend' => [
+                    ['period' => '0q', 'epsRevisions' => ['upLast30days' => $this->num(8.0), 'downLast30days' => $this->num(2.0)]],
+                ],
+            ],
+        ];
+
+        $this->assertNull(EarningsTrendParser::revisionBreadth($raw));
+    }
+
+    public function test_breadth_returns_null_when_earnings_trend_module_absent(): void
+    {
+        $this->assertNull(EarningsTrendParser::revisionBreadth([]));
+    }
+
+    public function test_breadth_returns_null_when_fields_missing(): void
+    {
+        $raw = $this->rawWithRevisions(['upLast30days' => $this->num(5.0)]);
+
+        $this->assertNull(EarningsTrendParser::revisionBreadth($raw));
+    }
 }

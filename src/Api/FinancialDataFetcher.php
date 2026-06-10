@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CVS\Api;
 
 use CVS\Forecast\EarningsCalendarParser;
+use CVS\Forecast\EarningsSurpriseParser;
 use CVS\Forecast\EarningsTrendParser;
 use CVS\Forecast\ForecastParser;
 use DateTimeImmutable;
@@ -54,6 +55,7 @@ class FinancialDataFetcher
         'recommendationTrend',
         'earningsTrend',
         'calendarEvents',
+        'earningsHistory',
     ];
 
     /** @param array<string, mixed> $config  The 'data_source' section from cvs-weights.php */
@@ -373,6 +375,11 @@ class FinancialDataFetcher
         $epsRevisionPct      = EarningsTrendParser::revisionPct($raw);
         $analystTargetUpside = $forecast['targets']['upside'];
 
+        // Phase 7 (slice 2) — predictive-signal inputs (shadow model_version 3.2).
+        $epsSurprisePct    = EarningsSurpriseParser::surprisePct($raw);
+        $epsBeatCount4q    = EarningsSurpriseParser::beatCount($raw);
+        $epsRevisionBreadth = EarningsTrendParser::revisionBreadth($raw);
+
         // Phase 5 (slice 2) — earnings-timing inputs (days since/to earnings),
         // computed once against the injected fetch-time reference date.
         $earningsTiming = EarningsCalendarParser::parse($raw, $referenceDate);
@@ -518,6 +525,17 @@ class FinancialDataFetcher
             // never recomputed inside scoring (FR-015).
             'days_since_earnings'        => $earningsTiming['days_since_earnings'],
             'days_to_earnings'           => $earningsTiming['days_to_earnings'],
+
+            // Phase 7 (slice 2) — predictive-signal inputs (shadow model_version 3.2, FR-004/006).
+            // eps_surprise_pct:     surprisePercent of the most recently reported quarter, fraction
+            //                       (e.g. 0.05 = +5% beat); null = no coverage/data.
+            // eps_beat_count_4q:    number of quarters with surprisePercent > 0 among the last
+            //                       (up to) 4 reported quarters; null = no coverage (distinct from 0).
+            // eps_revision_breadth: (up30d - down30d) / (up30d + down30d) for +1q EPS estimates,
+            //                       fraction in [-1, 1]; null = no coverage/data/zero opinions.
+            'eps_surprise_pct'           => $epsSurprisePct,
+            'eps_beat_count_4q'          => $epsBeatCount4q,
+            'eps_revision_breadth'       => $epsRevisionBreadth,
         ];
     }
 }
