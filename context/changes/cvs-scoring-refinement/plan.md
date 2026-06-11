@@ -361,6 +361,25 @@ eksperckiego. Zmiana wyłącznie w configu (FR-010). Jeśli rozkład stabilny �
 
 **Implementation Note**: Ostatnia faza. Po niej zmiana gotowa do archiwizacji (`/10x-archive`).
 
+### Decision (2026-06-11)
+
+`bin/score_distribution_report.php` uruchomiony na produkcji (read-only, `cvs_snapshots`):
+
+- Bucket "OLD" (sprzed `2026-06-03`, `model_version=3.0`/`origin=rescore`): **n=0** — w bazie nie ma
+  snapshotów sprzed przejścia na peer-group medians, więc dosłowne porównanie "stary vs nowy
+  rozkład" jest niewykonalne (brak danych historycznych do porównania).
+- Bucket "NEW" (n=245): rozkład CVS Swing/Fundamental zbalansowany na wszystkich 5 poziomach
+  rekomendacji (Swing: NEUTRALNIE 98, AKUMULUJ 93, REDUKUJ 25, SILNE KUPUJ 25, UNIKAJ 4;
+  Fundamental: NEUTRALNIE/REDUKUJ/AKUMULUJ po 58, SILNE KUPUJ 53, UNIKAJ 18).
+- Spot-check na liście obserwowanych użytkownika (42 spółki, 2026-06-11): etykiety spójne ze
+  zdrowym rozsądkiem — SILNE KUPUJ 4, AKUMULUJ 19, NEUTRALNIE 11, REDUKUJ 5, UNIKAJ 1, zgodnie
+  z progami 72/58/42/28.
+
+**Decyzja: bez zmian progów** (`thresholds`: strong_buy 72 / accumulate 58 / neutral 42 /
+reduce 28). Guardrail "AKUMULUJ obejmuje porównywalny zakres jakości" spełniony. Brak
+historycznego baseline'u sprzed Phase 3 nie pozwala na ścisłe porównanie przed/po, ale rozkład
+pod nową metodyką (peer-group) jest zdrowy i etykiety są wiarygodne.
+
 ---
 
 ## Testing Strategy
@@ -464,10 +483,10 @@ eksperckiego. Zmiana wyłącznie w configu (FR-010). Jeśli rozkład stabilny �
 ### Phase 5: Rekalibracja skali rekomendacji
 
 #### Automated
-- [ ] 5.1 `score_distribution_report.php` generuje raport bez błędu
-- [ ] 5.2 `composer stan` + PHPUnit zielone (progi, jeśli zmienione)
+- [x] 5.1 `score_distribution_report.php` generuje raport bez błędu
+- [x] 5.2 `composer stan` + PHPUnit zielone (progi, jeśli zmienione)
 
 #### Manual
-- [ ] 5.3 Raport przejrzany, decyzja o progach udokumentowana
-- [ ] 5.4 Etykiety rekomendacji spójne ze zdrowym rozsądkiem
-- [ ] 5.5 Guardrail skali spełniony
+- [x] 5.3 Raport przejrzany, decyzja o progach udokumentowana
+- [x] 5.4 Etykiety rekomendacji spójne ze zdrowym rozsądkiem
+- [x] 5.5 Guardrail skali spełniony
