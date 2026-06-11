@@ -34,24 +34,59 @@
          data-watchlist='<?= json_encode($watchlist ?? []) ?>'
          <?= empty($watchlist) ? 'hidden' : '' ?>>
         <h3>Obserwowane</h3>
+        <?php
+        // Maps a recommendation label to the same border-colour class used on the
+        // chip itself, so the tooltip's CVS Swing/Fund numbers get matching colours.
+        $recoToClass = static fn(string $reco): string => match (true) {
+            str_contains($reco, 'SILNE KUPUJ') => 'reco--strong-buy',
+            str_contains($reco, 'AKUMULUJ')    => 'reco--accumulate',
+            str_contains($reco, 'REDUKUJ')     => 'reco--reduce',
+            str_contains($reco, 'UNIKAJ')      => 'reco--avoid',
+            default                            => '',
+        };
+        ?>
         <div class="watchlist-chips">
             <?php foreach ($watchlist ?? [] as $t):
                 $reco      = $watchlistRecos[$t] ?? '';
-                $recoClass = match (true) {
-                    str_contains($reco, 'SILNE KUPUJ') => 'reco--strong-buy',
-                    str_contains($reco, 'AKUMULUJ')    => 'reco--accumulate',
-                    str_contains($reco, 'REDUKUJ')     => 'reco--reduce',
-                    str_contains($reco, 'UNIKAJ')      => 'reco--avoid',
-                    default                            => '',
-                };
+                $recoClass = $recoToClass($reco);
+                $info      = $watchlistInfo[$t] ?? [];
+                $name      = $info['companyName'] ?? null;
+                $cvsSwing  = $info['cvsSwing'] ?? null;
+                $cvsFund   = $info['cvsFund']  ?? null;
+                $swingCls  = $recoToClass((string) ($info['recoSwing'] ?? ''));
+                $fundCls   = $recoToClass((string) ($info['recoFund']  ?? ''));
             ?>
             <span class="watchlist-chip <?= $recoClass ?>" data-ticker="<?= htmlspecialchars($t) ?>">
                 <?= htmlspecialchars($t) ?>
                 <button class="watchlist-chip__remove"
                         data-ticker="<?= htmlspecialchars($t) ?>"
                         aria-label="Usuń <?= htmlspecialchars($t) ?>">&times;</button>
+                <span class="watchlist-chip__tooltip">
+                    <strong><?= htmlspecialchars($name ?? $t) ?></strong>
+                    <?php if ($cvsSwing !== null || $cvsFund !== null): ?>
+                    <span class="watchlist-chip__tooltip-scores">
+                        <?php if ($cvsSwing !== null): ?>
+                        <span class="<?= $swingCls ?>">CVS Swing <?= number_format($cvsSwing, 1) ?></span>
+                        <?php endif; ?>
+                        <?php if ($cvsFund !== null): ?>
+                        <span class="<?= $fundCls ?>">CVS Fund <?= number_format($cvsFund, 1) ?></span>
+                        <?php endif; ?>
+                    </span>
+                    <?php endif; ?>
+                </span>
             </span>
             <?php endforeach; ?>
+        </div>
+    </div>
+
+    <?php /* Confirmation modal for removing a ticker from the watchlist */ ?>
+    <div class="ai-modal" id="watchlist-remove-modal" hidden>
+        <div class="ai-modal__inner">
+            <p>Czy na pewno chcesz usunąć <strong id="watchlist-remove-ticker"></strong> z listy obserwowanych?</p>
+            <div style="display:flex; gap:.5rem; justify-content:center; margin-top:1rem;">
+                <button type="button" class="btn btn--ghost" id="watchlist-remove-cancel">Anuluj</button>
+                <button type="button" class="btn btn--primary" id="watchlist-remove-confirm">Usuń</button>
+            </div>
         </div>
     </div>
 

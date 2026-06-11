@@ -35,18 +35,21 @@ class SnapshotWriter
     /**
      * Persist every versioned row the result carries. Returns the number of rows written.
      *
-     * @param CVSResult   $result   Scored result (base + optional shadow overlay block)
-     * @param float|null  $price    Current price at scoring time
-     * @param string|null $sector   Yahoo Finance sector
-     * @param string|null $industry Yahoo Finance industry / sub-sector
-     * @param string      $origin   CvsSnapshotRepository::ORIGIN_RESCORE | ORIGIN_CORPUS
+     * @param CVSResult   $result      Scored result (base + optional shadow overlay block)
+     * @param float|null  $price       Current price at scoring time
+     * @param string|null $sector      Yahoo Finance sector
+     * @param string|null $industry    Yahoo Finance industry / sub-sector
+     * @param string      $origin      CvsSnapshotRepository::ORIGIN_RESCORE | ORIGIN_CORPUS
+     * @param string|null $companyName Yahoo Finance long name (FinancialDataFetcher 'long_name'),
+     *                                  for watchlist tooltip (migration 018)
      */
     public function persist(
         CVSResult $result,
         ?float    $price,
         ?string   $sector,
         ?string   $industry,
-        string    $origin
+        string    $origin,
+        ?string   $companyName = null
     ): int {
         $resultArray  = $result->toArray();
         $modelVersion = $result->modelVersion !== '' ? $result->modelVersion : null;
@@ -59,7 +62,7 @@ class SnapshotWriter
             $resultArray['signals'] = $rawSignals;
         }
 
-        $this->repo->save($result->ticker, $resultArray, $price, $sector, $industry, $modelVersion, $origin);
+        $this->repo->save($result->ticker, $resultArray, $price, $sector, $industry, $modelVersion, $origin, $companyName);
         $written = 1;
 
         // Fan out over the full shadows[] list (3.1 + 3.2 today) instead of the
@@ -76,7 +79,8 @@ class SnapshotWriter
                 $sector,
                 $industry,
                 (string) $shadow['shadow_version'],
-                $origin
+                $origin,
+                $companyName
             );
             $written++;
         }

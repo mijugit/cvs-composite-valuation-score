@@ -59,21 +59,34 @@ class AnalysisController
         $alertRepo     = new AlertRepository();
         $alertsEnabled = $alertRepo->isGlobalEnabled($userId);
 
-        // Build ticker→reco_swing map from latest snapshots for colour-coding chips.
+        // Build ticker→reco_swing map (chip colours) and ticker→tooltip data
+        // (company name + CVS Swing/Fund + recommendations) from latest snapshots.
         $watchlistRecos = [];
+        $watchlistInfo  = [];
         if (!empty($watchlist)) {
             $snapshotRepo = new CvsSnapshotRepository();
             foreach ($snapshotRepo->findAllLatest($this->modelVersion) as $row) {
                 $t = strtoupper((string) ($row['ticker'] ?? ''));
-                if (in_array($t, $watchlist, true) && isset($row['reco_swing'])) {
+                if (!in_array($t, $watchlist, true)) {
+                    continue;
+                }
+                if (isset($row['reco_swing'])) {
                     $watchlistRecos[$t] = (string) $row['reco_swing'];
                 }
+                $watchlistInfo[$t] = [
+                    'companyName' => $row['company_name'] ?? null,
+                    'cvsSwing'    => isset($row['cvs_swing']) ? (float) $row['cvs_swing'] : null,
+                    'cvsFund'     => isset($row['cvs_fund'])  ? (float) $row['cvs_fund']  : null,
+                    'recoSwing'   => $row['reco_swing'] ?? null,
+                    'recoFund'    => $row['reco_fund']  ?? null,
+                ];
             }
         }
 
         Response::view('dashboard', [
             'watchlist'      => $watchlist,
             'watchlistRecos' => $watchlistRecos, // ticker→reco_swing map for chip colours
+            'watchlistInfo'  => $watchlistInfo,  // ticker→{companyName, cvsSwing, cvsFund, recoSwing, recoFund} for hover tooltip
             'history'        => $history,
             'alertsEnabled'  => $alertsEnabled,
         ]);

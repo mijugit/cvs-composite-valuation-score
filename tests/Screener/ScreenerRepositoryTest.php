@@ -17,7 +17,7 @@ class ScreenerRepositoryTest extends TestCase
         $pdo->exec('
             CREATE TABLE cvs_snapshots (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                ticker TEXT NOT NULL, sector TEXT NULL,
+                ticker TEXT NOT NULL, company_name TEXT NULL, sector TEXT NULL,
                 model_version TEXT NULL,
                 origin TEXT NOT NULL DEFAULT \'rescore\',
                 score_date TEXT NOT NULL, scored_at TEXT NOT NULL DEFAULT (datetime(\'now\')),

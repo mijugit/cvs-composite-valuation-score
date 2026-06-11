@@ -28,6 +28,7 @@ class TrackRecordRepositoryTest extends TestCase
             CREATE TABLE cvs_snapshots (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 ticker TEXT NOT NULL,
+                company_name TEXT NULL,
                 sector TEXT NULL,
                 model_version TEXT NULL,
                 origin TEXT NOT NULL DEFAULT \'rescore\',

@@ -165,7 +165,7 @@
         const chips = section.querySelector('.watchlist-chips');
         if (!chips) return;
 
-        // Chip body click → append to textarea; × click → AJAX remove
+        // Chip body click → append to textarea; × click → confirm modal → AJAX remove
         chips.addEventListener('click', async (e) => {
             const chip = e.target.closest('.watchlist-chip');
             if (!chip) return;
@@ -173,20 +173,62 @@
             const ticker = chip.dataset.ticker;
 
             if (e.target.closest('.watchlist-chip__remove')) {
-                const data = await watchlistToggle(ticker);
-                if (!data?.ok) return;
-                if (data.action === 'removed') {
-                    chip.remove();
-                    watchedSet.delete(ticker);
-                    if (chips.children.length === 0) section.hidden = true;
-                    updateCardToggleBtns(ticker, false);
-                }
+                openRemoveModal(ticker, chip, chips, section);
                 return;
             }
 
             // Chip body → append ticker to textarea
             appendTickerToTextarea(ticker);
         });
+
+        // Double-click on a chip → open the latest analysis for that ticker.
+        chips.addEventListener('dblclick', (e) => {
+            const chip = e.target.closest('.watchlist-chip');
+            if (!chip || e.target.closest('.watchlist-chip__remove')) return;
+
+            const ticker = chip.dataset.ticker;
+            if (ticker) window.location.href = `/analysis/${encodeURIComponent(ticker)}`;
+        });
+    }
+
+    // ------ Removal confirmation modal ------------------------------
+
+    function openRemoveModal(ticker, chip, chips, section) {
+        const modal   = document.getElementById('watchlist-remove-modal');
+        const label   = document.getElementById('watchlist-remove-ticker');
+        const confirm = document.getElementById('watchlist-remove-confirm');
+        const cancel  = document.getElementById('watchlist-remove-cancel');
+        if (!modal || !label || !confirm || !cancel) return;
+
+        label.textContent = ticker;
+        modal.hidden = false;
+
+        const close = () => { modal.hidden = true; cleanup(); };
+
+        const onConfirm = async () => {
+            const data = await watchlistToggle(ticker);
+            if (data?.ok && data.action === 'removed') {
+                chip.remove();
+                watchedSet.delete(ticker);
+                if (chips.children.length === 0) section.hidden = true;
+                updateCardToggleBtns(ticker, false);
+            }
+            close();
+        };
+
+        const onCancel = () => close();
+
+        const onBackdrop = (e) => { if (e.target === modal) close(); };
+
+        function cleanup() {
+            confirm.removeEventListener('click', onConfirm);
+            cancel.removeEventListener('click', onCancel);
+            modal.removeEventListener('click', onBackdrop);
+        }
+
+        confirm.addEventListener('click', onConfirm);
+        cancel.addEventListener('click', onCancel);
+        modal.addEventListener('click', onBackdrop);
     }
 
     function appendTickerToTextarea(ticker) {

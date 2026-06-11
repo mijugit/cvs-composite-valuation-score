@@ -27,6 +27,7 @@ class CvsSnapshotRepositoryTest extends TestCase
             CREATE TABLE cvs_snapshots (
                 id                 INTEGER PRIMARY KEY AUTOINCREMENT,
                 ticker             TEXT    NOT NULL,
+                company_name       TEXT    NULL,
                 sector             TEXT    NULL,
                 industry           TEXT    NULL,
                 model_version      TEXT    NULL,
@@ -449,6 +450,7 @@ class CvsSnapshotRepositoryTest extends TestCase
             CREATE TABLE cvs_snapshots (
                 id                 INTEGER PRIMARY KEY AUTOINCREMENT,
                 ticker             TEXT    NOT NULL,
+                company_name       TEXT    NULL,
                 sector             TEXT    NULL,
                 industry           TEXT    NULL,
                 model_version      TEXT    NULL,

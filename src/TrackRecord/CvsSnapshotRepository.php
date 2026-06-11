@@ -56,6 +56,8 @@ class CvsSnapshotRepository
      * @param string               $origin          Snapshot origin: ORIGIN_RESCORE (user-facing,
      *                                              default — backward compatible) or ORIGIN_CORPUS
      *                                              (calibration layer, Phase 7 slice 1)
+     * @param string|null          $companyName     Yahoo Finance long name (FinancialDataFetcher
+     *                                              'long_name'), for watchlist tooltip (migration 018)
      */
     public function save(
         string  $ticker,
@@ -64,7 +66,8 @@ class CvsSnapshotRepository
         ?string $sector          = null,
         ?string $industry        = null,
         ?string $modelVersion    = null,
-        string  $origin          = self::ORIGIN_RESCORE
+        string  $origin          = self::ORIGIN_RESCORE,
+        ?string $companyName     = null
     ): void {
         $scoreDate = (new DateTimeImmutable())->format('Y-m-d');
         $scoredAt  = (new DateTimeImmutable())->format('Y-m-d H:i:s');
@@ -87,6 +90,7 @@ class CvsSnapshotRepository
 
         $params = [
             ':ticker'                => $ticker,
+            ':company_name'          => $companyName,
             ':sector'                => $sector,
             ':industry'              => $industry,
             ':model_version'         => $modelVersion,
@@ -112,12 +116,12 @@ class CvsSnapshotRepository
         try {
             $stmt = $this->db->prepare('
                 INSERT INTO cvs_snapshots
-                    (ticker, sector, industry, model_version, origin, score_date, scored_at,
+                    (ticker, company_name, sector, industry, model_version, origin, score_date, scored_at,
                      price_at_snapshot, cvs_swing, cvs_fund, reco_swing, reco_fund,
                      golden_signal, quality_gate, gate_failures, pillar_scores, signals,
                      days_since_earnings, days_to_earnings, earnings_state, earnings_guard_active)
                 VALUES
-                    (:ticker, :sector, :industry, :model_version, :origin, :score_date, :scored_at,
+                    (:ticker, :company_name, :sector, :industry, :model_version, :origin, :score_date, :scored_at,
                      :price_at_snapshot, :cvs_swing, :cvs_fund, :reco_swing, :reco_fund,
                      :golden_signal, :quality_gate, :gate_failures, :pillar_scores, :signals,
                      :days_since_earnings, :days_to_earnings, :earnings_state, :earnings_guard_active)
@@ -136,7 +140,8 @@ class CvsSnapshotRepository
             try {
                 $upd = $this->db->prepare('
                     UPDATE cvs_snapshots
-                    SET sector                = :sector,
+                    SET company_name          = COALESCE(:company_name, company_name),
+                        sector                = :sector,
                         industry              = :industry,
                         model_version         = :model_version,
                         origin                = :origin,

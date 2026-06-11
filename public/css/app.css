@@ -370,6 +370,7 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
 }
 
 .watchlist-chip {
+    position: relative;
     display: inline-flex;
     align-items: center;
     gap: .2rem;
@@ -382,6 +383,37 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
     transition: border-color .15s;
     user-select: none;
 }
+
+/* Hover tooltip: company full name + CVS Swing/Fund numbers */
+.watchlist-chip__tooltip {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 50;
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-md, 6px);
+    box-shadow: var(--shadow-lg);
+    padding: .5rem .75rem;
+    font-size: .8rem;
+    white-space: nowrap;
+    cursor: default;
+}
+.watchlist-chip:hover .watchlist-chip__tooltip { display: block; }
+
+.watchlist-chip__tooltip-scores {
+    display: flex;
+    flex-direction: column;
+    gap: .15rem;
+    margin-top: .25rem;
+    color: var(--c-muted);
+}
+.watchlist-chip__tooltip-scores .reco--strong-buy  { color: var(--c-success); }
+.watchlist-chip__tooltip-scores .reco--accumulate  { color: var(--c-primary); }
+.watchlist-chip__tooltip-scores .reco--reduce      { color: var(--c-warn); }
+.watchlist-chip__tooltip-scores .reco--avoid       { color: var(--c-danger); }
 
 .watchlist-chip:hover { border-color: var(--c-primary); }
 
