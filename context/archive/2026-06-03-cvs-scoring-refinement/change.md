@@ -1,9 +1,10 @@
 ---
 id: cvs-scoring-refinement
 title: "Faza 3 — doskonalenie oceny CVS (mediany sektorowe, granularność, kształt transformat)"
-status: implemented
+status: archived
 created: 2026-06-03
 updated: 2026-06-11
+archived_at: 2026-06-11T09:20:23Z
 
 ---
 
