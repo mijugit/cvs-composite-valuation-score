@@ -64,6 +64,63 @@ final class EarningsTrendParser
         return null;
     }
 
+    /**
+     * Compute the +1q analyst-revision breadth as a signed fraction in [-1, 1].
+     *
+     * Looks up `earningsTrend.trend[]` for the row with `period === '+1q'`,
+     * then reads `epsRevisions.upLast30days` / `downLast30days`:
+     *
+     *   breadth = (up30d - down30d) / (up30d + down30d)
+     *
+     * e.g. up=8, down=2 → 0.6 (broad upward consensus shift). Orthogonal to
+     * the magnitude-based revisionPct() above (Overlay A) — this measures how
+     * many analysts moved, not by how much.
+     *
+     * Returns null (→ "missing coverage", never a silent zero) when:
+     *   - `earningsTrend.trend` is absent/not an array
+     *   - no row has `period === '+1q'`
+     *   - `epsRevisions` is missing on that row
+     *   - `upLast30days`/`downLast30days` are missing
+     *   - the denominator (up30d + down30d) is 0 (zero opinions != neutral consensus)
+     *
+     * @param array<string, mixed> $raw  Raw quoteSummary result[0]
+     */
+    public static function revisionBreadth(array $raw): ?float
+    {
+        $trend = $raw['earningsTrend']['trend'] ?? null;
+
+        if (!is_array($trend)) {
+            return null;
+        }
+
+        foreach ($trend as $row) {
+            if (!is_array($row) || ($row['period'] ?? null) !== '+1q') {
+                continue;
+            }
+
+            $revisions = $row['epsRevisions'] ?? null;
+            if (!is_array($revisions)) {
+                return null;
+            }
+
+            $up   = self::raw($revisions['upLast30days']   ?? null);
+            $down = self::raw($revisions['downLast30days'] ?? null);
+
+            if ($up === null || $down === null) {
+                return null;
+            }
+
+            $denominator = $up + $down;
+            if ($denominator === 0.0) {
+                return null;
+            }
+
+            return ($up - $down) / $denominator;
+        }
+
+        return null;
+    }
+
     /** Unwrap Yahoo's {"raw": x, "fmt": "y"} value objects. */
     private static function raw(mixed $obj): ?float
     {

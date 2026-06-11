@@ -36,6 +36,28 @@ Wszystkie parametry — wagi, progi, benchmarki sektorowe — żyją w jednym pl
 
 ---
 
+## Model się uczy — w trybie cieniowym
+
+Obok głównego wyniku model liczy po cichu jego eksperymentalne warianty —
+**modele cieniowe**, widoczne na detalu spółki jako dodatkowe „podglądy", ale
+nigdy niezmieniające wyświetlanej rekomendacji. To laboratorium kalibracji
+przed publicznym wdrożeniem.
+
+Pierwszy wariant dokłada **kary** — za cięte prognozy analityków (rewizja EPS w
+dół) i za cenę, która wybiegła powyżej średniego celu analityków.
+
+Drugi wariant idzie dalej i dokłada **symetryczne sygnały oczekiwań**: jeśli
+spółka właśnie pobiła prognozy wyników, kara okołowynikowa znika (a przy
+mocnym pobiciu może nawet się odwrócić); jeśli zawiodła — kara rośnie. Do tego
+dochodzi szerokość rewizji prognoz analityków, dystans do 52-tygodniowego
+maksimum i konsystencja pobijania prognoz w ostatnich czterech kwartałach.
+
+Surowe wartości tych sygnałów trafiają do bazy razem z każdym wynikiem —
+budując korpus danych, na którym w przyszłości model zostanie skalibrowany i
+ostatecznie włączony do głównego wyniku.
+
+---
+
 ## Gdzie mieszka kontrariańskość
 
 CVS jest świadomie zaprojektowane jako narzędzie kontrariańskie. Jeśli analitycy mówią „Kupuj" na spółkę z wysokim momentum i wysoką wyceną — model powie „Redukuj", bo patrzy na liczby, nie na narrację. Ta rozbieżność jest informacją.
@@ -77,7 +99,7 @@ Analiza AI przez **Claude API (Anthropic)**. Klient napisany od zera z prompt ca
 
 **PHPMailer** na SMTP CF do alertów i formularza prośby o kod PRO. Cron na Cyber_Folks (2× dziennie) zasila snapshoty.
 
-189 testów offline w PHPUnit, PHPStan level 6 bez błędów, ręczny deploy przez SSH + git pull.
+417 testów offline w PHPUnit, PHPStan level 6 bez błędów, ręczny deploy przez SSH + git pull.
 
 ---
 

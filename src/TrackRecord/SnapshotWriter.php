@@ -51,18 +51,31 @@ class SnapshotWriter
         $resultArray  = $result->toArray();
         $modelVersion = $result->modelVersion !== '' ? $result->modelVersion : null;
 
+        // Phase 7 (slice 2): raw predictive-signal inputs (FR-022) — shared across
+        // base/3.1/3.2 rows for the same ticker-day, sourced from the 3.2 shadow's
+        // `signals` block (minus its `adjustments`, which are 3.2-specific).
+        $rawSignals = $this->rawSignals($result->shadows);
+        if ($rawSignals !== null) {
+            $resultArray['signals'] = $rawSignals;
+        }
+
         $this->repo->save($result->ticker, $resultArray, $price, $sector, $industry, $modelVersion, $origin);
         $written = 1;
 
-        $overlay = $result->overlay;
-        if ($overlay !== null && $overlay['shadow_version'] !== '') {
+        // Fan out over the full shadows[] list (3.1 + 3.2 today) instead of the
+        // single legacy `overlay` alias.
+        foreach ($result->shadows as $shadow) {
+            if (($shadow['shadow_version'] ?? '') === '') {
+                continue;
+            }
+
             $this->repo->save(
                 $result->ticker,
-                $this->overlayShadowResultArray($overlay, $resultArray),
+                $this->shadowResultArray($shadow, $resultArray),
                 $price,
                 $sector,
                 $industry,
-                $overlay['shadow_version'],
+                (string) $shadow['shadow_version'],
                 $origin
             );
             $written++;
@@ -72,29 +85,51 @@ class SnapshotWriter
     }
 
     /**
-     * Build a CVSResult::toArray()-shaped payload from the shadow overlay block,
+     * Extract the raw predictive-signal inputs from the 3.2 shadow block (if
+     * present), dropping its `adjustments` sub-block (3.2-specific corrections).
+     * Returns null when no shadow carries a `signals` block (3.2 disabled).
+     *
+     * @param array<int, array<string, mixed>> $shadows CVSResult->shadows[]
+     * @return array<string, mixed>|null
+     */
+    private function rawSignals(array $shadows): ?array
+    {
+        foreach ($shadows as $shadow) {
+            if (isset($shadow['signals']) && is_array($shadow['signals'])) {
+                $signals = $shadow['signals'];
+                unset($signals['adjustments']);
+                return $signals;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Build a CVSResult::toArray()-shaped payload from a shadow block,
      * suitable for persistence as a parallel snapshot row (model_version = shadow_version).
      *
-     * @param array<string, mixed> $overlay CVSResult->overlay block (non-null — caller checks)
-     * @param array<string, mixed> $base    CVSResult::toArray() of the base result
+     * @param array<string, mixed> $shadow CVSResult->shadows[] block
+     * @param array<string, mixed> $base   CVSResult::toArray() of the base result
      * @return array<string, mixed>
      */
-    private function overlayShadowResultArray(array $overlay, array $base): array
+    private function shadowResultArray(array $shadow, array $base): array
     {
         return [
             'ticker'        => $base['ticker']        ?? null,
             'quality_gate'  => $base['quality_gate']  ?? false,
             'swing'         => [
-                'cvs'            => $overlay['swing']      ?? null,
-                'recommendation' => $overlay['swing_reco'] ?? null,
+                'cvs'            => $shadow['swing']      ?? null,
+                'recommendation' => $shadow['swing_reco'] ?? null,
             ],
             'fundamental'   => [
-                'cvs'            => $overlay['fund']      ?? null,
-                'recommendation' => $overlay['fund_reco'] ?? null,
+                'cvs'            => $shadow['fund']      ?? null,
+                'recommendation' => $shadow['fund_reco'] ?? null,
             ],
             'golden_signal' => $base['golden_signal'] ?? null,
             'gate_failures' => $base['gate_failures'] ?? [],
             'pillar_scores' => $base['pillar_scores'] ?? null,
+            'signals'       => $base['signals'] ?? null,
         ];
     }
 }

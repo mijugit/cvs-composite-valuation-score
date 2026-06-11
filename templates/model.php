@@ -614,6 +614,47 @@
     jest włączony. To informacja dla Ciebie, nie element wyniku.
 </div>
 
+<h3>Modele cieniowe 3.1 / 3.2 — laboratorium kalibracji</h3>
+<p>
+    Obok opisanego wyżej shadow score (3.0 + Korekty A–C) model liczy po cichu dwa kolejne
+    <strong>warianty eksperymentalne</strong> — 3.1 i 3.2. Pojawiają się na detalu spółki jako
+    osobne chipy „Podgląd 3.1" i „Podgląd 3.2" pod headline'owym wynikiem. To laboratorium
+    kalibracji: surowe wartości sygnałów trafiają do bazy razem z każdym wynikiem, budując
+    korpus danych do przyszłej rekalibracji modelu.
+</p>
+<div class="callout callout--info">
+    <strong>Nigdy nie zmieniają wyświetlanej rekomendacji</strong>
+    Wynik 3.0 i wynikająca z niego rekomendacja (⬆ AKUMULUJ, ⬇ REDUKUJ itd.) pozostają
+    nietknięte. Chipy 3.1/3.2 to wyłącznie informacja poglądowa.
+</div>
+
+<h4 style="font-size:var(--text-sm);font-weight:600;margin:.75rem 0 .25rem;">Wariant 3.1 — same kary</h4>
+<p>
+    3.1 dziedziczy Korekty A i B (rewizja EPS, cel cenowy analityków) i zastępuje Korektę C
+    <strong>symetrycznym guardem okołowynikowym</strong> — karą działającą zarówno przed, jak
+    i po publikacji wyników kwartalnych.
+</p>
+
+<h4 style="font-size:var(--text-sm);font-weight:600;margin:.75rem 0 .25rem;">Wariant 3.2 — symetryczne sygnały oczekiwań</h4>
+<p>
+    3.2 dziedziczy kary rewizji/targetu z 3.1 bez ponownego liczenia (anty-dryf) i zastępuje
+    symetryczny guard okołowynikowy <strong>kierunkowym guardem PEAD</strong>
+    (post-earnings-announcement-drift): jeśli spółka właśnie pobiła prognozy wyników, kara
+    okołowynikowa znika (a przy mocnym pobiciu może się odwrócić); jeśli zawiodła — kara rośnie.
+    Do tego dochodzą trzy dodatkowe sygnały:
+</p>
+<ul>
+    <li><strong>Szerokość rewizji prognoz</strong> — jak wiele prognoz analityków poszło w górę vs. w dół w ostatnich 90 dniach</li>
+    <li><strong>Dystans do 52-tygodniowego maksimum</strong> — czy kurs jest blisko swojego rocznego szczytu czy daleko od niego</li>
+    <li><strong>Konsystencja „beatów"</strong> — ile razy w ostatnich 4 kwartałach spółka pobiła prognozy EPS</li>
+</ul>
+<div class="callout callout--tip">
+    <strong>Po co dwa warianty naraz?</strong>
+    3.1 i 3.2 pozwalają porównać „samo hamowanie" (3.1) z „hamowaniem + symetrycznym
+    reagowaniem na niespodzianki wynikowe" (3.2) na tych samych danych. Różnica między nimi
+    pokazuje, jak duży wpływ mają nowe sygnały — zanim którykolwiek trafi do głównego wyniku.
+</div>
+
 <!-- ══════════════════════════════════════════════════════════════════════ -->
 <h2 id="ai">Krok 5 — Analiza AI (Claude)</h2>
 <!-- ══════════════════════════════════════════════════════════════════════ -->
@@ -809,6 +850,12 @@
 
     <dt>Shadow score (Wynik cienia)</dt>
     <dd>Równoległa kalkulacja CVS uwzględniająca trzy korekty: rewizję EPS, konsensus cenowy analityków i bliskość wyników. Wyświetlany obok podstawowego CVS.</dd>
+
+    <dt>Model cieniowy 3.1 / 3.2 (shadow model_version)</dt>
+    <dd>Eksperymentalne warianty modelu liczone równolegle z 3.0, widoczne jako chipy „Podgląd 3.1" / „Podgląd 3.2" na detalu spółki. Nigdy nie zmieniają wyświetlanej rekomendacji — to laboratorium kalibracji przed ewentualnym włączeniem do głównego wyniku.</dd>
+
+    <dt>PEAD (Post-Earnings-Announcement Drift)</dt>
+    <dd>Zjawisko, w którym kurs akcji nadal reaguje na zaskoczenie wynikami kwartalnymi przez kilka sesji po ich publikacji. Model 3.2 wykorzystuje to jako kierunkowy guard: pobicie prognoz neutralizuje karę okołowynikową, a zawiedzenie ją wzmacnia.</dd>
 
     <dt>Forward EPS</dt>
     <dd>Prognozowany zysk na akcję na kolejny rok fiskalny, oparty na konsensusie analityków Wall Street.</dd>

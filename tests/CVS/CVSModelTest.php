@@ -737,6 +737,213 @@ class CVSModelTest extends TestCase
     }
 
     // ------------------------------------------------------------------
+    // Predictive signals — shadow model_version 3.2 (Phase 7, slice 2)
+    // ------------------------------------------------------------------
+
+    /**
+     * Neutral fixture: current_price/fifty_two_week_high ratio == signals_32.high_52w.baseline
+     * (0.85), no eps_revision_pct/analyst_target_upside (3.1 penalties == 0), no
+     * earnings calendar, no surprise/breadth/beatCount coverage. Every 3.2 signal
+     * is a coverage no-op -> 3.2 should collapse onto 3.1 (and 3.0).
+     */
+    private function neutralFinancials(array $overrides = []): array
+    {
+        return $this->baseFinancials(array_merge([
+            'current_price'        => 170.0,
+            'fifty_two_week_high'  => 200.0, // 170/200 = 0.85 == baseline
+        ], $overrides));
+    }
+
+    public function test_shadow32_present_in_shadows_list_alongside_31(): void
+    {
+        $result = $this->model()->calculate('TST', $this->neutralFinancials());
+
+        $this->assertCount(2, $result->shadows);
+        $this->assertSame('3.1', $result->shadows[0]['shadow_version']);
+        $this->assertSame('3.2', $result->shadows[1]['shadow_version']);
+
+        // overlay alias resolves to the 3.1 block (config['overlays']['shadow_version']).
+        $this->assertSame($result->shadows[0], $result->overlay);
+        $this->assertSame($result->shadows, $result->toArray()['shadows']);
+    }
+
+    public function test_shadow32_parity_with_31_when_all_signals_are_coverage_noops(): void
+    {
+        $result = $this->model()->calculate('TST', $this->neutralFinancials());
+
+        $overlay31 = $result->shadows[0];
+        $shadow32  = $result->shadows[1];
+
+        $this->assertSame($overlay31['penalties']['revision'], $shadow32['penalties']['revision']);
+        $this->assertSame($overlay31['penalties']['target'],   $shadow32['penalties']['target']);
+        $this->assertSame($overlay31['penalties']['total'],    $shadow32['penalties']['total']);
+        $this->assertSame($overlay31['swing'], $shadow32['swing']);
+        $this->assertSame($overlay31['fund'],  $shadow32['fund']);
+        $this->assertSame(0.0, $shadow32['signals']['adjustments']['total']);
+    }
+
+    public function test_shadow32_is_null_when_signals_32_disabled(): void
+    {
+        $config                = $this->config;
+        $config['signals_32']  = ['enabled' => false] + $config['signals_32'];
+
+        $result = (new CVSModel($config, $this->peerRepo))->calculate('TST', $this->neutralFinancials());
+
+        $this->assertCount(1, $result->shadows);
+        $this->assertSame('3.1', $result->shadows[0]['shadow_version']);
+    }
+
+    public function test_shadow32_is_null_when_overlays_disabled_hierarchical_kill_switch(): void
+    {
+        // Plan-review F3: signals_32.enabled stays true, but overlays.enabled=false
+        // disables the entire shadow stack including 3.2.
+        $config             = $this->config;
+        $config['overlays'] = ['enabled' => false] + $config['overlays'];
+
+        $result = (new CVSModel($config, $this->peerRepo))->calculate('TST', $this->neutralFinancials());
+
+        $this->assertSame([], $result->shadows);
+        $this->assertNull($result->overlay);
+    }
+
+    /**
+     * US-03: a post-earnings beat neutralises the 3.1 earnings-guard penalty in
+     * 3.2 (3.2 >= 3.1), while a beat-twin's miss amplifies it (3.2 < 3.1) — both
+     * visible in the penalty breakdown.
+     */
+    public function test_shadow32_us03_post_earnings_beat_neutralises_guard_penalty(): void
+    {
+        $financials = $this->neutralFinancials([
+            'days_since_earnings' => 2, // proximity = (5-2)/5 = 0.6 -> base penalty -6.0
+            'days_to_earnings'    => 89,
+            'eps_surprise_pct'    => 0.05, // beat
+        ]);
+
+        $result    = $this->model()->calculate('TST', $financials);
+        $overlay31 = $result->shadows[0];
+        $shadow32  = $result->shadows[1];
+
+        $this->assertEqualsWithDelta(-6.0, $overlay31['penalties']['earnings_guard'], 0.05);
+        $this->assertSame(0.0, $shadow32['penalties']['earnings_guard']); // beat_bonus default 0.0
+        $this->assertGreaterThanOrEqual($overlay31['swing'], $shadow32['swing']);
+        $this->assertGreaterThanOrEqual($overlay31['fund'],  $shadow32['fund']);
+    }
+
+    public function test_shadow32_us03_post_earnings_miss_amplifies_guard_penalty(): void
+    {
+        $financials = $this->neutralFinancials([
+            'days_since_earnings' => 2, // base penalty -6.0
+            'days_to_earnings'    => 89,
+            'eps_surprise_pct'    => -0.05, // miss
+        ]);
+
+        $result    = $this->model()->calculate('TST', $financials);
+        $overlay31 = $result->shadows[0];
+        $shadow32  = $result->shadows[1];
+
+        $this->assertEqualsWithDelta(-6.0, $overlay31['penalties']['earnings_guard'], 0.05);
+        // -6.0 * miss_multiplier(1.5) = -9.0 -- stronger than 3.1's -6.0.
+        $this->assertEqualsWithDelta(-9.0, $shadow32['penalties']['earnings_guard'], 0.05);
+        $this->assertLessThan($overlay31['swing'], $shadow32['swing']);
+        $this->assertLessThan($overlay31['fund'],  $shadow32['fund']);
+    }
+
+    /**
+     * Value-trap fixture (deep cheapness + estimate cuts, MU-style): 3.1 already
+     * carries revision/target penalties. With no post-earnings/breadth/52w
+     * signal active, 3.2 reuses those penalties unchanged -> 3.2 <= 3.1
+     * (signals never claw back penalties).
+     */
+    public function test_shadow32_value_trap_does_not_exceed_31(): void
+    {
+        // muFinancials() doesn't set fifty_two_week_high (defaults to 200.0,
+        // far below the 864.01 price) — neutralise the 52w-proximity signal
+        // by setting it so price/high == baseline (0.85), isolating the
+        // revision/target penalties this test is about.
+        $financials                       = $this->muFinancials();
+        $financials['fifty_two_week_high'] = $financials['current_price'] / 0.85;
+
+        $result = $this->model()->calculate('MU', $financials);
+
+        $overlay31 = $result->shadows[0];
+        $shadow32  = $result->shadows[1];
+
+        $this->assertNotNull($overlay31);
+        $this->assertNotNull($shadow32);
+        $this->assertLessThanOrEqual($overlay31['swing'], $shadow32['swing']);
+        $this->assertLessThanOrEqual($overlay31['fund'],  $shadow32['fund']);
+    }
+
+    /**
+     * Beat-with-positive-breadth fixture (PRD success criterion #3): a positive
+     * revision-breadth signal lifts 3.2 above 3.1.
+     */
+    public function test_shadow32_beat_with_positive_breadth_meets_or_exceeds_31(): void
+    {
+        $financials = $this->neutralFinancials([
+            'eps_revision_breadth' => 0.6,
+        ]);
+
+        $result    = $this->model()->calculate('TST', $financials);
+        $overlay31 = $result->shadows[0];
+        $shadow32  = $result->shadows[1];
+
+        $this->assertEqualsWithDelta(2.4, $shadow32['signals']['adjustments']['breadth'], 0.05);
+        $this->assertGreaterThanOrEqual($overlay31['swing'], $shadow32['swing']);
+        $this->assertGreaterThanOrEqual($overlay31['fund'],  $shadow32['fund']);
+    }
+
+    public function test_shadow32_signals_and_coverage_reflect_inputs(): void
+    {
+        $financials = $this->neutralFinancials([
+            'eps_surprise_pct'     => 0.04,
+            'eps_revision_breadth' => -0.2,
+            'eps_beat_count_4q'    => 3,
+        ]);
+
+        $shadow32 = $this->model()->calculate('TST', $financials)->shadows[1];
+
+        $this->assertSame(0.04, $shadow32['signals']['surprise_pct']);
+        $this->assertSame(-0.2, $shadow32['signals']['breadth']);
+        $this->assertSame(3,    $shadow32['signals']['beat_count_4q']);
+        $this->assertEqualsWithDelta(0.85, $shadow32['signals']['high_52w_proximity'], 0.001);
+
+        $this->assertFalse($shadow32['coverage']['missing_surprise']);
+        $this->assertFalse($shadow32['coverage']['missing_breadth']);
+        $this->assertFalse($shadow32['coverage']['missing_52w']);
+        $this->assertFalse($shadow32['coverage']['missing_consistency']);
+    }
+
+    public function test_shadow32_coverage_flags_missing_signals(): void
+    {
+        $shadow32 = $this->model()->calculate('TST', $this->neutralFinancials())->shadows[1];
+
+        $this->assertNull($shadow32['signals']['surprise_pct']);
+        $this->assertNull($shadow32['signals']['breadth']);
+        $this->assertNull($shadow32['signals']['beat_count_4q']);
+
+        $this->assertTrue($shadow32['coverage']['missing_surprise']);
+        $this->assertTrue($shadow32['coverage']['missing_breadth']);
+        $this->assertTrue($shadow32['coverage']['missing_consistency']);
+    }
+
+    public function test_shadow32_calculation_is_deterministic(): void
+    {
+        $financials = $this->neutralFinancials([
+            'days_since_earnings'  => 2,
+            'days_to_earnings'     => 89,
+            'eps_surprise_pct'     => -0.05,
+            'eps_revision_breadth' => 0.3,
+            'eps_beat_count_4q'    => 1,
+        ]);
+
+        $r1 = $this->model()->calculate('TST', $financials);
+        $r2 = $this->model()->calculate('TST', $financials);
+
+        $this->assertSame($r1->shadows, $r2->shadows);
+    }
+
+    // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
 

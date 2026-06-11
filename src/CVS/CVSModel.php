@@ -147,6 +147,16 @@ class CVSModel
         // until the recalibration slice).
         $overlay = $this->computeOverlay($valScore, $swingCvs, $fundCvs, $financials);
 
+        // Step 6b — Predictive-signals shadow (Phase 7, slice 2): SHADOW model_version
+        // (3.2). Reuses the 3.1 revision/target penalties (anti-drift — never
+        // recomputed), replaces the symmetric earnings_guard penalty with a
+        // directional PEAD guard, and layers symmetric breadth/52w/consistency
+        // signals on top. Hierarchical kill-switch (plan-review F3): null when
+        // signals_32 is disabled OR the 3.1 shadow itself is null.
+        $shadow32 = $this->computeShadow32($valScore, $swingCvs, $fundCvs, $financials, $overlay);
+
+        $shadows = array_values(array_filter([$overlay, $shadow32]));
+
         // Step 7 — Earnings-timing badge (Phase 5, slice 2): always-present, additive
         // (FR-006/FR-007/FR-010). Independent of overlays/earnings_guard.enabled — the
         // badge must work for every user, those flags gate only the shadow penalty
@@ -170,7 +180,7 @@ class CVSModel
             industry:                  is_string($financials['industry'] ?? null)
                                          ? (string) $financials['industry'] : null,
             valuationReference:        $valuationReference,
-            overlay:                   $overlay,
+            shadows:                   $shadows,
             earningsTiming:            $earningsTiming,
         );
     }
@@ -273,6 +283,108 @@ class CVSModel
                 'missing_eps_trend'         => $rev    === null,
                 'missing_target'            => $upside === null,
                 'missing_earnings_calendar' => ($daysTo === null && $daysSince === null),
+            ],
+        ];
+    }
+
+    // ------------------------------------------------------------------
+    // Predictive signals (Phase 7, slice 2 — shadow model_version 3.2)
+    // ------------------------------------------------------------------
+
+    /**
+     * Build the predictive-signals shadow block (model_version 3.2), or null
+     * when `signals_32.enabled` is false OR the 3.1 shadow (`$overlay31`) is
+     * null (plan-review F3 — hierarchical kill-switch: 3.2 rides on the 3.1
+     * revision/target penalties, so `overlays.enabled = false` disables the
+     * whole shadow stack).
+     *
+     * Reuses `$overlay31['penalties']['revision']` and `['target']` unchanged
+     * (anti-drift — never recomputed). Replaces `$overlay31['penalties']['earnings_guard']`
+     * with `ShadowSignals::peadGuard()`, then layers breadth / 52w-proximity /
+     * consistency on top.
+     *
+     * @param array<string, mixed> $financials
+     * @param array{penalties: array{revision: float, target: float, earnings_guard: float, total: float}}|null $overlay31
+     * @return array{
+     *   shadow_version: string,
+     *   swing: float, fund: float,
+     *   swing_reco: string, fund_reco: string,
+     *   penalties: array{revision: float, target: float, earnings_guard: float, total: float},
+     *   signals: array{
+     *     surprise_pct: ?float, breadth: ?float, high_52w_proximity: ?float, beat_count_4q: ?int,
+     *     adjustments: array{pead_guard: float, breadth: float, high_52w: float, consistency: float, total: float}
+     *   },
+     *   coverage: array{missing_eps_trend: bool, missing_target: bool, missing_earnings_calendar: bool, missing_surprise: bool, missing_breadth: bool, missing_52w: bool, missing_consistency: bool}
+     * }|null
+     */
+    private function computeShadow32(float $valScore, float $swingCvs, float $fundCvs, array $financials, ?array $overlay31): ?array
+    {
+        $cfg = $this->config['signals_32'] ?? [];
+
+        if (empty($cfg['enabled']) || $overlay31 === null) {
+            return null;
+        }
+
+        $surprisePct  = is_numeric($financials['eps_surprise_pct']     ?? null) ? (float) $financials['eps_surprise_pct']     : null;
+        $breadth      = is_numeric($financials['eps_revision_breadth'] ?? null) ? (float) $financials['eps_revision_breadth'] : null;
+        $beatCount    = is_int($financials['eps_beat_count_4q'] ?? null) ? $financials['eps_beat_count_4q'] : null;
+        $price        = is_numeric($financials['current_price']        ?? null) ? (float) $financials['current_price']        : null;
+        $high52w      = is_numeric($financials['fifty_two_week_high']  ?? null) ? (float) $financials['fifty_two_week_high']  : null;
+
+        $daysSince = is_int($financials['days_since_earnings'] ?? null) ? $financials['days_since_earnings'] : null;
+        $daysTo    = is_int($financials['days_to_earnings']    ?? null) ? $financials['days_to_earnings']    : null;
+        $windowSessions = (int) ($this->config['earnings_guard']['window_sessions'] ?? 0);
+        $earningsState  = EarningsGuard::state($daysTo, $daysSince, $windowSessions);
+
+        $revPenalty    = $overlay31['penalties']['revision'];
+        $targetPenalty = $overlay31['penalties']['target'];
+
+        $peadCfg = ($cfg['pead'] ?? []) + ['cap' => (float) ($this->config['earnings_guard']['penalty']['cap'] ?? 0.0)];
+        $peadPenalty = ShadowSignals::peadGuard($earningsState, $surprisePct, $overlay31['penalties']['earnings_guard'], $peadCfg);
+
+        $breadthAdj    = ShadowSignals::breadth($breadth, $cfg['breadth'] ?? []);
+        $high52wProximity = ($price !== null && $high52w !== null && $high52w > 0.0) ? $price / $high52w : null;
+        $high52wAdj    = ShadowSignals::high52w($price, $high52w, $cfg['high_52w'] ?? []);
+        $consistencyAdj = ShadowSignals::consistency($beatCount, $cfg['consistency'] ?? []);
+
+        $totalPenalty = round($revPenalty + $targetPenalty + $peadPenalty + $breadthAdj + $high52wAdj + $consistencyAdj, 1);
+
+        $shadowSwing = (float) min(100.0, max(0.0, $swingCvs + $totalPenalty));
+        $shadowFund  = (float) min(100.0, max(0.0, $fundCvs  + $totalPenalty));
+
+        return [
+            'shadow_version' => (string) ($cfg['shadow_version'] ?? ''),
+            'swing'          => $shadowSwing,
+            'fund'           => $shadowFund,
+            'swing_reco'     => $this->mapToLabel((int) round($shadowSwing)),
+            'fund_reco'      => $this->mapToLabel((int) round($shadowFund)),
+            'penalties'      => [
+                'revision'       => $revPenalty,
+                'target'         => $targetPenalty,
+                'earnings_guard' => $peadPenalty,
+                'total'          => $totalPenalty,
+            ],
+            'signals' => [
+                'surprise_pct'       => $surprisePct,
+                'breadth'            => $breadth,
+                'high_52w_proximity' => $high52wProximity,
+                'beat_count_4q'      => $beatCount,
+                'adjustments' => [
+                    'pead_guard'  => $peadPenalty,
+                    'breadth'     => $breadthAdj,
+                    'high_52w'    => $high52wAdj,
+                    'consistency' => $consistencyAdj,
+                    'total'       => $totalPenalty,
+                ],
+            ],
+            'coverage' => [
+                'missing_eps_trend'         => $overlay31['coverage']['missing_eps_trend'],
+                'missing_target'            => $overlay31['coverage']['missing_target'],
+                'missing_earnings_calendar' => $overlay31['coverage']['missing_earnings_calendar'],
+                'missing_surprise'          => $surprisePct === null,
+                'missing_breadth'           => $breadth === null,
+                'missing_52w'               => $high52wProximity === null,
+                'missing_consistency'       => $beatCount === null,
             ],
         ];
     }

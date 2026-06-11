@@ -46,6 +46,7 @@ class CvsSnapshotRepositoryTest extends TestCase
                 quality_gate       INTEGER NOT NULL DEFAULT 0,
                 gate_failures      TEXT    NULL,
                 pillar_scores      TEXT    NULL,
+                signals            TEXT    NULL,
                 UNIQUE (ticker, score_date)
             )
         ');
@@ -303,6 +304,39 @@ class CvsSnapshotRepositoryTest extends TestCase
         $this->assertSame(1, (int) $row['earnings_guard_active']);
     }
 
+    public function test_save_persists_signals_round_trip(): void
+    {
+        // Phase 7 (slice 2, FR-022): raw predictive-signal inputs persist as JSON
+        // and survive a round trip; absent → NULL (migration 017).
+        $repo   = $this->makeRepo();
+        $result = $this->passResult('MU');
+        $result['signals'] = [
+            'surprise_pct'       => 0.05,
+            'breadth'            => 0.6,
+            'high_52w_proximity' => 0.9,
+            'beat_count_4q'      => 3,
+        ];
+        $repo->save('MU', $result);
+
+        $row = $repo->findLatestByTicker('MU');
+        $this->assertNotNull($row);
+        $signals = json_decode((string) $row['signals'], true);
+        $this->assertSame(0.05, $signals['surprise_pct']);
+        $this->assertSame(0.6, $signals['breadth']);
+        $this->assertSame(0.9, $signals['high_52w_proximity']);
+        $this->assertSame(3, $signals['beat_count_4q']);
+    }
+
+    public function test_save_signals_null_when_absent(): void
+    {
+        $repo = $this->makeRepo();
+        $repo->save('AAPL', $this->passResult('AAPL'));
+
+        $row = $repo->findLatestByTicker('AAPL');
+        $this->assertNotNull($row);
+        $this->assertNull($row['signals']);
+    }
+
     public function test_save_persists_negative_days_to_earnings(): void
     {
         // days_to may be NEGATIVE (Yahoo calendar/data-lag signal — 'in_transit').
@@ -434,6 +468,7 @@ class CvsSnapshotRepositoryTest extends TestCase
                 quality_gate       INTEGER NOT NULL DEFAULT 0,
                 gate_failures      TEXT    NULL,
                 pillar_scores      TEXT    NULL,
+                signals            TEXT    NULL,
                 UNIQUE (ticker, score_date, model_version, origin)
             )
         ');
