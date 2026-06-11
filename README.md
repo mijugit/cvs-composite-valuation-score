@@ -54,6 +54,27 @@ Wszystkie parametry (wagi, progi, benchmarki sektorowe) są w jednym pliku konfi
 
 ---
 
+## Model cieniowy (shadow model_version)
+
+Obok headline'owego wyniku 3.0 model liczy równolegle dwa **shadow modele** —
+eksperymentalne korekty post-agregacyjne, zapisywane do snapshotów obok 3.0,
+ale **nigdy niezmieniające wyświetlanej rekomendacji** (FR-016/FR-020).
+
+| Wersja | Charakter | Co dokłada |
+|---|---|---|
+| **3.1** | Tylko kary (hamulce) | Kara za cięte prognozy EPS (rewizja), bramka cena vs target analityków, symetryczny guard okołowynikowy |
+| **3.2** | Symetryczne sygnały oczekiwań | Kierunkowy guard PEAD (beat neutralizuje karę z 3.1, miss ją wzmacnia), szerokość rewizji prognoz, dystans do 52-tygodniowego maksimum, konsystencja "beatów" w ostatnich 4 kwartałach |
+
+3.2 dziedziczy kary rewizji/targetu z 3.1 bez ponownego liczenia (anty-dryf) i
+zastępuje symetryczny guard okołowynikowy kierunkowym PEAD-em. Surowe wartości
+sygnałów (`surprise_pct`, `breadth`, `52w proximity`, `beat_count_4q`) trafiają
+do snapshotów jako JSON — korpus do przyszłego grid-search/rekalibracji.
+
+Na detalu spółki oba shadow modele pokazują się jako chipy "Podgląd 3.1" /
+"Podgląd 3.2" pod headline'owymi wynikami — informacyjnie, eksperymentalnie.
+
+---
+
 ## Funkcjonalności
 
 ### Rdzeń analityczny
@@ -91,7 +112,7 @@ Wszystkie parametry (wagi, progi, benchmarki sektorowe) są w jednym pliku konfi
 | AI | Claude API (Anthropic) — Sonnet 4.6, prompt caching |
 | Email | PHPMailer + SMTP CF |
 | Dane rynkowe | Yahoo Finance (cURL, session cache 1h) |
-| Testy | PHPUnit 11 (164 testów offline), PHPStan level 6 |
+| Testy | PHPUnit 11 (417 testów offline), PHPStan level 6 |
 | Hosting | Cyber_Folks (shared), Apache, cron CLI |
 | Deploy | SSH + git pull ręczny |
 
@@ -142,7 +163,7 @@ config/
   mail.php          SMTP config
 templates/     Plain-PHP views
 public/        Front controller + assets (CSS, JS, images)
-database/      Migracje SQL (001–011)
+database/      Migracje SQL (001–017)
 bin/           rescore.php (cron), gen_favicon.php
 ```
 
