@@ -45,6 +45,7 @@ $asset = static function (string $path): string {
                 <ul class="admin-menu__dropdown" role="menu">
                     <li><a href="/admin/pro" role="menuitem">Panel PRO</a></li>
                     <li><a href="/admin/sectors" role="menuitem">Sektory</a></li>
+                    <li><a href="/admin/tickers" role="menuitem">Tickery</a></li>
                 </ul>
             </div>
             <?php endif; ?>
