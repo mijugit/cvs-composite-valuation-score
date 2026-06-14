@@ -6,7 +6,13 @@
 /* --c-text, --c-muted, --c-primary, --c-fund, --c-success, --c-warn,   */
 /* --c-danger) — zero hardcoded light fallbacks.                         */
 
-.model-page { max-width: 860px; margin: 0 auto; padding: 2rem 0 4rem; }
+.model-page {
+    max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem 4rem;
+    background: rgba(14, 27, 47, 0.5);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    border-radius: var(--radius);
+}
 
 .model-page h1 { font-size: var(--text-2xl); margin-bottom: .25rem; color: var(--c-text); }
 
