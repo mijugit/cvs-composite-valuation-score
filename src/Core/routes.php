@@ -19,6 +19,7 @@ use CVS\Watchlist\WatchlistController;
 use CVS\Admin\SectorsController;
 use CVS\Admin\TickersController;
 use CVS\Pro\ProController;
+use CVS\Translation\TranslationController;
 
 $auth        = new AuthController();
 $analysis    = new AnalysisController();
@@ -29,6 +30,7 @@ $tickersAdmin = new TickersController();
 $trackRecord = new TrackRecordController();
 $screener    = new ScreenerController();
 $alertCtrl   = new AlertController();
+$translation = new TranslationController();
 $aiConfig   = require dirname(__DIR__, 2) . '/config/ai.php';
 $aiAnalysis = new AiAnalysisController($aiConfig);
 
@@ -124,3 +126,9 @@ $router->get('/screener', fn($req) => $screener->index($req));
 
 $router->post('/alerts/global', fn($req) => $alertCtrl->toggleGlobal($req));
 $router->post('/alerts/ticker', fn($req) => $alertCtrl->toggleTicker($req));
+
+// ------------------------------------------------------------------
+// On-device translation cache (Chrome Translator API / Built-in AI)
+// ------------------------------------------------------------------
+
+$router->post('/api/translation/save', fn($req) => $translation->save($req));

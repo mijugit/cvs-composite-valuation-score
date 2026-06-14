@@ -15,6 +15,7 @@ use CVS\Pro\AiUsageRepository;
 use CVS\Pro\ProGate;
 use CVS\Pro\ProRepository;
 use CVS\TrackRecord\CvsSnapshotRepository;
+use CVS\Translation\TranslationRepository;
 use CVS\Watchlist\WatchlistRepository;
 
 /**
@@ -186,6 +187,9 @@ class AnalysisController
         $alertsEnabled      = $alertRepo->isGlobalEnabled($userId);
         $tickerAlertDisabled = $alertRepo->isTickerDisabled($userId, $ticker);
 
+        $translationRepo   = new TranslationRepository();
+        $cachedDescriptionPl = $translationRepo->find($ticker, 'pl', 'long_description');
+
         Response::view('analysis', [
             'ticker'               => $ticker,
             'result'               => $result->toArray(),
@@ -197,6 +201,7 @@ class AnalysisController
             'aiCanRefresh'         => $aiCanRefresh,
             'alertsEnabled'        => $alertsEnabled,        // S-04
             'tickerAlertDisabled'  => $tickerAlertDisabled,  // S-04
+            'cachedDescriptionPl'  => $cachedDescriptionPl,  // on-device translation cache
             'error'                => null,
         ]);
     }

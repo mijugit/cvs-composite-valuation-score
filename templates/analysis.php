@@ -51,12 +51,23 @@
                         <?php if (!empty($financials['country'])): ?> · <?= htmlspecialchars((string) $financials['country']) ?><?php endif; ?>
                     </p>
                 </div>
-                <button id="btn-company-close" class="btn btn--ghost btn--sm" style="flex-shrink:0;">✕</button>
+                <div style="display:flex;gap:.5rem;flex-shrink:0;">
+                    <?php if (!empty($financials['long_description'])): ?>
+                    <button id="btn-translate-desc" class="btn btn--ghost btn--sm" type="button"
+                            data-lang="en" title="Przetłumacz opis na polski (tłumaczenie on-device w Chrome)">
+                        EN ⇄ PL
+                    </button>
+                    <?php endif; ?>
+                    <button id="btn-company-close" class="btn btn--ghost btn--sm">✕</button>
+                </div>
             </div>
 
             <p class="company-modal__desc">
                 <?php if (!empty($financials['long_description'])): ?>
-                    <?= htmlspecialchars((string) $financials['long_description']) ?>
+                    <span id="company-desc-text"
+                          data-en="<?= htmlspecialchars((string) $financials['long_description']) ?>"
+                          <?php if ($cachedDescriptionPl ?? null): ?>data-pl="<?= htmlspecialchars((string) $cachedDescriptionPl) ?>"<?php endif; ?>
+                    ><?= htmlspecialchars((string) $financials['long_description']) ?></span>
                 <?php else: ?>
                     <em style="color:var(--c-muted);">Opis spółki zostanie załadowany przy następnym odświeżeniu danych (cache wygaśnie po 1h).</em>
                 <?php endif; ?>
@@ -89,6 +100,82 @@
     document.getElementById('company-modal')?.addEventListener('click', function (e) {
         if (e.target === this) this.hidden = true;
     });
+
+    // On-device translation (Chrome Translator API / Built-in AI, Gemini Nano).
+    // Falls back to a cached server-side translation (data-pl) saved by an
+    // earlier user whose browser did support the API.
+    (function () {
+        const btn  = document.getElementById('btn-translate-desc');
+        const text = document.getElementById('company-desc-text');
+        if (!btn || !text) return;
+
+        btn.addEventListener('click', async function () {
+            if (btn.dataset.lang === 'en') {
+                // EN → PL
+                if (text.dataset.pl) {
+                    text.textContent = text.dataset.pl;
+                    btn.dataset.lang = 'pl';
+                    return;
+                }
+
+                if (!('Translator' in self)) {
+                    alert('Tłumaczenie on-device wymaga aktualnego Chrome (Translator API / Built-in AI). Ta przeglądarka go nie wspiera, a tłumaczenie nie jest jeszcze dostępne w cache.');
+                    return;
+                }
+
+                btn.disabled = true;
+                btn.textContent = 'Tłumaczenie…';
+                try {
+                    const availability = await Translator.availability({ sourceLanguage: 'en', targetLanguage: 'pl' });
+                    if (availability === 'unavailable') {
+                        alert('Tłumaczenie EN → PL nie jest dostępne w tej przeglądarce.');
+                        return;
+                    }
+
+                    const translator = await Translator.create({ sourceLanguage: 'en', targetLanguage: 'pl' });
+                    const translated = await translator.translate(text.dataset.en);
+
+                    text.dataset.pl  = translated;
+                    text.textContent = translated;
+                    btn.dataset.lang = 'pl';
+
+                    // Cache the result so users without Translator API benefit too.
+                    const csrf = getCsrfTokenForTranslation();
+                    fetch('/api/translation/save', {
+                        method:  'POST',
+                        headers: {
+                            'Content-Type':     'application/x-www-form-urlencoded',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-Token':     csrf,
+                        },
+                        body: new URLSearchParams({
+                            ticker: <?= json_encode($ticker) ?>,
+                            lang:   'pl',
+                            field:  'long_description',
+                            text:   translated,
+                            _csrf:  csrf,
+                        }),
+                    }).catch(function () {});
+                } catch (e) {
+                    alert('Tłumaczenie nie powiodło się: ' + e.message);
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = 'EN ⇄ PL';
+                }
+                return;
+            }
+
+            // PL → EN
+            text.textContent = text.dataset.en;
+            btn.dataset.lang = 'en';
+        });
+
+        function getCsrfTokenForTranslation() {
+            return document.querySelector('meta[name="csrf-token"]')?.content
+                ?? document.getElementById('csrf-token')?.value
+                ?? '';
+        }
+    })();
     </script>
 
     <?php if (!empty($error)): ?>
