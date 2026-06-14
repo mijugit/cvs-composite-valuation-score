@@ -64,7 +64,12 @@ $router->post('/watchlist/toggle',     fn($req) => $watchlist->toggle($req));
 // ------------------------------------------------------------------
 
 $router->get('/model', function ($req) {
-    \CVS\Core\Response::view('model');
+    $translationRepo  = new \CVS\Translation\TranslationRepository();
+    $cachedModelPageEn = $translationRepo->find('_MODEL_PAGE', 'en', 'model_page');
+
+    \CVS\Core\Response::view('model', [
+        'cachedModelPageEn' => $cachedModelPageEn, // on-device translation cache (JSON array)
+    ]);
 });
 
 // ------------------------------------------------------------------

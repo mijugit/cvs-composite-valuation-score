@@ -18,7 +18,7 @@ use CVS\Core\Response;
 class TranslationController
 {
     private const ALLOWED_LANGS  = ['pl', 'en'];
-    private const ALLOWED_FIELDS = ['long_description'];
+    private const ALLOWED_FIELDS = ['long_description', 'model_page'];
 
     private TranslationRepository $repo;
 

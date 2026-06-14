@@ -269,11 +269,20 @@
 </style>
 
 <!-- ── HEADER ──────────────────────────────────────────────────────────── -->
-<h1>Jak działa model CVS?</h1>
-<p class="subtitle">
-    Kompletny przewodnik po metodologii Composite Valuation Score — od danych wejściowych
-    do rekomendacji. Bez wymaganej wiedzy finansowej.
-</p>
+<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;">
+    <div>
+        <h1>Jak działa model CVS?</h1>
+        <p class="subtitle">
+            Kompletny przewodnik po metodologii Composite Valuation Score — od danych wejściowych
+            do rekomendacji. Bez wymaganej wiedzy finansowej.
+        </p>
+    </div>
+    <button id="btn-translate-model" class="btn btn--ghost btn--sm" type="button"
+            data-lang="pl" title="Przetłumacz tę stronę na angielski (tłumaczenie on-device w Chrome)"
+            style="flex-shrink:0;">
+        PL ⇄ EN
+    </button>
+</div>
 
 <!-- ── TOC ─────────────────────────────────────────────────────────────── -->
 <nav class="toc mp-glass" aria-label="Spis treści">
@@ -968,3 +977,109 @@
 </div>
 
 </article>
+
+<script>
+// On-device translation of the whole /model page (Chrome Translator API / Built-in AI,
+// Gemini Nano). Falls back to a cached server-side translation saved by an earlier
+// user whose browser did support the API.
+(function () {
+    const btn = document.getElementById('btn-translate-model');
+    if (!btn) return;
+
+    const SELECTOR = [
+        '.model-page h1',
+        '.model-page .subtitle',
+        '.model-page h2',
+        '.model-page h3',
+        '.model-page h4:not(.toc h4)',
+        '.model-page p',
+        '.model-page li:not(.toc li)',
+        '.model-page dt',
+        '.model-page dd',
+        '.model-page td',
+        '.model-page th',
+        '.model-page summary',
+        '.model-page .faq__body',
+        '.model-page .pillar-card__name',
+        '.model-page .pillar-card__weight',
+        '.model-page .pillar-card__desc',
+        '.model-page .reco-badge',
+        '.model-page .callout',
+    ].join(', ');
+
+    const elements  = Array.from(document.querySelectorAll(SELECTOR));
+    const originals = elements.map(el => el.textContent);
+
+    let translatedEn = null;
+    const cachedEn = <?= json_encode($cachedModelPageEn ?? null) ?>;
+    if (cachedEn) {
+        try {
+            const arr = JSON.parse(cachedEn);
+            if (Array.isArray(arr) && arr.length === elements.length) translatedEn = arr;
+        } catch (e) {}
+    }
+
+    btn.addEventListener('click', async function () {
+        if (btn.dataset.lang === 'pl') {
+            // PL → EN
+            if (translatedEn) {
+                elements.forEach((el, i) => { el.textContent = translatedEn[i]; });
+                btn.dataset.lang = 'en';
+                return;
+            }
+
+            if (!('Translator' in self)) {
+                alert('Tłumaczenie on-device wymaga aktualnego Chrome (Translator API / Built-in AI). Ta przeglądarka go nie wspiera, a tłumaczenie strony nie jest jeszcze dostępne w cache.');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Tłumaczenie…';
+            try {
+                const availability = await Translator.availability({ sourceLanguage: 'pl', targetLanguage: 'en' });
+                if (availability === 'unavailable') {
+                    alert('Tłumaczenie PL → EN nie jest dostępne w tej przeglądarce.');
+                    return;
+                }
+
+                const translator = await Translator.create({ sourceLanguage: 'pl', targetLanguage: 'en' });
+                const result = [];
+                for (let i = 0; i < elements.length; i++) {
+                    result.push(await translator.translate(originals[i]));
+                    elements[i].textContent = result[i];
+                }
+                translatedEn = result;
+                btn.dataset.lang = 'en';
+
+                // Cache the result so users without Translator API benefit too.
+                const csrf = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+                fetch('/api/translation/save', {
+                    method:  'POST',
+                    headers: {
+                        'Content-Type':     'application/x-www-form-urlencoded',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-Token':     csrf,
+                    },
+                    body: new URLSearchParams({
+                        ticker: '_MODEL_PAGE',
+                        lang:   'en',
+                        field:  'model_page',
+                        text:   JSON.stringify(result),
+                        _csrf:  csrf,
+                    }),
+                }).catch(function () {});
+            } catch (e) {
+                alert('Tłumaczenie nie powiodło się: ' + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'PL ⇄ EN';
+            }
+            return;
+        }
+
+        // EN → PL
+        elements.forEach((el, i) => { el.textContent = originals[i]; });
+        btn.dataset.lang = 'pl';
+    });
+})();
+</script>
