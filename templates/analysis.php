@@ -195,6 +195,32 @@
         <?php else: ?>
 
             <?php
+            // Dual-currency display helpers (Phase 4 multi-currency-fx)
+            $nativeCcy   = (string) ($financials['native_currency'] ?? '');
+            $fxToUsd     = isset($financials['fx_rate_to_usd']) && (float) $financials['fx_rate_to_usd'] > 0
+                ? (float) $financials['fx_rate_to_usd'] : null;
+            $isDualCcy   = $nativeCcy !== '' && $nativeCcy !== 'USD' && $fxToUsd !== null;
+
+            $ccySymbol = static function (string $code): string {
+                return match ($code) {
+                    'KRW' => '₩', 'EUR' => '€', 'JPY' => '¥', 'GBP' => '£',
+                    'TWD' => 'NT$', 'CNY' => '¥', 'HKD' => 'HK$', 'SGD' => 'S$',
+                    'CAD' => 'C$', 'AUD' => 'A$', 'CHF' => 'CHF ',
+                    default => $code . ' ',
+                };
+            };
+
+            /** Format USD value; if dual-currency, append "(SYMBOL native)" in parentheses. */
+            $fmtDual = static function (?float $usdVal, ?float $nativeVal = null) use ($isDualCcy, $nativeCcy, $fxToUsd, $ccySymbol): string {
+                if ($usdVal === null) return '–';
+                $usdStr = '$' . number_format($usdVal, 2);
+                if (!$isDualCcy || $fxToUsd === null) return $usdStr;
+                $native = $nativeVal ?? ($usdVal / $fxToUsd);
+                $sym    = $ccySymbol($nativeCcy);
+                $dec    = in_array($nativeCcy, ['KRW', 'JPY', 'IDR', 'VND', 'CLP', 'HUF'], true) ? 0 : 2;
+                return $usdStr . ' (' . $sym . number_format($native, $dec) . ')';
+            };
+
             // Helper: format raw financial values (B/M/K + ratio %)
             $ratioKeys = ['gross_margins', 'revenue_growth', 'return_on_equity'];
             $fmtRaw = static function (string $key, $val) use ($ratioKeys): string {
@@ -270,11 +296,7 @@
                 }
                 $growth = $growth !== null ? min($growth, $maxGrowthPct) : null;
 
-                $quoteCcy    = (string) ($financials['currency']           ?? 'USD');
-                $financialCcy = (string) ($financials['financial_currency'] ?? $quoteCcy);
-                $currencyOK  = ($quoteCcy === '' || $financialCcy === '' || $quoteCcy === $financialCcy);
-
-                if ($fcf > 0 && $growth !== null && $medEvFcf > 0 && $shares > 0 && $currencyOK) {
+                if ($fcf > 0 && $growth !== null && $medEvFcf > 0 && $shares > 0) {
                     $fwdFcf      = $fcf * (1 + $growth / 100) ** 2;
                     $fairEv      = $medEvFcf * $fwdFcf;
                     $fairPriceRaw = ($fairEv - $debt + $cash) / $shares;
@@ -545,7 +567,7 @@
                         <tbody>
                             <?php
                             $rawFields = [
-                                'current_price'       => 'Cena bieżąca ($)',
+                                'current_price'       => 'Cena bieżąca (USD)',
                                 'shares_outstanding'  => 'Liczba akcji',
                                 'revenue'             => 'Przychody ($)',
                                 'ebitda'              => 'EBITDA ($)',
@@ -649,13 +671,13 @@
                         <div class="forecast-tile forecast-tile--cvs">
                             <div class="forecast-tile__label">CVS Fair Value</div>
                             <div class="forecast-tile__value" style="color:var(--c-fund);">
-                                $<?= number_format($cvsFairPrice, 2) ?>
+                                <?= htmlspecialchars($fmtDual($cvsFairPrice)) ?>
                             </div>
                         </div>
                         <?php endif; ?>
                     </div>
                     <?php if ($fcNum !== null): ?>
-                        <p class="forecast-note">Na podstawie <?= (int) $fcNum ?> ocen analityków<?php if ($curPrice !== null): ?> · cena bieżąca $<?= number_format((float) $curPrice, 2) ?><?php endif; ?>.</p>
+                        <p class="forecast-note">Na podstawie <?= (int) $fcNum ?> ocen analityków<?php if ($curPrice !== null): ?> · cena bieżąca <?= htmlspecialchars($fmtDual((float) $curPrice, isset($financials['native_price']) ? (float) $financials['native_price'] : null)) ?><?php endif; ?>.</p>
                     <?php endif; ?>
                 </div>
                 <?php endif; ?>

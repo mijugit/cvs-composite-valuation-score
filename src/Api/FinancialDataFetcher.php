@@ -548,6 +548,21 @@ class FinancialDataFetcher
         $nativePrice  = $currentPrice;        // preserve before conversion for dual-display
         $currentPrice = $currentPrice * $fxP; // guaranteed non-null (checked above)
 
+        // Convert analyst price targets and monthly closes to USD so the forecast chart
+        // stays on the same scale as current_price and cvsFairPrice.
+        if ($fxP !== 1.0) {
+            $targets = $forecast['targets'];
+            foreach (['mean', 'median', 'high', 'low'] as $k) {
+                if ($targets[$k] !== null) {
+                    $targets[$k] = round((float) $targets[$k] * $fxP, 2);
+                }
+            }
+            $forecast = array_replace($forecast, ['targets' => $targets]);
+            // upside is (mean/price - 1) — dimensionless, already correct.
+
+            $closes = array_map(static fn(float $c): float => $c * $fxP, $closes);
+        }
+
         // Convert FCF intermediates before deriving forward_fcf_est.
         $fcf          = $fxApply($fcf,          $fxF);
         $opCf         = $fxApply($opCf,         $fxF);

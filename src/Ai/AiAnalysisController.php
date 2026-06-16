@@ -196,13 +196,7 @@ class AiAnalysisController
             return null;
         }
 
-        // Currency mismatch guard: financials in TWD/EUR/etc. but price in USD → skip.
-        $quoteCurrency    = (string) ($financials['currency']           ?? 'USD');
-        $financialCurrency = (string) ($financials['financial_currency'] ?? $quoteCurrency);
-        if ($quoteCurrency !== '' && $financialCurrency !== '' && $quoteCurrency !== $financialCurrency) {
-            return null;
-        }
-
+        // Phase 4 (multi-currency-fx): guard removed — all inputs are in USD after normalise().
         $fwdFcf = $fcf * (1 + $growth / 100) ** 2;
         $fairEv = $medEvFcf * $fwdFcf;
         $price  = ($fairEv - $debt + $cash) / $shares;

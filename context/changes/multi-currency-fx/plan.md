@@ -313,14 +313,14 @@ Jeden dodatkowy request chart per spółka nie-USD na pobranie kursu (cache per-
 ### Phase 3: Migracja snapshotów + writer/reader + bump wersji
 
 #### Automated
-- [x] 3.1 Migracja aplikuje się czysto; 3 nowe kolumny
-- [x] 3.2 PHPStan level 6 — 0 błędów
-- [x] 3.3 Test: save() persystuje nowe pola; reader je zwraca
-- [x] 3.4 Track-record odczyty wołane z live model_version (brak mieszania wersji)
+- [x] 3.1 Migracja aplikuje się czysto; 3 nowe kolumny — b2ff87e
+- [x] 3.2 PHPStan level 6 — 0 błędów — b2ff87e
+- [x] 3.3 Test: save() persystuje nowe pola; reader je zwraca — b2ff87e
+- [x] 3.4 Track-record odczyty wołane z live model_version (brak mieszania wersji) — b2ff87e
 
 #### Manual
-- [ ] 3.5 Po rescore w dev: 000660.KS ma model_version=4.0, native_currency/fx_rate/native_price, price USD
-- [ ] 3.6 Track-record bez garbage zwrotów dla zagranicznych (stare 3.0 wykluczone)
+- [x] 3.5 Po rescore w dev: 000660.KS ma model_version=4.0, native_currency/fx_rate/native_price, price USD
+- [x] 3.6 Track-record bez garbage zwrotów dla zagranicznych (stare 3.0 wykluczone)
 
 ### Phase 4: Fair Value w USD + dual-currency display
 
