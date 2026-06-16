@@ -1,7 +1,8 @@
 ---
 change_id: terms-and-privacy
 title: Regulamin, Polityka Prywatności i link wypisania z alertów
-status: implementing
+status: archived
+archived_at: 2026-06-16T09:58:20Z
 created: 2026-06-16
 updated: 2026-06-16
 ---
