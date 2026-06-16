@@ -1,9 +1,62 @@
 <?php declare(strict_types=1); ?>
 
-<div class="prose" style="max-width:760px;margin:0 auto;">
+<article class="legal-page">
+
+<style>
+.legal-page {
+    max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem 4rem;
+    background: rgba(14, 27, 47, 0.5);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    border-radius: var(--radius);
+}
+.legal-page h1 { font-size: var(--text-2xl); margin-bottom: .25rem; color: var(--c-text); }
+.legal-page .legal-meta { color: var(--c-text-muted); font-size: var(--text-sm); margin-bottom: 2.5rem; }
+.legal-page h2 {
+    font-size: var(--text-xl);
+    margin: 2.5rem 0 .75rem;
+    padding-bottom: .4rem;
+    border-bottom: 1px solid var(--c-border);
+    color: var(--c-primary);
+}
+.legal-page h3 {
+    font-size: var(--text-base);
+    margin: 1.5rem 0 .5rem;
+    font-weight: 600;
+    color: var(--c-text);
+}
+.legal-page p, .legal-page li { line-height: 1.75; color: var(--c-text); }
+.legal-page ul { padding-left: 1.5rem; margin: .5rem 0 1rem; }
+.legal-page li { margin-bottom: .35rem; }
+.legal-page a { color: var(--c-primary); }
+.legal-page a:hover { text-decoration: underline; }
+.legal-page strong { color: var(--c-text); }
+.legal-page code {
+    background: rgba(255,255,255,.07);
+    padding: .1em .35em;
+    border-radius: 3px;
+    font-size: .875em;
+}
+.legal-page table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.legal-page th, .legal-page td {
+    padding: .55rem .75rem;
+    border: 1px solid var(--c-border);
+    font-size: var(--text-sm);
+    color: var(--c-text);
+    text-align: left;
+}
+.legal-page th { background: rgba(255,255,255,.05); font-weight: 600; }
+.legal-footer {
+    margin-top: 3rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--c-border);
+    font-size: var(--text-xs);
+    color: var(--c-text-muted);
+}
+</style>
 
 <h1>Polityka Prywatności aplikacji CVS</h1>
-<p style="color:var(--c-text-muted);font-size:.875rem;">Ostatnia aktualizacja: 2026-06-16</p>
+<p class="legal-meta">Ostatnia aktualizacja: 2026-06-16</p>
 
 <h2>1. Administrator danych osobowych</h2>
 <p>Administratorem danych osobowych Użytkowników jest <strong>Autor aplikacji CVS</strong> — osoba fizyczna.<br>
@@ -56,7 +109,7 @@ Kontakt w sprawach danych osobowych: <a href="mailto:blog@timeflow.fun">blog@tim
 <h2>4. Pliki cookie</h2>
 <p>Aplikacja używa wyłącznie <strong>ściśle niezbędnych plików cookie</strong> (strictly necessary cookies):</p>
 
-<table class="pillar-table" style="width:100%;margin:1rem 0;">
+<table>
     <thead>
         <tr>
             <th>Nazwa</th>
@@ -100,8 +153,6 @@ Kontakt w sprawach danych osobowych: <a href="mailto:blog@timeflow.fun">blog@tim
 <h2>6. Zmiany Polityki Prywatności</h2>
 <p>O istotnych zmianach niniejszej Polityki Prywatności Użytkownicy zostaną poinformowani za pośrednictwem poczty e-mail lub komunikatu w Aplikacji.</p>
 
-<p style="margin-top:3rem;padding-top:1.5rem;border-top:1px solid var(--c-border);color:var(--c-text-muted);font-size:.8125rem;">
-    <a href="/terms-of-service">Regulamin</a>
-</p>
+<p class="legal-footer"><a href="/terms-of-service">Regulamin</a></p>
 
-</div>
+</article>

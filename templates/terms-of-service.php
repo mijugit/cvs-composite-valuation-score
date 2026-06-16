@@ -1,9 +1,42 @@
 <?php declare(strict_types=1); ?>
 
-<div class="prose" style="max-width:760px;margin:0 auto;">
+<article class="legal-page">
+
+<style>
+.legal-page {
+    max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem 4rem;
+    background: rgba(14, 27, 47, 0.5);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    border-radius: var(--radius);
+}
+.legal-page h1 { font-size: var(--text-2xl); margin-bottom: .25rem; color: var(--c-text); }
+.legal-page .legal-meta { color: var(--c-text-muted); font-size: var(--text-sm); margin-bottom: 2.5rem; }
+.legal-page h2 {
+    font-size: var(--text-xl);
+    margin: 2.5rem 0 .75rem;
+    padding-bottom: .4rem;
+    border-bottom: 1px solid var(--c-border);
+    color: var(--c-primary);
+}
+.legal-page h2.warning { color: var(--c-signal-sell, #e05252); }
+.legal-page p, .legal-page li { line-height: 1.75; color: var(--c-text); }
+.legal-page ul { padding-left: 1.5rem; margin: .5rem 0 1rem; }
+.legal-page li { margin-bottom: .35rem; }
+.legal-page a { color: var(--c-primary); }
+.legal-page a:hover { text-decoration: underline; }
+.legal-page strong { color: var(--c-text); }
+.legal-footer {
+    margin-top: 3rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--c-border);
+    font-size: var(--text-xs);
+    color: var(--c-text-muted);
+}
+</style>
 
 <h1>Regulamin korzystania z aplikacji CVS</h1>
-<p style="color:var(--c-text-muted);font-size:.875rem;">Ostatnia aktualizacja: 2026-06-16</p>
+<p class="legal-meta">Ostatnia aktualizacja: 2026-06-16</p>
 
 <h2>1. Postanowienia ogólne</h2>
 <p>Niniejszy Regulamin określa zasady korzystania z aplikacji internetowej <strong>CVS — Composite Valuation Score</strong> (dalej: „Aplikacja"), dostępnej pod adresem <a href="https://cvs.timeflow.fun">cvs.timeflow.fun</a>.</p>
@@ -23,7 +56,7 @@
 <p>Dostęp do pełnych funkcji Aplikacji (konto PRO) przyznawany jest wyłącznie <strong>na zaproszenie Operatora, bezpłatnie</strong>.</p>
 <p>Aplikacja korzysta z modelu językowego Claude API (Anthropic) wyłącznie do generowania narracyjnych komentarzy analitycznych. Komentarze te są oznaczone jako wygenerowane przez AI i nie stanowią rekomendacji inwestycyjnej.</p>
 
-<h2 style="color:var(--c-signal-sell, #c0392b);">3. Zastrzeżenie inwestycyjne</h2>
+<h2 class="warning">3. Zastrzeżenie inwestycyjne</h2>
 <p><strong>Wyniki CVS stanowią wyłącznie hipotezę modelu analitycznego i nie stanowią rekomendacji inwestycyjnej w rozumieniu przepisów prawa.</strong></p>
 <p>Operator nie jest doradcą inwestycyjnym i nie świadczy usług doradztwa inwestycyjnego w rozumieniu ustawy o obrocie instrumentami finansowymi.</p>
 <p>Wszelkie decyzje inwestycyjne podejmowane przez Użytkownika na podstawie lub w związku z korzystaniem z Aplikacji są dokonywane <strong>wyłącznie na własne ryzyko i odpowiedzialność Użytkownika</strong>.</p>
@@ -67,8 +100,6 @@
 <h2>8. Kontakt</h2>
 <p>Wszelkie pytania, zgłoszenia i korespondencja dotycząca Aplikacji: <a href="mailto:blog@timeflow.fun">blog@timeflow.fun</a></p>
 
-<p style="margin-top:3rem;padding-top:1.5rem;border-top:1px solid var(--c-border);color:var(--c-text-muted);font-size:.8125rem;">
-    <a href="/privacy-policy">Polityka Prywatności</a>
-</p>
+<p class="legal-footer"><a href="/privacy-policy">Polityka Prywatności</a></p>
 
-</div>
+</article>
