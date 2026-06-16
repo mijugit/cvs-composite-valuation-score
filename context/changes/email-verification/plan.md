@@ -446,23 +446,23 @@ $emailVerified = $userRepo->isEmailVerified($userId);
 ### Phase 1: Migracja 021 — kolumny weryfikacyjne
 
 #### Automated
-- [x] 1.1 Plik `database/migrations/021_add_email_verification.sql` istnieje
-- [x] 1.2 composer stan — 0 błędów (migracja SQL, PHP bez zmian)
+- [x] 1.1 Plik `database/migrations/021_add_email_verification.sql` istnieje — d7ef679
+- [x] 1.2 composer stan — 0 błędów (migracja SQL, PHP bez zmian) — d7ef679
 
 #### Manual
-- [x] 1.3 Migracja wykonana na DB, 3 kolumny w `users`, istniejący użytkownicy mają `email_verified_at` NOT NULL
+- [x] 1.3 Migracja wykonana na DB, 3 kolumny w `users`, istniejący użytkownicy mają `email_verified_at` NOT NULL — d7ef679
 
 ### Phase 2: UserRepository — metody weryfikacyjne
 
 #### Automated
-- [ ] 2.1 `setVerifyToken()` dodana
-- [ ] 2.2 `findByVerifyToken()` dodana
-- [ ] 2.3 `setEmailVerified()` dodana
-- [ ] 2.4 `isEmailVerified()` dodana
-- [ ] 2.5 `composer stan` — 0 błędów
+- [x] 2.1 `setVerifyToken()` dodana
+- [x] 2.2 `findByVerifyToken()` dodana
+- [x] 2.3 `setEmailVerified()` dodana
+- [x] 2.4 `isEmailVerified()` dodana
+- [x] 2.5 `composer stan` — 0 błędów
 
 #### Manual
-- [ ] 2.6 (testowanie przez integrację w fazie 3)
+- [x] 2.6 (testowanie przez integrację w fazie 3)
 
 ### Phase 3: AuthController — przepływ weryfikacji
 
