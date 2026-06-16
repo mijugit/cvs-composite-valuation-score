@@ -802,6 +802,7 @@
     sectorRows.forEach(row => {
         row.addEventListener('click', e => {
             if (e.target.closest('.js-refresh-sector')) return;
+            if (e.target.closest('.js-sector-chart')) return;
             const slug = row.dataset.sector;
             if (!slug) return;
             const children = document.querySelectorAll('.industry-row--' + slug);
@@ -840,6 +841,128 @@
                 btn.disabled = false;
             }
         });
+    });
+}());
+
+// ------------------------------------------------------------------
+// Admin Sectors — history modal + Chart.js
+// ------------------------------------------------------------------
+
+(function () {
+    'use strict';
+
+    const chartBtns = document.querySelectorAll('.js-sector-chart');
+    if (!chartBtns.length) return;
+
+    const modal    = document.getElementById('sector-history-modal');
+    const titleEl  = document.getElementById('sector-history-title');
+    const emptyEl  = document.getElementById('sector-history-empty');
+    const canvas   = document.getElementById('sector-history-chart');
+    const closeBtn = document.getElementById('sector-history-close');
+
+    if (!modal || !canvas) return;
+
+    let activeChart = null;
+
+    function destroyChart() {
+        if (activeChart) { activeChart.destroy(); activeChart = null; }
+        const existing = Chart.getChart(canvas);
+        if (existing) existing.destroy();
+    }
+
+    function openModal(level, bucket) {
+        titleEl.textContent = 'Historia: ' + bucket;
+        emptyEl.hidden = true;
+        canvas.style.display = 'none';
+        modal.hidden = false;
+        destroyChart();
+
+        fetch('/admin/sectors/history?level=' + encodeURIComponent(level) + '&bucket_key=' + encodeURIComponent(bucket), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        })
+            .then(r => r.json())
+            .then(json => {
+                if (!json.ok || !json.data || !json.data.labels || json.data.labels.length === 0) {
+                    emptyEl.hidden = false;
+                    return;
+                }
+                const d = json.data;
+                canvas.style.display = 'block';
+                activeChart = new Chart(canvas, {
+                    type: 'line',
+                    data: {
+                        labels: d.labels,
+                        datasets: [
+                            {
+                                label: 'EV/FCF',
+                                data: d.ev_fcf,
+                                yAxisID: 'y',
+                                borderColor: 'rgba(64, 144, 224, 0.9)',
+                                backgroundColor: 'rgba(64, 144, 224, 0.1)',
+                                tension: 0.3,
+                                spanGaps: true,
+                            },
+                            {
+                                label: 'EV/Sales',
+                                data: d.ev_sales,
+                                yAxisID: 'y',
+                                borderColor: 'rgba(250, 204, 21, 0.9)',
+                                backgroundColor: 'rgba(250, 204, 21, 0.1)',
+                                tension: 0.3,
+                                spanGaps: true,
+                            },
+                            {
+                                label: 'GM%',
+                                data: d.gm,
+                                yAxisID: 'y1',
+                                borderColor: 'rgba(52, 211, 153, 0.9)',
+                                backgroundColor: 'rgba(52, 211, 153, 0.1)',
+                                tension: 0.3,
+                                spanGaps: true,
+                            },
+                        ],
+                    },
+                    options: {
+                        responsive: true,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: { legend: { display: true } },
+                        scales: {
+                            y: {
+                                position: 'left',
+                                title: { display: true, text: 'Mnożnik (×)' },
+                            },
+                            y1: {
+                                position: 'right',
+                                title: { display: true, text: 'GM%' },
+                                min: 0,
+                                max: 100,
+                                grid: { drawOnChartArea: false },
+                            },
+                        },
+                    },
+                });
+            })
+            .catch(() => { emptyEl.hidden = false; });
+    }
+
+    function closeModal() {
+        modal.hidden = true;
+        destroyChart();
+    }
+
+    chartBtns.forEach(btn => {
+        btn.addEventListener('click', e => {
+            e.stopPropagation();
+            const level  = btn.dataset.level;
+            const bucket = btn.dataset.bucket;
+            if (level && bucket) openModal(level, bucket);
+        });
+    });
+
+    closeBtn?.addEventListener('click', closeModal);
+
+    modal.addEventListener('click', e => {
+        if (e.target === modal) closeModal();
     });
 }());
 

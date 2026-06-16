@@ -262,6 +262,56 @@ class PeerMedianRepository
     }
 
     /**
+     * Fetch history snapshots for a given bucket and model version.
+     *
+     * Rows are grouped by calendar date (DATE(snapshotted_at)). When multiple
+     * refreshes occur on the same day, the last-seen value per metric wins
+     * (rows arrive ordered ASC so later overwrites earlier in the pivot).
+     *
+     * @return array{labels: list<string>, ev_fcf: list<float|null>, ev_sales: list<float|null>, gm: list<float|null>}
+     */
+    public function findHistory(string $level, string $bucketKey, string $modelVersion): array
+    {
+        $stmt = $this->db->prepare('
+            SELECT DATE(snapshotted_at) AS snap_date, metric_type, median_value
+            FROM   peer_medians_history
+            WHERE  level         = :level
+              AND  bucket_key    = :bucket_key
+              AND  model_version = :model_version
+            ORDER  BY snapshotted_at ASC
+        ');
+        $stmt->execute([
+            ':level'         => $level,
+            ':bucket_key'    => $bucketKey,
+            ':model_version' => $modelVersion,
+        ]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        // Pivot: collect all dates, map each metric — last value per day wins.
+        $byDate = [];
+        foreach ($rows as $row) {
+            $date   = (string) $row['snap_date'];
+            $metric = (string) $row['metric_type'];
+            if (!isset($byDate[$date])) {
+                $byDate[$date] = ['ev_fcf' => null, 'ev_sales' => null, 'gm' => null];
+            }
+            if (in_array($metric, ['ev_fcf', 'ev_sales', 'gm'], true)) {
+                $byDate[$date][$metric] = $row['median_value'] !== null ? (float) $row['median_value'] : null;
+            }
+        }
+
+        $result = ['labels' => [], 'ev_fcf' => [], 'ev_sales' => [], 'gm' => []];
+        foreach ($byDate as $date => $metrics) {
+            $result['labels'][]   = $date;
+            $result['ev_fcf'][]   = $metrics['ev_fcf'];
+            $result['ev_sales'][] = $metrics['ev_sales'];
+            $result['gm'][]       = $metrics['gm'];
+        }
+
+        return $result;
+    }
+
+    /**
      * Fetch all rows for a given model version (useful for diagnostics / reports).
      *
      * @return array<int, array<string, mixed>>

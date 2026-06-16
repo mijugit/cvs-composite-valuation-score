@@ -312,9 +312,9 @@ Brak danych historycznych. Dane zaczną się gromadzić od następnego odśwież
 
 #### Automated
 
-- [x] 1.1 Migracja 020 aplikuje się bez błędów
-- [x] 1.2 Testy przechodzą: vendor/bin/phpunit
-- [x] 1.3 PHPStan: vendor/bin/phpstan analyse (no errors)
+- [x] 1.1 Migracja 020 aplikuje się bez błędów — 595d9f6
+- [x] 1.2 Testy przechodzą: vendor/bin/phpunit — 595d9f6
+- [x] 1.3 PHPStan: vendor/bin/phpstan analyse (no errors) — 595d9f6
 
 #### Manual
 
@@ -326,9 +326,9 @@ Brak danych historycznych. Dane zaczną się gromadzić od następnego odśwież
 
 #### Automated
 
-- [ ] 2.1 Testy przechodzą: vendor/bin/phpunit
-- [ ] 2.2 PHPStan: vendor/bin/phpstan analyse (no errors)
-- [ ] 2.3 PHP lint szablonu: php -l templates/admin/sectors.php
+- [x] 2.1 Testy przechodzą: vendor/bin/phpunit
+- [x] 2.2 PHPStan: vendor/bin/phpstan analyse (no errors)
+- [x] 2.3 PHP lint szablonu: php -l templates/admin/sectors.php
 - [ ] 2.4 Endpoint GET /admin/sectors/history zwraca 200 z ok:true dla istniejącego sektora
 - [ ] 2.5 Endpoint zwraca 400 dla nieprawidłowego parametru level
 

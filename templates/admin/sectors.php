@@ -86,6 +86,10 @@ function fmt(?float $v): string {
                     data-sector="<?= htmlspecialchars($sectorName) ?>">
                 Odśwież
             </button>
+            <button class="btn btn--ghost btn--sm js-sector-chart"
+                    data-level="sector"
+                    data-bucket="<?= htmlspecialchars($sectorName) ?>"
+                    title="Historia median">📊</button>
         </td>
     </tr>
 
@@ -109,7 +113,12 @@ function fmt(?float $v): string {
         <td style="text-align:right;font-size:.8125rem;"><?= fmt($iStat['ev_fcf']  ?? null) ?></td>
         <td style="text-align:right;font-size:.8125rem;"><?= fmt($iStat['ev_sales'] ?? null) ?></td>
         <td style="text-align:right;font-size:.8125rem;"><?= fmt($iStat['gm']      ?? null) ?></td>
-        <td></td>
+        <td style="text-align:center;">
+            <button class="btn btn--ghost btn--sm js-sector-chart"
+                    data-level="industry"
+                    data-bucket="<?= htmlspecialchars((string)$industryName) ?>"
+                    title="Historia median">📊</button>
+        </td>
     </tr>
     <?php endforeach; ?>
 
@@ -119,3 +128,16 @@ function fmt(?float $v): string {
 </div>
 
 <div id="sectors-toast" class="sectors-toast" hidden></div>
+
+<div id="sector-history-modal" class="ai-modal" hidden>
+    <div class="ai-modal__inner" style="max-width:700px;text-align:left;width:calc(100% - 2rem);">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:1rem;">
+            <h3 id="sector-history-title" style="font-size:var(--text-lg);margin:0;">Historia: —</h3>
+            <button id="sector-history-close" class="btn btn--ghost btn--sm">✕</button>
+        </div>
+        <p id="sector-history-empty" style="color:var(--c-text-muted);text-align:center;padding:2rem 0;" hidden>
+            Brak danych historycznych. Dane zaczną się gromadzić od następnego odświeżenia.
+        </p>
+        <canvas id="sector-history-chart" style="display:none;"></canvas>
+    </div>
+</div>

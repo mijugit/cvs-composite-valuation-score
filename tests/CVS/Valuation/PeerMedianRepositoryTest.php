@@ -235,6 +235,48 @@ class PeerMedianRepositoryTest extends TestCase
         $this->assertSame(50, (int) $rows[0]['sample_count']);
     }
 
+    // ------------------------------------------------------------------
+    // findHistory — read-path for Chart.js modal
+    // ------------------------------------------------------------------
+
+    public function test_find_history_returns_empty_arrays_when_no_data(): void
+    {
+        $result = $this->repo->findHistory('sector', 'Technology', '3.0');
+
+        $this->assertSame([], $result['labels']);
+        $this->assertSame([], $result['ev_fcf']);
+        $this->assertSame([], $result['ev_sales']);
+        $this->assertSame([], $result['gm']);
+    }
+
+    public function test_find_history_returns_pivoted_data_for_all_three_metrics(): void
+    {
+        $this->repo->upsertMedian('sector', 'Technology', null, '3.0', 'ev_fcf',   32.0, 50);
+        $this->repo->upsertMedian('sector', 'Technology', null, '3.0', 'ev_sales',  8.0, 50);
+        $this->repo->upsertMedian('sector', 'Technology', null, '3.0', 'gm',       55.0, 50);
+
+        $result = $this->repo->findHistory('sector', 'Technology', '3.0');
+
+        $this->assertCount(1, $result['labels']);
+        $this->assertEqualsWithDelta(32.0, $result['ev_fcf'][0],   0.001);
+        $this->assertEqualsWithDelta(8.0,  $result['ev_sales'][0], 0.001);
+        $this->assertEqualsWithDelta(55.0, $result['gm'][0],       0.001);
+    }
+
+    public function test_find_history_isolates_by_level_and_bucket(): void
+    {
+        $this->repo->upsertMedian('sector',   'Technology',  null,         '3.0', 'ev_fcf', 32.0, 50);
+        $this->repo->upsertMedian('industry', 'Software',    'Technology', '3.0', 'ev_fcf', 40.0, 20);
+
+        $sector   = $this->repo->findHistory('sector',   'Technology', '3.0');
+        $industry = $this->repo->findHistory('industry', 'Software',   '3.0');
+
+        $this->assertCount(1, $sector['labels']);
+        $this->assertEqualsWithDelta(32.0, $sector['ev_fcf'][0],   0.001);
+        $this->assertCount(1, $industry['labels']);
+        $this->assertEqualsWithDelta(40.0, $industry['ev_fcf'][0], 0.001);
+    }
+
     public function test_repeated_upsert_appends_multiple_history_rows(): void
     {
         $this->repo->upsertMedian('sector', 'Technology', null, '3.0', 'ev_fcf', 32.0, 50);

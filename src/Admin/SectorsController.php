@@ -102,6 +102,29 @@ class SectorsController
         Response::json(['ok' => true, 'message' => "Odświeżanie $sector uruchomiono"]);
     }
 
+    public function history(Request $req): void
+    {
+        $this->requireAdmin();
+
+        $level        = (string) ($req->query('level') ?? '');
+        $bucketKey    = (string) ($req->query('bucket_key') ?? '');
+        $modelVersion = (string) ($this->config['model_version'] ?? '3.0');
+
+        if (!in_array($level, ['sector', 'industry'], true)) {
+            Response::json(['ok' => false, 'message' => 'Nieprawidłowy parametr level'], 400);
+            return;
+        }
+
+        if ($bucketKey === '' || strlen($bucketKey) > 150) {
+            Response::json(['ok' => false, 'message' => 'Nieprawidłowy parametr bucket_key'], 400);
+            return;
+        }
+
+        $data = $this->medians->findHistory($level, $bucketKey, $modelVersion);
+
+        Response::json(['ok' => true, 'data' => $data]);
+    }
+
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------

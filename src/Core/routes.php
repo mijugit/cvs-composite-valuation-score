@@ -95,6 +95,7 @@ $router->post('/admin/pro/activate-code', fn($req) => $pro->activateCode($req));
 // ------------------------------------------------------------------
 
 $router->get('/admin/sectors',          fn($req) => $sectors->index($req));
+$router->get('/admin/sectors/history',  fn($req) => $sectors->history($req));
 $router->post('/admin/sectors/refresh', fn($req) => $sectors->refresh($req));
 
 // ------------------------------------------------------------------
