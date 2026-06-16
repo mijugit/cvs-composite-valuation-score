@@ -318,26 +318,26 @@ Brak danych historycznych. Dane zaczną się gromadzić od następnego odśwież
 
 #### Manual
 
-- [ ] 1.4 POST /admin/sectors/refresh zapisuje wiersze w peer_medians_history
-- [ ] 1.5 Drugi refresh dopisuje nowe wiersze (append, nie nadpisanie)
-- [ ] 1.6 Panel /admin/sectors działa normalnie po migracji
+- [x] 1.4 POST /admin/sectors/refresh zapisuje wiersze w peer_medians_history — 595d9f6
+- [x] 1.5 Drugi refresh dopisuje nowe wiersze (append, nie nadpisanie) — 595d9f6
+- [x] 1.6 Panel /admin/sectors działa normalnie po migracji — 595d9f6
 
 ### Phase 2: Endpoint AJAX + modal z wykresem
 
 #### Automated
 
-- [x] 2.1 Testy przechodzą: vendor/bin/phpunit
-- [x] 2.2 PHPStan: vendor/bin/phpstan analyse (no errors)
-- [x] 2.3 PHP lint szablonu: php -l templates/admin/sectors.php
-- [ ] 2.4 Endpoint GET /admin/sectors/history zwraca 200 z ok:true dla istniejącego sektora
-- [ ] 2.5 Endpoint zwraca 400 dla nieprawidłowego parametru level
+- [x] 2.1 Testy przechodzą: vendor/bin/phpunit — fbc56cb
+- [x] 2.2 PHPStan: vendor/bin/phpstan analyse (no errors) — fbc56cb
+- [x] 2.3 PHP lint szablonu: php -l templates/admin/sectors.php — fbc56cb
+- [x] 2.4 Endpoint GET /admin/sectors/history zwraca 200 z ok:true dla istniejącego sektora — fbc56cb
+- [x] 2.5 Endpoint zwraca 400 dla nieprawidłowego parametru level — fbc56cb
 
 #### Manual
 
-- [ ] 2.6 Ikona wykresu widoczna przy każdym wierszu sektora
-- [ ] 2.7 Ikona wykresu widoczna przy rozwiniętych wierszach branży
-- [ ] 2.8 Modal otwiera się z tytułem i pustym komunikatem (brak historii)
-- [ ] 2.9 Po refresh: modal pokazuje wykres z punktem danych
-- [ ] 2.10 Zmiana sektora: poprzedni wykres zniszczony, brak błędów konsoli
-- [ ] 2.11 Backdrop click zamyka modal
-- [ ] 2.12 Trzy serie w legendzie, dual-axis Y poprawnie opisane
+- [x] 2.6 Ikona wykresu widoczna przy każdym wierszu sektora — fbc56cb
+- [x] 2.7 Ikona wykresu widoczna przy rozwiniętych wierszach branży — fbc56cb
+- [x] 2.8 Modal otwiera się z tytułem i pustym komunikatem (brak historii) — fbc56cb
+- [x] 2.9 Po refresh: modal pokazuje wykres z punktem danych — fbc56cb
+- [x] 2.10 Zmiana sektora: poprzedni wykres zniszczony, brak błędów konsoli — fbc56cb
+- [x] 2.11 Backdrop click zamyka modal — fbc56cb
+- [x] 2.12 Trzy serie w legendzie, dual-axis Y poprawnie opisane — fbc56cb
