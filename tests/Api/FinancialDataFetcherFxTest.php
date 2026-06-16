@@ -179,6 +179,7 @@ class FinancialDataFetcherFxTest extends TestCase
     }
 
     // ------------------------------------------------------------------
+    // ------------------------------------------------------------------
     // Regression: existing USD-only downstream code still works (fx=1.0)
     // ------------------------------------------------------------------
 
@@ -192,5 +193,140 @@ class FinancialDataFetcherFxTest extends TestCase
         $this->assertSame('Technology', $result['sector']);
         $this->assertSame('USD', $result['currency']);
         $this->assertSame('USD', $result['financial_currency']);
+        $this->assertSame(100.0, $result['native_price'], 'native_price == current_price for USD');
+    }
+
+    // ------------------------------------------------------------------
+    // 2.3 — EV/FCF invariant: same ratio regardless of currency (dimensionless)
+    // ------------------------------------------------------------------
+
+    public function testEvFcfRatioIsIdenticalInUsdAndNativeKrw(): void
+    {
+        // Simulate KRW ticker (price=79500 KRW, FCF=10_000_000_000 KRW, shares=1B)
+        $krwPrice  = 79500.0;
+        $krwFcf    = 10_000_000_000.0;
+        $krwDebt   = 5_000_000_000.0;
+        $krwCash   = 2_000_000_000.0;
+        $shares    = 1_000_000_000.0;
+        $fxRate    = 1.0 / 1350.0; // KRW→USD
+
+        $raw = array_merge($this->baseRaw('KRW', 'KRW'), [
+            'financialData' => [
+                'currentPrice'         => ['raw' => $krwPrice],
+                'financialCurrency'    => 'KRW',
+                'freeCashflow'         => ['raw' => $krwFcf],
+                'operatingCashflow'    => ['raw' => $krwFcf * 1.1], // capex < 70%
+                'totalDebt'            => ['raw' => $krwDebt],
+                'totalCash'            => ['raw' => $krwCash],
+                'ebitda'               => ['raw' => 8_000_000_000.0],
+                'grossMargins'         => ['raw' => 0.40],
+                'returnOnEquity'       => ['raw' => 0.15],
+                'revenueGrowth'        => ['raw' => 0.10],
+                'twoHundredDayAverage' => ['raw' => 78000.0],
+            ],
+            'defaultKeyStatistics' => [
+                'sharesOutstanding'            => ['raw' => $shares],
+                'priceToSalesTrailing12Months' => ['raw' => 1.5],
+                'enterpriseToEbitda'           => ['raw' => 6.0],
+            ],
+        ]);
+
+        $result = $this->callNormalise($this->fetcher(), $raw, $fxRate);
+        $this->assertNotNull($result);
+
+        // EV/FCF computed natively (in KRW)
+        $evNative  = $krwPrice * $shares + $krwDebt - $krwCash;
+        $evFcfNative = $evNative / $krwFcf;
+
+        // EV/FCF from converted USD fields
+        $priceUsd  = (float) $result['current_price'];
+        $fcfUsd    = (float) $result['free_cash_flow'];
+        $debtUsd   = (float) $result['total_debt'];
+        $cashUsd   = (float) $result['cash'];
+        $evUsd     = $priceUsd * $shares + $debtUsd - $cashUsd;
+        $evFcfUsd  = $evUsd / $fcfUsd;
+
+        $this->assertEqualsWithDelta($evFcfNative, $evFcfUsd, 0.001,
+            'EV/FCF must be identical in native KRW and USD (dimensionless)');
+
+        // Price and FCF must now be in USD, not KRW
+        $this->assertEqualsWithDelta($krwPrice * $fxRate,  $priceUsd, 1e-6, 'current_price converted to USD');
+        $this->assertEqualsWithDelta($krwFcf   * $fxRate,  $fcfUsd,   1e-2, 'free_cash_flow converted to USD');
+
+        // native_price must still be KRW
+        $this->assertEqualsWithDelta($krwPrice, (float) $result['native_price'], 1e-6, 'native_price is KRW');
+        $this->assertSame('KRW', $result['native_currency']);
+    }
+
+    // ------------------------------------------------------------------
+    // 2.4 — ADR: EV computed consistently in USD (no currency mixing)
+    // ------------------------------------------------------------------
+
+    public function testAdrTickerNoMixedCurrencyInEv(): void
+    {
+        // ADR: quote currency USD (TSM-style), financial currency TWD
+        $usdPrice  = 185.0;   // quoted in USD (already USD)
+        $twdFcf    = 600_000_000_000.0; // TWD
+        $twdDebt   = 100_000_000_000.0; // TWD
+        $twdCash   =  50_000_000_000.0; // TWD
+        $shares    = 5_000_000_000.0;   // ADR shares
+        $fxRateTwd = 1.0 / 32.0;        // TWD=X ≈ 32
+
+        $raw = [
+            'financialData' => [
+                'currentPrice'         => ['raw' => $usdPrice],
+                'financialCurrency'    => 'TWD',
+                'freeCashflow'         => ['raw' => $twdFcf],
+                'operatingCashflow'    => ['raw' => $twdFcf * 1.05],
+                'totalDebt'            => ['raw' => $twdDebt],
+                'totalCash'            => ['raw' => $twdCash],
+                'ebitda'               => ['raw' => 800_000_000_000.0],
+                'grossMargins'         => ['raw' => 0.55],
+                'returnOnEquity'       => ['raw' => 0.20],
+                'revenueGrowth'        => ['raw' => 0.12],
+                'twoHundredDayAverage' => ['raw' => 180.0],
+            ],
+            'summaryDetail' => [
+                'currency'        => 'USD', // ADR quoted in USD
+                'fiftyTwoWeekLow'  => ['raw' => 160.0],
+                'fiftyTwoWeekHigh' => ['raw' => 210.0],
+                'trailingPE'       => ['raw' => 25.0],
+            ],
+            'defaultKeyStatistics' => [
+                'sharesOutstanding'            => ['raw' => $shares],
+                'priceToSalesTrailing12Months' => ['raw' => 3.0],
+                'enterpriseToEbitda'           => ['raw' => 12.0],
+            ],
+            'assetProfile' => ['sector' => 'Technology', 'industry' => 'Semiconductors', 'country' => 'TW'],
+            'incomeStatementHistory' => ['incomeStatementHistory' => []],
+            'balanceSheetHistory'    => ['balanceSheetStatements' => []],
+        ];
+
+        $result = $this->callNormalise($this->fetcher(), $raw, $fxRateTwd);
+        $this->assertNotNull($result, 'ADR with valid TWD FX rate must not return null');
+
+        // Price must stay USD (fxP=1.0 for ADR)
+        $this->assertEqualsWithDelta($usdPrice, (float) $result['current_price'], 1e-6,
+            'ADR current_price must stay in USD (not re-converted)');
+
+        // Financials must be in USD
+        $expectedFcfUsd  = $twdFcf  * $fxRateTwd;
+        $expectedDebtUsd = $twdDebt * $fxRateTwd;
+        $expectedCashUsd = $twdCash * $fxRateTwd;
+
+        $this->assertEqualsWithDelta($expectedFcfUsd,  (float) $result['free_cash_flow'], 1e-2);
+        $this->assertEqualsWithDelta($expectedDebtUsd, (float) $result['total_debt'],     1e-2);
+        $this->assertEqualsWithDelta($expectedCashUsd, (float) $result['cash'],           1e-2);
+
+        // EV = USD_price * shares + USD_debt - USD_cash — no TWD in the mix
+        $evUsd = $usdPrice * $shares + $expectedDebtUsd - $expectedCashUsd;
+        $this->assertGreaterThan(0.0, $evUsd, 'EV must be positive and in USD');
+
+        // EV/FCF must be finite and reasonable (sanity: not mixing USD price with TWD financials)
+        $evFcfUsd = $evUsd / $expectedFcfUsd;
+        $this->assertGreaterThan(0.0, $evFcfUsd);
+        $this->assertLessThan(1000.0, $evFcfUsd, 'EV/FCF < 1000 confirms no currency mixing');
+
+        $this->assertSame('TWD', $result['native_currency']);
     }
 }

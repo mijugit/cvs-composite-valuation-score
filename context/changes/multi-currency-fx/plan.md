@@ -289,10 +289,10 @@ Jeden dodatkowy request chart per spółka nie-USD na pobranie kursu (cache per-
 ### Phase 1: FX rate fetch + determinism seam
 
 #### Automated
-- [x] 1.1 PHPStan level 6 — 0 błędów
-- [x] 1.2 Test: ticker USD → fx_rate_to_usd = 1.0, brak fetchu FX
-- [x] 1.3 Test: waluta obca z kursem → fx_rate_to_usd + native_currency ustawione
-- [x] 1.4 Test: nie-USD bez kursu → fetch/normalise zwraca null
+- [x] 1.1 PHPStan level 6 — 0 błędów — bd7ba33
+- [x] 1.2 Test: ticker USD → fx_rate_to_usd = 1.0, brak fetchu FX — bd7ba33
+- [x] 1.3 Test: waluta obca z kursem → fx_rate_to_usd + native_currency ustawione — bd7ba33
+- [x] 1.4 Test: nie-USD bez kursu → fetch/normalise zwraca null — bd7ba33
 
 #### Manual
 - [ ] 1.5 Dev: 000660.KS nie wywala się, kurs KRW pobrany
@@ -301,10 +301,10 @@ Jeden dodatkowy request chart per spółka nie-USD na pobranie kursu (cache per-
 ### Phase 2: Konwersja w normalise()
 
 #### Automated
-- [ ] 2.1 PHPStan level 6 — 0 błędów
-- [ ] 2.2 CVSModelTest zielony (US fixtures niezmienione)
-- [ ] 2.3 Test-inwariant: EV/FCF KRW == natywne; pola w USD
-- [ ] 2.4 Test ADR: EV spójnie w USD, brak miksu walut
+- [x] 2.1 PHPStan level 6 — 0 błędów
+- [x] 2.2 CVSModelTest zielony (US fixtures niezmienione)
+- [x] 2.3 Test-inwariant: EV/FCF KRW == natywne; pola w USD
+- [x] 2.4 Test ADR: EV spójnie w USD, brak miksu walut
 
 #### Manual
 - [ ] 2.5 000660.KS: CVS sensowny, surowe pola w USD

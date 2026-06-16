@@ -525,24 +525,63 @@ class FinancialDataFetcher
         $fcfEffective = $fcf;
 
         if ($fcf !== null && $opCf !== null && $opCf > 0) {
-            $capexRatio = ($opCf - $fcf) / $opCf;  // ≈ capex / opCf
+            $capexRatio = ($opCf - $fcf) / $opCf;  // ≈ capex / opCf (dimensionless)
             if ($capexRatio > 0.70) {
                 $fcfEffective = $opCf * 0.50;
                 $fcfAdjusted  = true;
             }
         }
 
+        // ------------------------------------------------------------------
+        // FX Conversion — bring all monetary fields to USD
+        // fxF: multiplier for financial statement fields (revenue, FCF, debt…)
+        // fxP: multiplier for price fields; for ADRs currency='USD' so fxP=1.0
+        //      (price is already USD, only financials need conversion).
+        // ------------------------------------------------------------------
+        $fxF = $fxRateToUsd ?? 1.0;
+        $fxP = (is_string($sd['currency'] ?? null) && ($sd['currency'] ?? '') === 'USD') ? 1.0 : $fxF;
+
+        /** Apply FX rate to a nullable float; preserves null when value is absent. */
+        $fxApply = static fn (?float $val, float $rate): ?float =>
+            $val !== null ? $val * $rate : null;
+
+        $nativePrice  = $currentPrice;        // preserve before conversion for dual-display
+        $currentPrice = $currentPrice * $fxP; // guaranteed non-null (checked above)
+
+        // Convert FCF intermediates before deriving forward_fcf_est.
+        $fcf          = $fxApply($fcf,          $fxF);
+        $opCf         = $fxApply($opCf,         $fxF);
+        $fcfEffective = $fxApply($fcfEffective, $fxF);
+
+        // Convert EPS to USD so forward_fcf_est is derived from consistent USD inputs.
+        $forwardEps  = $fxApply($v($ks['forwardEps']  ?? []), $fxF);
+        $trailingEps = $fxApply($v($ks['trailingEps'] ?? []), $fxF);
+
+        // forward_fcf_est: forward_eps × (fcfEffective / trailing_eps).
+        // The ratio fcfEffective/trailingEps is dimensionless; multiplied by forwardEps_USD
+        // yields forward_fcf_est_USD. Do NOT convert again (FR-011 double-conversion guard).
+        $forwardFcfEst = (static function () use ($fcfEffective, $forwardEps, $trailingEps): ?float {
+            if ($fcfEffective === null || $fcfEffective <= 0.0) return null;
+            if ($forwardEps   === null)                         return null;
+            if ($trailingEps  === null || $trailingEps <= 0.0) return null;
+            return $forwardEps * ($fcfEffective / $trailingEps);
+        })();
+
+        // Revenue history: convert each entry to USD.
+        $revenueHistory = array_map(static fn (float $r): float => $r * $fxF, $revenueHistory);
+        // gross_margin_history: already dimensionless (grossProfit/revenue) — no conversion.
+
         return [
             // Company metadata
             'sector'                     => is_string($ap['sector'] ?? null) ? $ap['sector'] : null,
 
-            // Currency — quote currency and financial currency (may differ for ADRs).
-            // native_currency / fx_rate_to_usd are set here for presentation and audit;
-            // Phase 2 will apply the conversion to all monetary fields.
+            // Currency — quote and financial currency (may differ for ADRs).
+            // native_price / native_currency / fx_rate_to_usd enable dual-display.
             'currency'           => is_string($sd['currency']  ?? null) ? $sd['currency']  : null,
             'financial_currency' => $financialCurrency,
             'native_currency'    => $financialCurrency,
-            'fx_rate_to_usd'     => $fxRateToUsd ?? 1.0,
+            'native_price'       => $nativePrice,
+            'fx_rate_to_usd'     => $fxF,
 
             // Company profile (assetProfile — already fetched, zero extra cost)
             'long_name'        => is_string($ap['longName']             ?? null) ? $ap['longName']             : null,
@@ -552,65 +591,53 @@ class FinancialDataFetcher
             'employees'        => isset($ap['fullTimeEmployees']) ? (int) $ap['fullTimeEmployees'] : null,
             'long_description' => is_string($ap['longBusinessSummary']  ?? null) ? $ap['longBusinessSummary']  : null,
 
-            // Pricing
+            // Pricing — all in USD (ADR: price already USD, fxP=1.0)
             'current_price'              => $currentPrice,
-            'fifty_two_week_low'         => $v($sd['fiftyTwoWeekLow']  ?? []),
-            'fifty_two_week_high'        => $v($sd['fiftyTwoWeekHigh'] ?? []),
-            'moving_average_200'         => $v($fin['twoHundredDayAverage'] ?? []),
+            'fifty_two_week_low'         => $fxApply($v($sd['fiftyTwoWeekLow']  ?? []), $fxP),
+            'fifty_two_week_high'        => $fxApply($v($sd['fiftyTwoWeekHigh'] ?? []), $fxP),
+            'moving_average_200'         => $fxApply($v($fin['twoHundredDayAverage'] ?? []), $fxP),
 
-            // Income statement
-            'revenue'                    => $v($latestIs['totalRevenue'] ?? []),
-            'gross_profit'               => $v($latestIs['grossProfit']  ?? []),
-            'ebitda'                     => $v($fin['ebitda'] ?? []),
+            // Income statement — all in USD
+            'revenue'                    => $fxApply($v($latestIs['totalRevenue'] ?? []), $fxF),
+            'gross_profit'               => $fxApply($v($latestIs['grossProfit']  ?? []), $fxF),
+            'ebitda'                     => $fxApply($v($fin['ebitda'] ?? []), $fxF),
             'revenue_history'            => $revenueHistory,
-            'gross_margin_history'       => $grossMarginHistory,
+            'gross_margin_history'       => $grossMarginHistory, // ratios — no conversion
 
-            // Balance sheet
-            'total_debt'                 => $v($fin['totalDebt']          ?? []),
-            'total_equity'               => $v($latestBs['totalStockholderEquity'] ?? []),
-            'cash'                       => $v($fin['totalCash']           ?? []),
-            'current_assets'             => $v($latestBs['totalCurrentAssets']      ?? []),
-            'current_liabilities'        => $v($latestBs['totalCurrentLiabilities'] ?? []),
+            // Balance sheet — all in USD
+            'total_debt'                 => $fxApply($v($fin['totalDebt']          ?? []), $fxF),
+            'total_equity'               => $fxApply($v($latestBs['totalStockholderEquity'] ?? []), $fxF),
+            'cash'                       => $fxApply($v($fin['totalCash']           ?? []), $fxF),
+            'current_assets'             => $fxApply($v($latestBs['totalCurrentAssets']      ?? []), $fxF),
+            'current_liabilities'        => $fxApply($v($latestBs['totalCurrentLiabilities'] ?? []), $fxF),
 
-            // Cash flow — with capex-heavy company fallback (S-05)
+            // Cash flow — with capex-heavy company fallback (S-05), all in USD.
             // If capex absorbs > 70 % of OpCF, use OpCF × 0.5 as a proxy FCF.
-            // This prevents XOM-style companies from scoring 0 on valuation
-            // when their reported FCF is artificially low due to heavy investment.
             'free_cash_flow'             => $fcfEffective,
             'free_cash_flow_raw'         => $fcf,
             'free_cash_flow_adjusted'    => $fcfAdjusted,
             'operating_cash_flow'        => $opCf,
 
-            // FCF normalization estimate (FR-011) — computed unconditionally when inputs are
-            // available; ValuationPillar decides whether to use it (bounds + feature flag).
-            // Derives analyst-forward FCF: forward_eps × (fcfEffective / trailing_eps).
-            // Uses $fcfEffective (capex-adjusted) for denominator parity with free_cash_flow.
-            'forward_fcf_est' => (static function () use ($fcfEffective, $ks, $v): ?float {
-                if ($fcfEffective === null || $fcfEffective <= 0.0) return null;
-                $forwardEps  = $v($ks['forwardEps']  ?? []);
-                $trailingEps = $v($ks['trailingEps'] ?? []);
-                if ($forwardEps === null) return null;
-                if ($trailingEps === null || $trailingEps <= 0.0) return null;
-                return $forwardEps * ($fcfEffective / $trailingEps);
-            })(),
+            // FCF normalisation estimate (FR-011) — pre-computed from USD inputs above.
+            'forward_fcf_est'            => $forwardFcfEst,
 
-            // Quality ratios
+            // Quality ratios (dimensionless — no conversion)
             'return_on_equity'           => $v($fin['returnOnEquity'] ?? []),
 
-            // Valuation multiples (company-level)
+            // Valuation multiples (dimensionless — no conversion)
             'pe_ratio'                   => $v($sd['trailingPE']    ?? []),
             'ps_ratio'                   => $v($ks['priceToSalesTrailing12Months'] ?? []),
             'ev_ebitda'                  => $v($ks['enterpriseToEbitda'] ?? []),
 
-            // EV / Sector fields (for SectorBenchmarkPillar)
+            // EV / Sector fields
             'shares_outstanding'         => $v($ks['sharesOutstanding']         ?? []),
-            'gross_margins'              => $v($fin['grossMargins']              ?? []),
-            'forward_eps'                => $v($ks['forwardEps']                 ?? []),
-            'trailing_eps'               => $v($ks['trailingEps']                ?? []),
-            'revenue_growth'             => $v($fin['revenueGrowth']             ?? []),
-            'earnings_quarterly_growth'  => $v($ks['earningsQuarterlyGrowth']   ?? []),
+            'gross_margins'              => $v($fin['grossMargins']              ?? []), // ratio
+            'forward_eps'                => $forwardEps,    // USD
+            'trailing_eps'               => $trailingEps,   // USD
+            'revenue_growth'             => $v($fin['revenueGrowth']             ?? []), // ratio
+            'earnings_quarterly_growth'  => $v($ks['earningsQuarterlyGrowth']   ?? []), // ratio
 
-            // Price history (for MomentumPillar)
+            // Price history (for MomentumPillar — base-100 index, dimensionless)
             'monthly_closes'             => $closes,
             'spy_closes'                 => $spyCloses,
 
