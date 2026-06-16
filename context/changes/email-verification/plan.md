@@ -496,15 +496,15 @@ $emailVerified = $userRepo->isEmailVerified($userId);
 ### Phase 5: Szablony, trasy, dashboard baner
 
 #### Automated
-- [x] 5.1 `templates/auth/check-email.php` istnieje
-- [x] 5.2 `templates/auth/verify-error.php` istnieje
-- [x] 5.3 3 trasy dodane w `routes.php` (GET check-email, POST resend, GET verify)
-- [x] 5.4 `dashboard()` zwraca `$emailVerified` do szablonu
-- [x] 5.5 `composer stan` — 0 błędów
-- [x] 5.6 `php -l` na nowych szablonach — 0 błędów
+- [x] 5.1 `templates/auth/check-email.php` istnieje — ffefe2e
+- [x] 5.2 `templates/auth/verify-error.php` istnieje — ffefe2e
+- [x] 5.3 3 trasy dodane w `routes.php` (GET check-email, POST resend, GET verify) — ffefe2e
+- [x] 5.4 `dashboard()` zwraca `$emailVerified` do szablonu — ffefe2e
+- [x] 5.5 `composer stan` — 0 błędów — ffefe2e
+- [x] 5.6 `php -l` na nowych szablonach — 0 błędów — ffefe2e
 
 #### Manual
-- [x] 5.7 GET `/auth/check-email` renderuje się poprawnie
-- [x] 5.8 "Wyślij link ponownie" → flash "Nowy link wysłany" na check-email
-- [x] 5.9 GET `/auth/verify?token=WYGASLY` → strona verify-error
-- [x] 5.10 Dashboard: baner dla NULL, brak banera dla zweryfikowanego
+- [x] 5.7 GET `/auth/check-email` renderuje się poprawnie — ffefe2e
+- [x] 5.8 "Wyślij link ponownie" → flash "Nowy link wysłany" na check-email — ffefe2e
+- [x] 5.9 GET `/auth/verify?token=WYGASLY` → strona verify-error — ffefe2e
+- [x] 5.10 Dashboard: baner dla NULL, brak banera dla zweryfikowanego — ffefe2e
