@@ -455,32 +455,32 @@ $emailVerified = $userRepo->isEmailVerified($userId);
 ### Phase 2: UserRepository — metody weryfikacyjne
 
 #### Automated
-- [x] 2.1 `setVerifyToken()` dodana
-- [x] 2.2 `findByVerifyToken()` dodana
-- [x] 2.3 `setEmailVerified()` dodana
-- [x] 2.4 `isEmailVerified()` dodana
-- [x] 2.5 `composer stan` — 0 błędów
+- [x] 2.1 `setVerifyToken()` dodana — 75bf781
+- [x] 2.2 `findByVerifyToken()` dodana — 75bf781
+- [x] 2.3 `setEmailVerified()` dodana — 75bf781
+- [x] 2.4 `isEmailVerified()` dodana — 75bf781
+- [x] 2.5 `composer stan` — 0 błędów — 75bf781
 
 #### Manual
-- [x] 2.6 (testowanie przez integrację w fazie 3)
+- [x] 2.6 (testowanie przez integrację w fazie 3) — 75bf781
 
 ### Phase 3: AuthController — przepływ weryfikacji
 
 #### Automated
-- [ ] 3.1 `MailService $mail` property + `use CVS\Mail\MailService` dodane
-- [ ] 3.2 `register()` generuje token + wysyła email + redirect check-email (brak logowania)
-- [ ] 3.3 `login()` blokuje niezweryfikowanych → resend + redirect check-email
-- [ ] 3.4 `showCheckEmail()` dodana
-- [ ] 3.5 `resendVerification()` dodana
-- [ ] 3.6 `verify()` dodana — sukces: sesja + redirect dashboard z flash
-- [ ] 3.7 `buildVerificationHtml()` dodana (private)
-- [ ] 3.8 `composer stan` — 0 błędów
+- [x] 3.1 `MailService $mail` property + `use CVS\Mail\MailService` dodane
+- [x] 3.2 `register()` generuje token + wysyła email + redirect check-email (brak logowania)
+- [x] 3.3 `login()` blokuje niezweryfikowanych → resend + redirect check-email
+- [x] 3.4 `showCheckEmail()` dodana
+- [x] 3.5 `resendVerification()` dodana
+- [x] 3.6 `verify()` dodana — sukces: sesja + redirect dashboard z flash
+- [x] 3.7 `buildVerificationHtml()` dodana (private)
+- [x] 3.8 `composer stan` — 0 błędów
 
 #### Manual
-- [ ] 3.9 Rejestracja → brak sesji, redirect check-email, email dociera
-- [ ] 3.10 Kliknięcie linku → zalogowany, flash, dashboard
-- [ ] 3.11 Logowanie na niezweryfikowane → redirect check-email z nowym mailem
-- [ ] 3.12 Wygasły link → strona verify-error
+- [x] 3.9 Rejestracja → brak sesji, redirect check-email, email dociera
+- [x] 3.10 Kliknięcie linku → zalogowany, flash, dashboard
+- [x] 3.11 Logowanie na niezweryfikowane → redirect check-email z nowym mailem
+- [x] 3.12 Wygasły link → strona verify-error
 
 ### Phase 4: AlertController — gate weryfikacji
 
