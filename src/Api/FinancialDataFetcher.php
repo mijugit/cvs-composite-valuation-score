@@ -96,6 +96,21 @@ class FinancialDataFetcher
             return null;
         }
 
+        // Determine financial currency early so we can fetch FX rate before
+        // making the more expensive chart/spy calls (skip fast if unavailable).
+        $financialCurrency = is_string($raw['financialData']['financialCurrency'] ?? null)
+            ? (string) $raw['financialData']['financialCurrency']
+            : 'USD';
+
+        // FR-015 determinism seam: FX rate fetched ONCE in fetch(), injected
+        // into normalise() — never computed inside scoring layers.
+        $fxRateToUsd = $this->fetchFxRateToUsd($financialCurrency);
+
+        // Skip non-USD tickers when FX rate is unavailable (no Yahoo {CCY}=X data).
+        if ($financialCurrency !== 'USD' && $fxRateToUsd === null) {
+            return null;
+        }
+
         $closes    = $this->fetchChartData($ticker, '3y');
         $spyCloses = $this->fetchSpyCloses();
 
@@ -105,7 +120,7 @@ class FinancialDataFetcher
         // inside the parsing/scoring layers — keeps them pure and offline-testable.
         $referenceDate = new DateTimeImmutable();
 
-        $normalised = $this->normalise($raw, $closes, $spyCloses, $referenceDate);
+        $normalised = $this->normalise($raw, $closes, $spyCloses, $referenceDate, $fxRateToUsd);
 
         if ($normalised === null) {
             return null;
@@ -274,6 +289,85 @@ class FinancialDataFetcher
         return $closes;
     }
 
+    /**
+     * Fetch the multiplicative FX rate so that: usd = native × fx_rate_to_usd.
+     *
+     * Uses Yahoo Finance chart endpoint for {CCY}=X (e.g. KRW=X), which returns
+     * how many CCY units per 1 USD.  The stored factor is the reciprocal (1 / close).
+     *
+     * USD → 1.0 immediately (no network call).
+     * Non-USD with no Yahoo data → null (caller must skip the ticker).
+     *
+     * Cached per-currency in session under cvs_fx_{CCY}.
+     */
+    private function fetchFxRateToUsd(string $financialCurrency): ?float
+    {
+        if ($financialCurrency === 'USD') {
+            return 1.0;
+        }
+
+        $cacheKey = 'cvs_fx_' . $financialCurrency;
+        $ttl      = (int) ($this->config['cache_ttl'] ?? 3600);
+
+        if (isset($_SESSION[$cacheKey], $_SESSION[$cacheKey . '_ts'])) {
+            if (time() - $_SESSION[$cacheKey . '_ts'] < $ttl) {
+                $cached = $_SESSION[$cacheKey];
+                return is_float($cached) ? $cached : null;
+            }
+        }
+
+        $auth   = $this->getCrumbAndCookie();
+        $fxTicker = $financialCurrency . '=X';
+        $url    = self::CHART_URL . urlencode($fxTicker)
+                . '?interval=1d&range=5d'
+                . '&crumb=' . urlencode($auth['crumb']);
+
+        $result = $this->curlGetWithHeaders($url, $auth['cookie'], []);
+        $body   = $result['body'] ?? null;
+
+        if ($body === null) {
+            return null;
+        }
+
+        try {
+            $decoded = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return null;
+        }
+
+        $chartResult = $decoded['chart']['result'][0] ?? null;
+        if (!is_array($chartResult)) {
+            return null;
+        }
+
+        $closes = $chartResult['indicators']['quote'][0]['close'] ?? [];
+        if (!is_array($closes)) {
+            return null;
+        }
+
+        // Take the last non-null close (most recent trading session).
+        $lastClose = null;
+        foreach (array_reverse($closes) as $c) {
+            if ($c !== null) {
+                $lastClose = (float) $c;
+                break;
+            }
+        }
+
+        if ($lastClose === null || $lastClose <= 0.0) {
+            return null;
+        }
+
+        // {CCY}=X gives CCY per 1 USD, so to get USD: usd = native / close.
+        // Store as multiplicative factor: usd = native * fx_rate_to_usd.
+        $fxRate = 1.0 / $lastClose;
+
+        $_SESSION[$cacheKey]         = $fxRate;
+        $_SESSION[$cacheKey . '_ts'] = time();
+
+        return $fxRate;
+    }
+
     // ------------------------------------------------------------------
     // HTTP helpers
     // ------------------------------------------------------------------
@@ -343,15 +437,17 @@ class FinancialDataFetcher
      * Map the raw Yahoo Finance response to the flat structure expected
      * by QualityGate and the four pillars.
      *
-     * Returns null if critical fields are absent.
+     * Returns null if critical fields are absent or FX rate is unavailable for
+     * a non-USD ticker.
      *
      * @param array<string, mixed> $raw
-     * @param float[]              $closes     Monthly closes for the ticker (oldest first)
-     * @param float[]              $spyCloses  Monthly SPY closes (oldest first)
-     * @param  DateTimeImmutable $referenceDate  Fetch-time "now", injected (Phase 5 slice 2 — determinism seam)
+     * @param float[]              $closes         Monthly closes for the ticker (oldest first)
+     * @param float[]              $spyCloses       Monthly SPY closes (oldest first)
+     * @param DateTimeImmutable    $referenceDate   Fetch-time "now", injected (FR-015 determinism seam)
+     * @param float|null           $fxRateToUsd     Multiplicative factor: usd = native × rate; null = unavailable
      * @return array<string, mixed>|null
      */
-    private function normalise(array $raw, array $closes, array $spyCloses, DateTimeImmutable $referenceDate): ?array
+    private function normalise(array $raw, array $closes, array $spyCloses, DateTimeImmutable $referenceDate, ?float $fxRateToUsd = null): ?array
     {
         $ap   = $raw['assetProfile']            ?? [];
         $fin  = $raw['financialData']           ?? [];
@@ -363,6 +459,13 @@ class FinancialDataFetcher
         // Helper: extract raw value from Yahoo's {"raw": x, "fmt": "y"} objects.
         $v = static fn($obj): ?float =>
             isset($obj['raw']) ? (float) $obj['raw'] : null;
+
+        $financialCurrency = is_string($fin['financialCurrency'] ?? null) ? (string) $fin['financialCurrency'] : 'USD';
+
+        // Safety net: skip non-USD tickers with no FX rate (primary check is in fetch()).
+        if ($financialCurrency !== 'USD' && $fxRateToUsd === null) {
+            return null;
+        }
 
         $currentPrice = $v($fin['currentPrice'] ?? []);
 
@@ -433,9 +536,13 @@ class FinancialDataFetcher
             // Company metadata
             'sector'                     => is_string($ap['sector'] ?? null) ? $ap['sector'] : null,
 
-            // Currency — needed for fair-value guard (financial_currency may differ from quote currency)
+            // Currency — quote currency and financial currency (may differ for ADRs).
+            // native_currency / fx_rate_to_usd are set here for presentation and audit;
+            // Phase 2 will apply the conversion to all monetary fields.
             'currency'           => is_string($sd['currency']  ?? null) ? $sd['currency']  : null,
-            'financial_currency' => is_string($fin['financialCurrency'] ?? null) ? $fin['financialCurrency'] : null,
+            'financial_currency' => $financialCurrency,
+            'native_currency'    => $financialCurrency,
+            'fx_rate_to_usd'     => $fxRateToUsd ?? 1.0,
 
             // Company profile (assetProfile — already fetched, zero extra cost)
             'long_name'        => is_string($ap['longName']             ?? null) ? $ap['longName']             : null,
