@@ -862,6 +862,7 @@
 
     if (!modal || !canvas) return;
 
+    const historyBase = modal.dataset.historyBase || '/admin/sectors/history';
     let activeChart = null;
 
     function destroyChart() {
@@ -877,7 +878,7 @@
         modal.hidden = false;
         destroyChart();
 
-        fetch('/admin/sectors/history?level=' + encodeURIComponent(level) + '&bucket_key=' + encodeURIComponent(bucket), {
+        fetch(historyBase + '?level=' + encodeURIComponent(level) + '&bucket_key=' + encodeURIComponent(bucket), {
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
         })
             .then(r => r.json())

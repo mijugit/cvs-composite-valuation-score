@@ -82,10 +82,12 @@ function fmt(?float $v): string {
         <td style="text-align:right;"><?= $indexed ? fmt($stat['ev_sales']) : '—' ?></td>
         <td style="text-align:right;"><?= $indexed ? fmt($stat['gm'])      : '—' ?></td>
         <td style="text-align:center;">
+            <?php if ($isAdmin ?? true): ?>
             <button class="btn btn--ghost btn--sm js-refresh-sector"
                     data-sector="<?= htmlspecialchars($sectorName) ?>">
                 Odśwież
             </button>
+            <?php endif; ?>
             <button class="btn btn--ghost btn--sm js-sector-chart"
                     data-level="sector"
                     data-bucket="<?= htmlspecialchars($sectorName) ?>"
@@ -129,7 +131,8 @@ function fmt(?float $v): string {
 
 <div id="sectors-toast" class="sectors-toast" hidden></div>
 
-<div id="sector-history-modal" class="ai-modal" hidden>
+<div id="sector-history-modal" class="ai-modal" hidden
+     data-history-base="<?= htmlspecialchars($historyEndpoint ?? '/admin/sectors/history') ?>">
     <div class="ai-modal__inner" style="max-width:700px;text-align:left;width:calc(100% - 2rem);">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:1rem;">
             <h3 id="sector-history-title" style="font-size:var(--text-lg);margin:0;">Historia: —</h3>

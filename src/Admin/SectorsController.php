@@ -4,17 +4,21 @@ declare(strict_types=1);
 
 namespace CVS\Admin;
 
+use CVS\Auth\AuthController;
 use CVS\Auth\UserRepository;
 use CVS\Core\Request;
 use CVS\Core\Response;
 use CVS\CVS\Valuation\PeerMedianRepository;
 
 /**
- * Admin panel: sector peer-median indexing status and manual refresh trigger.
+ * Sector peer-median indexing status, history charts, and manual refresh.
  *
  * Routes:
- *   GET  /admin/sectors         — sector table view
- *   POST /admin/sectors/refresh — fire-and-forget exec() trigger (AJAX)
+ *   GET  /sectors               — public view (auth-only, no refresh button)
+ *   GET  /sectors/history       — history JSON (auth-only)
+ *   GET  /admin/sectors         — admin view (with refresh button)
+ *   GET  /admin/sectors/history — history JSON (admin-only)
+ *   POST /admin/sectors/refresh — fire-and-forget exec() trigger (admin AJAX)
  */
 class SectorsController
 {
@@ -33,34 +37,13 @@ class SectorsController
     public function index(Request $req): void
     {
         $this->requireAdmin();
+        $this->renderSectors(true);
+    }
 
-        $schedule     = $this->config['batch_schedule'] ?? [];
-        $modelVersion = (string) ($this->config['model_version'] ?? '3.0');
-
-        // Build canonical sector list from batch_schedule (days 1–5 only).
-        $allSectors = array_values(array_unique(array_merge(
-            ...array_values(array_filter($schedule, static fn($s) => !empty($s)))
-        )));
-        sort($allSectors);
-
-        // Day-of-week labels per sector (for tooltip).
-        $dayNames = [1 => 'Pon', 2 => 'Wt', 3 => 'Śr', 4 => 'Czw', 5 => 'Pt'];
-        $sectorDay = [];
-        foreach ($schedule as $day => $sectors) {
-            foreach ($sectors as $sector) {
-                $sectorDay[$sector] = $dayNames[$day] ?? '?';
-            }
-        }
-
-        $stats = $this->medians->findSectorStats($modelVersion);
-
-        Response::view('admin/sectors', [
-            'allSectors'   => $allSectors,
-            'sectorDay'    => $sectorDay,
-            'sectorStats'  => $stats['sector'],
-            'industryStats' => $stats['industry'],
-            'modelVersion' => $modelVersion,
-        ]);
+    public function publicIndex(Request $req): void
+    {
+        AuthController::requireAuth();
+        $this->renderSectors(false);
     }
 
     public function refresh(Request $req): void
@@ -105,7 +88,54 @@ class SectorsController
     public function history(Request $req): void
     {
         $this->requireAdmin();
+        $this->renderHistory($req);
+    }
 
+    public function publicHistory(Request $req): void
+    {
+        AuthController::requireAuth();
+        $this->renderHistory($req);
+    }
+
+    // ------------------------------------------------------------------
+    // Helpers
+    // ------------------------------------------------------------------
+
+    private function renderSectors(bool $isAdmin): void
+    {
+        $schedule     = $this->config['batch_schedule'] ?? [];
+        $modelVersion = (string) ($this->config['model_version'] ?? '3.0');
+
+        // Build canonical sector list from batch_schedule (days 1–5 only).
+        $allSectors = array_values(array_unique(array_merge(
+            ...array_values(array_filter($schedule, static fn($s) => !empty($s)))
+        )));
+        sort($allSectors);
+
+        // Day-of-week labels per sector (for tooltip).
+        $dayNames  = [1 => 'Pon', 2 => 'Wt', 3 => 'Śr', 4 => 'Czw', 5 => 'Pt'];
+        $sectorDay = [];
+        foreach ($schedule as $day => $sectors) {
+            foreach ($sectors as $sector) {
+                $sectorDay[$sector] = $dayNames[$day] ?? '?';
+            }
+        }
+
+        $stats = $this->medians->findSectorStats($modelVersion);
+
+        Response::view('admin/sectors', [
+            'allSectors'      => $allSectors,
+            'sectorDay'       => $sectorDay,
+            'sectorStats'     => $stats['sector'],
+            'industryStats'   => $stats['industry'],
+            'modelVersion'    => $modelVersion,
+            'isAdmin'         => $isAdmin,
+            'historyEndpoint' => $isAdmin ? '/admin/sectors/history' : '/sectors/history',
+        ]);
+    }
+
+    private function renderHistory(Request $req): void
+    {
         $level        = (string) ($req->query('level') ?? '');
         $bucketKey    = (string) ($req->query('bucket_key') ?? '');
         $modelVersion = (string) ($this->config['model_version'] ?? '3.0');
@@ -121,13 +151,8 @@ class SectorsController
         }
 
         $data = $this->medians->findHistory($level, $bucketKey, $modelVersion);
-
         Response::json(['ok' => true, 'data' => $data]);
     }
-
-    // ------------------------------------------------------------------
-    // Helpers
-    // ------------------------------------------------------------------
 
     private function requireAdmin(): void
     {

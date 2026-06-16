@@ -37,6 +37,9 @@ $asset = static function (string $path): string {
             <a href="/screener">Screener</a>
             <a href="/track-record">Track Record</a>
             <a href="/model">Model</a>
+            <?php if (empty($_SESSION['is_admin'])): ?>
+            <a href="/sectors">Sektory</a>
+            <?php endif; ?>
             <?php if (!empty($_SESSION['is_admin'])): ?>
             <div class="admin-menu">
                 <button class="admin-menu__trigger" type="button" aria-haspopup="true">
