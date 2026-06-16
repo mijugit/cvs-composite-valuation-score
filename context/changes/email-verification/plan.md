@@ -467,31 +467,31 @@ $emailVerified = $userRepo->isEmailVerified($userId);
 ### Phase 3: AuthController — przepływ weryfikacji
 
 #### Automated
-- [x] 3.1 `MailService $mail` property + `use CVS\Mail\MailService` dodane
-- [x] 3.2 `register()` generuje token + wysyła email + redirect check-email (brak logowania)
-- [x] 3.3 `login()` blokuje niezweryfikowanych → resend + redirect check-email
-- [x] 3.4 `showCheckEmail()` dodana
-- [x] 3.5 `resendVerification()` dodana
-- [x] 3.6 `verify()` dodana — sukces: sesja + redirect dashboard z flash
-- [x] 3.7 `buildVerificationHtml()` dodana (private)
-- [x] 3.8 `composer stan` — 0 błędów
+- [x] 3.1 `MailService $mail` property + `use CVS\Mail\MailService` dodane — 9e90f9b
+- [x] 3.2 `register()` generuje token + wysyła email + redirect check-email (brak logowania) — 9e90f9b
+- [x] 3.3 `login()` blokuje niezweryfikowanych → resend + redirect check-email — 9e90f9b
+- [x] 3.4 `showCheckEmail()` dodana — 9e90f9b
+- [x] 3.5 `resendVerification()` dodana — 9e90f9b
+- [x] 3.6 `verify()` dodana — sukces: sesja + redirect dashboard z flash — 9e90f9b
+- [x] 3.7 `buildVerificationHtml()` dodana (private) — 9e90f9b
+- [x] 3.8 `composer stan` — 0 błędów — 9e90f9b
 
 #### Manual
-- [x] 3.9 Rejestracja → brak sesji, redirect check-email, email dociera
-- [x] 3.10 Kliknięcie linku → zalogowany, flash, dashboard
-- [x] 3.11 Logowanie na niezweryfikowane → redirect check-email z nowym mailem
-- [x] 3.12 Wygasły link → strona verify-error
+- [x] 3.9 Rejestracja → brak sesji, redirect check-email, email dociera — 9e90f9b
+- [x] 3.10 Kliknięcie linku → zalogowany, flash, dashboard — 9e90f9b
+- [x] 3.11 Logowanie na niezweryfikowane → redirect check-email z nowym mailem — 9e90f9b
+- [x] 3.12 Wygasły link → strona verify-error — 9e90f9b
 
 ### Phase 4: AlertController — gate weryfikacji
 
 #### Automated
-- [ ] 4.1 Gate `isEmailVerified` w `toggleGlobal()` dodany (blokuje `$new === true`)
-- [ ] 4.2 Obsługa `needs_verification` w JS dashboardu (inline message)
-- [ ] 4.3 `composer stan` — 0 błędów
+- [x] 4.1 Gate `isEmailVerified` w `toggleGlobal()` dodany (blokuje `$new === true`)
+- [x] 4.2 Obsługa `needs_verification` w JS dashboardu (inline message)
+- [x] 4.3 `composer stan` — 0 błędów
 
 #### Manual
-- [ ] 4.4 Konto z NULL `email_verified_at`: toggle 🔕→🔔 zablokowany, pojawia się komunikat
-- [ ] 4.5 Konto zweryfikowane: toggle działa normalnie
+- [x] 4.4 Konto z NULL `email_verified_at`: toggle 🔕→🔔 zablokowany, pojawia się komunikat
+- [x] 4.5 Konto zweryfikowane: toggle działa normalnie
 
 ### Phase 5: Szablony, trasy, dashboard baner
 

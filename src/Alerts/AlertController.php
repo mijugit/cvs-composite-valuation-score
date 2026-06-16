@@ -38,6 +38,16 @@ class AlertController
         $userId  = (int) $_SESSION['user_id'];
         $current = $this->repo->isGlobalEnabled($userId);
         $new     = !$current;
+
+        if ($new === true && !$this->users->isEmailVerified($userId)) {
+            Response::json([
+                'ok'                => false,
+                'message'           => 'Potwierdź adres e-mail, by włączyć alerty.',
+                'needs_verification' => true,
+            ]);
+            return;
+        }
+
         $this->repo->setGlobalEnabled($userId, $new);
 
         Response::json(['ok' => true, 'enabled' => $new]);

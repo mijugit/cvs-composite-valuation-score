@@ -20,7 +20,13 @@
             headers: {'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-Token': csrf},
             body: new URLSearchParams({_csrf: csrf}),
         }).then(function (r) { return r.json(); }).then(function (d) {
-            if (!d.ok) return;
+            if (!d.ok) {
+                if (d.needs_verification) {
+                    var errEl = document.getElementById('error-msg');
+                    if (errEl) { errEl.textContent = d.message; errEl.hidden = false; }
+                }
+                return;
+            }
             btn.dataset.enabled = d.enabled ? '1' : '0';
             btn.textContent = d.enabled ? '🔔 ON' : '🔕 OFF';
             btn.className   = 'btn btn--sm ' + (d.enabled ? 'btn--primary' : 'btn--ghost');
