@@ -1,7 +1,8 @@
 ---
 change-id: sector-benchmark-history-charts
 title: "Historia median sektorowych + wykresy w /sectors i /admin/sectors"
-status: implemented
+status: archived
+archived_at: 2026-06-16T00:00:00Z
 created: 2026-06-16
 updated: 2026-06-16
 roadmap_ref: null
