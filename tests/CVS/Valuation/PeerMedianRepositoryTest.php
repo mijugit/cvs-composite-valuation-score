@@ -21,7 +21,7 @@ class PeerMedianRepositoryTest extends TestCase
         $this->db = new PDO('sqlite::memory:');
         $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-        // Bootstrap table (mirrors 012_create_peer_medians.sql for SQLite).
+        // Bootstrap tables (mirror 012 and 020 migrations for SQLite).
         $this->db->exec('CREATE TABLE peer_medians (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
             level        TEXT NOT NULL,
@@ -33,6 +33,18 @@ class PeerMedianRepositoryTest extends TestCase
             sample_count INTEGER NOT NULL DEFAULT 0,
             computed_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             UNIQUE (level, bucket_key, model_version, metric_type)
+        )');
+
+        $this->db->exec('CREATE TABLE peer_medians_history (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            level          TEXT NOT NULL,
+            bucket_key     TEXT NOT NULL,
+            parent_sector  TEXT NULL,
+            model_version  TEXT NOT NULL,
+            metric_type    TEXT NOT NULL,
+            median_value   REAL NULL,
+            sample_count   INTEGER NOT NULL DEFAULT 0,
+            snapshotted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         )');
 
         $this->repo = new PeerMedianRepository($this->db);
@@ -203,5 +215,41 @@ class PeerMedianRepositoryTest extends TestCase
 
         $this->assertEqualsWithDelta(28.0, $v3['median'], 0.001);
         $this->assertEqualsWithDelta(30.0, $v4['median'], 0.001);
+    }
+
+    // ------------------------------------------------------------------
+    // peer_medians_history — append-only write-path
+    // ------------------------------------------------------------------
+
+    public function test_upsert_appends_row_to_history(): void
+    {
+        $this->repo->upsertMedian('sector', 'Technology', null, '3.0', 'ev_fcf', 32.0, 50);
+
+        $rows = $this->db->query(
+            "SELECT * FROM peer_medians_history WHERE bucket_key = 'Technology' AND metric_type = 'ev_fcf'"
+        )->fetchAll(\PDO::FETCH_ASSOC);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame('sector', $rows[0]['level']);
+        $this->assertEqualsWithDelta(32.0, (float) $rows[0]['median_value'], 0.001);
+        $this->assertSame(50, (int) $rows[0]['sample_count']);
+    }
+
+    public function test_repeated_upsert_appends_multiple_history_rows(): void
+    {
+        $this->repo->upsertMedian('sector', 'Technology', null, '3.0', 'ev_fcf', 32.0, 50);
+        $this->repo->upsertMedian('sector', 'Technology', null, '3.0', 'ev_fcf', 33.5, 52);
+
+        $count = $this->db->query(
+            "SELECT COUNT(*) FROM peer_medians_history WHERE bucket_key = 'Technology' AND metric_type = 'ev_fcf'"
+        )->fetchColumn();
+
+        // peer_medians still has 1 row (upsert), history has 2 (append).
+        $this->assertSame(2, (int) $count);
+
+        $pm = $this->db->query(
+            "SELECT COUNT(*) FROM peer_medians WHERE bucket_key = 'Technology' AND metric_type = 'ev_fcf'"
+        )->fetchColumn();
+        $this->assertSame(1, (int) $pm);
     }
 }

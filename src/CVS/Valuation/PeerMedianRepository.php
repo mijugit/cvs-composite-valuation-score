@@ -116,6 +116,48 @@ class PeerMedianRepository
                 ));
             }
         }
+
+        // Append snapshot to history regardless of insert/update path.
+        $this->insertHistory($level, $bucketKey, $parentSector, $modelVersion, $metricType, $medianValue, $sampleCount);
+    }
+
+    /**
+     * Append one row to peer_medians_history (best-effort — errors are logged, never rethrown).
+     */
+    private function insertHistory(
+        string  $level,
+        string  $bucketKey,
+        ?string $parentSector,
+        string  $modelVersion,
+        string  $metricType,
+        ?float  $medianValue,
+        int     $sampleCount
+    ): void {
+        try {
+            $stmt = $this->db->prepare('
+                INSERT INTO peer_medians_history
+                    (level, bucket_key, parent_sector, model_version, metric_type,
+                     median_value, sample_count, snapshotted_at)
+                VALUES
+                    (:level, :bucket_key, :parent_sector, :model_version, :metric_type,
+                     :median_value, :sample_count, :snapshotted_at)
+            ');
+            $stmt->execute([
+                ':level'          => $level,
+                ':bucket_key'     => $bucketKey,
+                ':parent_sector'  => $parentSector,
+                ':model_version'  => $modelVersion,
+                ':metric_type'    => $metricType,
+                ':median_value'   => $medianValue,
+                ':sample_count'   => $sampleCount,
+                ':snapshotted_at' => (new DateTimeImmutable())->format('Y-m-d H:i:s'),
+            ]);
+        } catch (PDOException $e) {
+            error_log(sprintf(
+                'PeerMedianRepository::insertHistory failed (%s/%s/%s/%s): %s',
+                $level, $bucketKey, $modelVersion, $metricType, $e->getMessage()
+            ));
+        }
     }
 
     // ------------------------------------------------------------------
