@@ -26,6 +26,7 @@ class ScreenerRepositoryTest extends TestCase
                 reco_swing TEXT NULL, reco_fund TEXT NULL,
                 golden_signal TEXT NULL, quality_gate INTEGER NOT NULL DEFAULT 0,
                 gate_failures TEXT NULL, pillar_scores TEXT NULL, signals TEXT NULL,
+                fx_rate_to_usd REAL NULL, native_currency TEXT NULL, native_price REAL NULL,
                 UNIQUE (ticker, score_date, model_version, origin)
             )
         ');

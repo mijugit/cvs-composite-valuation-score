@@ -301,10 +301,10 @@ Jeden dodatkowy request chart per spółka nie-USD na pobranie kursu (cache per-
 ### Phase 2: Konwersja w normalise()
 
 #### Automated
-- [x] 2.1 PHPStan level 6 — 0 błędów
-- [x] 2.2 CVSModelTest zielony (US fixtures niezmienione)
-- [x] 2.3 Test-inwariant: EV/FCF KRW == natywne; pola w USD
-- [x] 2.4 Test ADR: EV spójnie w USD, brak miksu walut
+- [x] 2.1 PHPStan level 6 — 0 błędów — 6cdc44d
+- [x] 2.2 CVSModelTest zielony (US fixtures niezmienione) — 6cdc44d
+- [x] 2.3 Test-inwariant: EV/FCF KRW == natywne; pola w USD — 6cdc44d
+- [x] 2.4 Test ADR: EV spójnie w USD, brak miksu walut — 6cdc44d
 
 #### Manual
 - [ ] 2.5 000660.KS: CVS sensowny, surowe pola w USD
@@ -313,10 +313,10 @@ Jeden dodatkowy request chart per spółka nie-USD na pobranie kursu (cache per-
 ### Phase 3: Migracja snapshotów + writer/reader + bump wersji
 
 #### Automated
-- [ ] 3.1 Migracja aplikuje się czysto; 3 nowe kolumny
-- [ ] 3.2 PHPStan level 6 — 0 błędów
-- [ ] 3.3 Test: save() persystuje nowe pola; reader je zwraca
-- [ ] 3.4 Track-record odczyty wołane z live model_version (brak mieszania wersji)
+- [x] 3.1 Migracja aplikuje się czysto; 3 nowe kolumny
+- [x] 3.2 PHPStan level 6 — 0 błędów
+- [x] 3.3 Test: save() persystuje nowe pola; reader je zwraca
+- [x] 3.4 Track-record odczyty wołane z live model_version (brak mieszania wersji)
 
 #### Manual
 - [ ] 3.5 Po rescore w dev: 000660.KS ma model_version=4.0, native_currency/fx_rate/native_price, price USD

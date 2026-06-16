@@ -40,6 +40,7 @@ class TrackRecordRepositoryTest extends TestCase
                 golden_signal TEXT NULL,
                 quality_gate INTEGER NOT NULL DEFAULT 0,
                 signals TEXT NULL,
+                fx_rate_to_usd REAL NULL, native_currency TEXT NULL, native_price REAL NULL,
                 UNIQUE (ticker, score_date, model_version, origin)
             )
         ');

@@ -14,6 +14,7 @@ use CVS\Core\Response;
 class TrackRecordController
 {
     private TrackRecordRepository $repo;
+    private string $liveModelVersion;
 
     private const VALID_HORIZONS = [30, 60, 90];
     private const DEFAULT_HORIZON = 30;
@@ -21,6 +22,8 @@ class TrackRecordController
     public function __construct()
     {
         $this->repo = new TrackRecordRepository();
+        $config = require dirname(__DIR__, 2) . '/config/cvs-weights.php';
+        $this->liveModelVersion = (string) ($config['model_version'] ?? '');
     }
 
     // ------------------------------------------------------------------
@@ -33,7 +36,7 @@ class TrackRecordController
 
         $horizon = $this->parseHorizon($req);
 
-        $evaluations = $this->repo->getEvaluations($horizon);
+        $evaluations = $this->repo->getEvaluations($horizon, $this->liveModelVersion !== '' ? $this->liveModelVersion : null);
         $enriched    = TrackRecordCalculator::enrichWithResult($evaluations);
         $stats       = TrackRecordCalculator::summarise($enriched);
 
@@ -67,7 +70,7 @@ class TrackRecordController
         $ticker  = strtoupper(trim((string) $req->param('ticker', '')));
         $horizon = $this->parseHorizon($req);
 
-        $evaluations = $this->repo->getForTicker($ticker, $horizon);
+        $evaluations = $this->repo->getForTicker($ticker, $horizon, $this->liveModelVersion !== '' ? $this->liveModelVersion : null);
         $enriched    = TrackRecordCalculator::enrichWithResult($evaluations);
         $stats       = TrackRecordCalculator::summarise($enriched);
         $all         = $this->repo->getAllForTicker($ticker); // for CVS chart

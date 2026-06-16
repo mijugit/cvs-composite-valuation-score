@@ -15,7 +15,7 @@ return [
     // Bump model_version whenever the scoring methodology changes so that
     // track-record rows from different methodologies are never mixed.
     // FR-010: never hardcode this in business logic — always read from here.
-    'model_version' => '3.0',
+    'model_version' => '4.0',
 
     // --- Overlay penalties (Phase 5, slice 1) ---
     // Two deterministic post-aggregation penalties applied on top of the base CVS,

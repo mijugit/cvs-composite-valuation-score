@@ -67,7 +67,10 @@ class CvsSnapshotRepository
         ?string $industry        = null,
         ?string $modelVersion    = null,
         string  $origin          = self::ORIGIN_RESCORE,
-        ?string $companyName     = null
+        ?string $companyName     = null,
+        ?float  $fxRateToUsd    = null,
+        ?string $nativeCurrency  = null,
+        ?float  $nativePrice     = null
     ): void {
         $scoreDate = (new DateTimeImmutable())->format('Y-m-d');
         $scoredAt  = (new DateTimeImmutable())->format('Y-m-d H:i:s');
@@ -111,6 +114,9 @@ class CvsSnapshotRepository
             ':earnings_state'        => $et['state'] ?? null,
             ':earnings_guard_active' => isset($et['guard_active']) ? (int) $et['guard_active'] : null,
             ':signals'               => $sig,
+            ':fx_rate_to_usd'        => $fxRateToUsd,
+            ':native_currency'       => $nativeCurrency,
+            ':native_price'          => $nativePrice,
         ];
 
         try {
@@ -119,12 +125,14 @@ class CvsSnapshotRepository
                     (ticker, company_name, sector, industry, model_version, origin, score_date, scored_at,
                      price_at_snapshot, cvs_swing, cvs_fund, reco_swing, reco_fund,
                      golden_signal, quality_gate, gate_failures, pillar_scores, signals,
-                     days_since_earnings, days_to_earnings, earnings_state, earnings_guard_active)
+                     days_since_earnings, days_to_earnings, earnings_state, earnings_guard_active,
+                     fx_rate_to_usd, native_currency, native_price)
                 VALUES
                     (:ticker, :company_name, :sector, :industry, :model_version, :origin, :score_date, :scored_at,
                      :price_at_snapshot, :cvs_swing, :cvs_fund, :reco_swing, :reco_fund,
                      :golden_signal, :quality_gate, :gate_failures, :pillar_scores, :signals,
-                     :days_since_earnings, :days_to_earnings, :earnings_state, :earnings_guard_active)
+                     :days_since_earnings, :days_to_earnings, :earnings_state, :earnings_guard_active,
+                     :fx_rate_to_usd, :native_currency, :native_price)
             ');
             $stmt->execute($params);
         } catch (PDOException $e) {
@@ -159,7 +167,10 @@ class CvsSnapshotRepository
                         days_since_earnings   = :days_since_earnings,
                         days_to_earnings      = :days_to_earnings,
                         earnings_state        = :earnings_state,
-                        earnings_guard_active = :earnings_guard_active
+                        earnings_guard_active = :earnings_guard_active,
+                        fx_rate_to_usd        = :fx_rate_to_usd,
+                        native_currency       = :native_currency,
+                        native_price          = :native_price
                     WHERE ticker = :ticker AND score_date = :score_date
                       AND (model_version = :model_version_match
                            OR (model_version IS NULL AND :model_version_match_null IS NULL))

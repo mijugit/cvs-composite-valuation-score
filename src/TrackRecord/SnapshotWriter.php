@@ -49,7 +49,10 @@ class SnapshotWriter
         ?string   $sector,
         ?string   $industry,
         string    $origin,
-        ?string   $companyName = null
+        ?string   $companyName    = null,
+        ?float    $fxRateToUsd   = null,
+        ?string   $nativeCurrency = null,
+        ?float    $nativePrice    = null
     ): int {
         $resultArray  = $result->toArray();
         $modelVersion = $result->modelVersion !== '' ? $result->modelVersion : null;
@@ -62,7 +65,7 @@ class SnapshotWriter
             $resultArray['signals'] = $rawSignals;
         }
 
-        $this->repo->save($result->ticker, $resultArray, $price, $sector, $industry, $modelVersion, $origin, $companyName);
+        $this->repo->save($result->ticker, $resultArray, $price, $sector, $industry, $modelVersion, $origin, $companyName, $fxRateToUsd, $nativeCurrency, $nativePrice);
         $written = 1;
 
         // Fan out over the full shadows[] list (3.1 + 3.2 today) instead of the
@@ -80,7 +83,10 @@ class SnapshotWriter
                 $industry,
                 (string) $shadow['shadow_version'],
                 $origin,
-                $companyName
+                $companyName,
+                $fxRateToUsd,
+                $nativeCurrency,
+                $nativePrice
             );
             $written++;
         }

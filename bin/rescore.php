@@ -92,15 +92,18 @@ foreach ($tickers as $ticker) {
         continue;
     }
 
-    $result      = $model->calculate($ticker, $financials);
-    $price       = isset($financials['current_price']) ? (float)  $financials['current_price'] : null;
-    $sector      = isset($financials['sector'])        ? (string) $financials['sector']        : null;
-    $industry    = isset($financials['industry'])      ? (string) $financials['industry']      : null;
-    $companyName = isset($financials['long_name'])     ? (string) $financials['long_name']     : null;
+    $result         = $model->calculate($ticker, $financials);
+    $price          = isset($financials['current_price'])  ? (float)  $financials['current_price']  : null;
+    $sector         = isset($financials['sector'])         ? (string) $financials['sector']         : null;
+    $industry       = isset($financials['industry'])       ? (string) $financials['industry']       : null;
+    $companyName    = isset($financials['long_name'])      ? (string) $financials['long_name']      : null;
+    $fxRateToUsd    = isset($financials['fx_rate_to_usd']) ? (float)  $financials['fx_rate_to_usd'] : null;
+    $nativeCurrency = isset($financials['native_currency']) ? (string) $financials['native_currency'] : null;
+    $nativePrice    = isset($financials['native_price'])   ? (float)  $financials['native_price']   : null;
 
-    // Base (3.0) + shadow (3.1) rows in one call — shadow mode (FR-016/FR-019)
-    // unchanged: headline recommendation and base snapshot are unaffected.
-    $writer->persist($result, $price, $sector, $industry, CvsSnapshotRepository::ORIGIN_RESCORE, $companyName);
+    // Base (4.0) + shadow (3.1/3.2) rows in one call — shadow mode (FR-016/FR-019).
+    // FX fields propagate to every version row (same stock, same point in time).
+    $writer->persist($result, $price, $sector, $industry, CvsSnapshotRepository::ORIGIN_RESCORE, $companyName, $fxRateToUsd, $nativeCurrency, $nativePrice);
 
     // S-04: check for state change and notify watching users.
     $alerted = $alertSvc->checkAndNotify($ticker, $result->toArray());
