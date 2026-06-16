@@ -1,7 +1,8 @@
 ---
 change_id: email-verification
 title: Weryfikacja email przy rejestracji — magiczny link aktywacyjny
-status: implemented
+status: archived
+archived_at: 2026-06-16T13:45:00Z
 created: 2026-06-16
 updated: 2026-06-16
 ---
