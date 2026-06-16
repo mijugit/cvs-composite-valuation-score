@@ -1,4 +1,10 @@
 <section class="dashboard">
+    <?php if (!($emailVerified ?? true)): ?>
+    <div class="alert" style="margin-bottom:1rem;background:rgba(224,82,82,.15);border:1px solid rgba(224,82,82,.3);border-radius:var(--radius);padding:.75rem 1rem;font-size:var(--text-sm);">
+        &#9888; <strong>Potwierdź adres e-mail</strong>, by włączyć alerty.
+        <a href="/auth/check-email" style="margin-left:.75rem;color:var(--c-primary);">Wyślij link ponownie</a>
+    </div>
+    <?php endif; ?>
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;margin-bottom:1rem;">
         <h1 style="margin:0;">Panel analizy CVS</h1>
         <div style="display:flex;align-items:center;gap:.5rem;font-size:var(--text-sm);">

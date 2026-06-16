@@ -59,6 +59,8 @@ class AnalysisController
         $history       = $this->history->findByUser($userId, $this->maxHistory);
         $alertRepo     = new AlertRepository();
         $alertsEnabled = $alertRepo->isGlobalEnabled($userId);
+        $userRepo      = new \CVS\Auth\UserRepository();
+        $emailVerified = $userRepo->isEmailVerified($userId);
 
         // Build ticker→reco_swing map (chip colours) and ticker→tooltip data
         // (company name + CVS Swing/Fund + recommendations) from latest snapshots.
@@ -90,6 +92,7 @@ class AnalysisController
             'watchlistInfo'  => $watchlistInfo,  // ticker→{companyName, cvsSwing, cvsFund, recoSwing, recoFund} for hover tooltip
             'history'        => $history,
             'alertsEnabled'  => $alertsEnabled,
+            'emailVerified'  => $emailVerified,
         ]);
     }
 

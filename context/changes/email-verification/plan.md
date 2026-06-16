@@ -485,26 +485,26 @@ $emailVerified = $userRepo->isEmailVerified($userId);
 ### Phase 4: AlertController — gate weryfikacji
 
 #### Automated
-- [x] 4.1 Gate `isEmailVerified` w `toggleGlobal()` dodany (blokuje `$new === true`)
-- [x] 4.2 Obsługa `needs_verification` w JS dashboardu (inline message)
-- [x] 4.3 `composer stan` — 0 błędów
+- [x] 4.1 Gate `isEmailVerified` w `toggleGlobal()` dodany (blokuje `$new === true`) — 71d0beb
+- [x] 4.2 Obsługa `needs_verification` w JS dashboardu (inline message) — 71d0beb
+- [x] 4.3 `composer stan` — 0 błędów — 71d0beb
 
 #### Manual
-- [x] 4.4 Konto z NULL `email_verified_at`: toggle 🔕→🔔 zablokowany, pojawia się komunikat
-- [x] 4.5 Konto zweryfikowane: toggle działa normalnie
+- [x] 4.4 Konto z NULL `email_verified_at`: toggle 🔕→🔔 zablokowany, pojawia się komunikat — 71d0beb
+- [x] 4.5 Konto zweryfikowane: toggle działa normalnie — 71d0beb
 
 ### Phase 5: Szablony, trasy, dashboard baner
 
 #### Automated
-- [ ] 5.1 `templates/auth/check-email.php` istnieje
-- [ ] 5.2 `templates/auth/verify-error.php` istnieje
-- [ ] 5.3 3 trasy dodane w `routes.php` (GET check-email, POST resend, GET verify)
-- [ ] 5.4 `dashboard()` zwraca `$emailVerified` do szablonu
-- [ ] 5.5 `composer stan` — 0 błędów
-- [ ] 5.6 `php -l` na nowych szablonach — 0 błędów
+- [x] 5.1 `templates/auth/check-email.php` istnieje
+- [x] 5.2 `templates/auth/verify-error.php` istnieje
+- [x] 5.3 3 trasy dodane w `routes.php` (GET check-email, POST resend, GET verify)
+- [x] 5.4 `dashboard()` zwraca `$emailVerified` do szablonu
+- [x] 5.5 `composer stan` — 0 błędów
+- [x] 5.6 `php -l` na nowych szablonach — 0 błędów
 
 #### Manual
-- [ ] 5.7 GET `/auth/check-email` renderuje się poprawnie
-- [ ] 5.8 "Wyślij link ponownie" → flash "Nowy link wysłany" na check-email
-- [ ] 5.9 GET `/auth/verify?token=WYGASLY` → strona verify-error
-- [ ] 5.10 Dashboard: baner dla NULL, brak banera dla zweryfikowanego
+- [x] 5.7 GET `/auth/check-email` renderuje się poprawnie
+- [x] 5.8 "Wyślij link ponownie" → flash "Nowy link wysłany" na check-email
+- [x] 5.9 GET `/auth/verify?token=WYGASLY` → strona verify-error
+- [x] 5.10 Dashboard: baner dla NULL, brak banera dla zweryfikowanego
