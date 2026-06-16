@@ -75,6 +75,11 @@ $asset = static function (string $path): string {
             Wyniki CVS to hipoteza modelu analitycznego, nie rekomendacja inwestycyjna.
             Inwestuj świadomie.
         </p>
+        <p style="margin-top:.5rem;font-size:.75rem;color:var(--c-text-muted);">
+            <a href="/terms-of-service" style="color:var(--c-text-muted);">Regulamin</a>
+            &nbsp;·&nbsp;
+            <a href="/privacy-policy" style="color:var(--c-text-muted);">Polityka Prywatności</a>
+        </p>
     </div>
 </footer>
 

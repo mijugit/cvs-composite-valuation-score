@@ -70,13 +70,23 @@ class AlertService
             $oldReco   = $last['last_reco']   ?? null;
             $oldSignal = $last['last_signal']  ?? null;
 
+            $unsubToken = hash_hmac(
+                'sha256',
+                'unsub:' . $userId . ':' . $user['email'],
+                $_ENV['APP_SECRET'] ?? ''
+            );
+            $unsubUrl = ($_ENV['APP_URL'] ?? 'https://cvs.timeflow.fun')
+                . '/alerts/unsubscribe?uid=' . $userId
+                . '&token=' . $unsubToken;
+
             $html = $this->buildHtml(
                 $ticker,
                 $oldReco,
                 $currentReco ?: null,
                 $oldSignal,
                 $currentSignal,
-                $cvsSwing
+                $cvsSwing,
+                $unsubUrl
             );
 
             $subject = sprintf('CVS Alert: %s — zmiana sygnału', $ticker);
@@ -101,7 +111,8 @@ class AlertService
         ?string $newReco,
         ?string $oldSignal,
         ?string $newSignal,
-        ?float  $cvsSwing
+        ?float  $cvsSwing,
+        string  $unsubUrl = ''
     ): string {
         $recoLine = ($oldReco !== null && $oldReco !== '')
             ? htmlspecialchars($oldReco) . ' → ' . htmlspecialchars((string) $newReco)
@@ -143,6 +154,11 @@ class AlertService
                 Wyniki CVS to hipoteza modelu analitycznego, nie rekomendacja inwestycyjna. Inwestuj świadomie.<br>
                 Wygenerowano automatycznie przez CVS Composite Valuation Score.
             </p>
+            ' . ($unsubUrl !== '' ? '
+            <p style="color:#aaa;font-size:10px;margin-top:8px;">
+                Nie chcesz już otrzymywać alertów?
+                <a href="' . htmlspecialchars($unsubUrl) . '" style="color:#aaa;">Wypisz się z alertów</a>.
+            </p>' : '') . '
         ';
     }
 }

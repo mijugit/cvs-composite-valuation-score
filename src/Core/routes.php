@@ -38,12 +38,15 @@ $aiAnalysis = new AiAnalysisController($aiConfig);
 // Public routes
 // ------------------------------------------------------------------
 
-$router->get('/',          fn($req) => $auth->index($req));
-$router->get('/login',     fn($req) => $auth->loginForm($req));
-$router->post('/login',    fn($req) => $auth->login($req));
-$router->get('/register',  fn($req) => $auth->registerForm($req));
-$router->post('/register', fn($req) => $auth->register($req));
-$router->get('/logout',    fn($req) => $auth->logout($req));
+$router->get('/',                    fn($req) => $auth->index($req));
+$router->get('/login',               fn($req) => $auth->loginForm($req));
+$router->post('/login',              fn($req) => $auth->login($req));
+$router->get('/register',            fn($req) => $auth->registerForm($req));
+$router->post('/register',           fn($req) => $auth->register($req));
+$router->get('/logout',              fn($req) => $auth->logout($req));
+$router->get('/terms-of-service',    fn($req) => \CVS\Core\Response::view('terms-of-service'));
+$router->get('/privacy-policy',      fn($req) => \CVS\Core\Response::view('privacy-policy'));
+$router->get('/alerts/unsubscribe',  fn($req) => $alertCtrl->unsubscribe($req));
 
 // ------------------------------------------------------------------
 // Protected routes (auth middleware applied inside controllers)

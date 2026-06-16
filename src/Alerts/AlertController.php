@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CVS\Alerts;
 
 use CVS\Auth\AuthController;
+use CVS\Auth\UserRepository;
 use CVS\Core\Request;
 use CVS\Core\Response;
 
@@ -14,10 +15,12 @@ use CVS\Core\Response;
 class AlertController
 {
     private AlertRepository $repo;
+    private UserRepository  $users;
 
     public function __construct()
     {
-        $this->repo = new AlertRepository();
+        $this->repo  = new AlertRepository();
+        $this->users = new UserRepository();
     }
 
     // ------------------------------------------------------------------
@@ -38,6 +41,35 @@ class AlertController
         $this->repo->setGlobalEnabled($userId, $new);
 
         Response::json(['ok' => true, 'enabled' => $new]);
+    }
+
+    // ------------------------------------------------------------------
+    // GET /alerts/unsubscribe?uid=X&token=Y  (no login required)
+    // ------------------------------------------------------------------
+
+    public function unsubscribe(Request $req): void
+    {
+        $uid   = (int) ($req->query('uid') ?? 0);
+        $token = (string) ($req->query('token') ?? '');
+
+        $success = false;
+
+        if ($uid > 0 && $token !== '') {
+            $user = $this->users->findById($uid);
+            if ($user !== null && isset($user['email'])) {
+                $expected = hash_hmac(
+                    'sha256',
+                    'unsub:' . $uid . ':' . $user['email'],
+                    $_ENV['APP_SECRET'] ?? ''
+                );
+                if (hash_equals($expected, $token)) {
+                    $this->repo->setGlobalEnabled($uid, false);
+                    $success = true;
+                }
+            }
+        }
+
+        Response::view('alerts/unsubscribe', ['success' => $success]);
     }
 
     // ------------------------------------------------------------------

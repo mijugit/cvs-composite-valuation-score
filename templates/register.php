@@ -24,6 +24,11 @@
         </div>
 
         <button type="submit" class="btn btn--primary">Utwórz konto</button>
+
+        <p style="font-size:.75rem;color:var(--c-text-muted);margin-top:.75rem;">
+            Rejestrując się, akceptujesz <a href="/terms-of-service" target="_blank">Regulamin</a>
+            i <a href="/privacy-policy" target="_blank">Politykę Prywatności</a>.
+        </p>
     </form>
 
     <p class="auth-switch">Masz już konto? <a href="/login">Zaloguj się</a></p>
