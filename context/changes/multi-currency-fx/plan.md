@@ -325,23 +325,23 @@ Jeden dodatkowy request chart per spółka nie-USD na pobranie kursu (cache per-
 ### Phase 4: Fair Value w USD + dual-currency display
 
 #### Automated
-- [ ] 4.1 PHPStan level 6 — 0 błędów
-- [ ] 4.2 php -l templates/analysis.php — 0 błędów
-- [ ] 4.3 Pełny suite phpunit zielony
+- [x] 4.1 PHPStan level 6 — 0 błędów — feea700
+- [x] 4.2 php -l templates/analysis.php — 0 błędów — feea700
+- [x] 4.3 Pełny suite phpunit zielony — feea700
 
 #### Manual
-- [ ] 4.4 000660.KS: cena i FV jako `$… (₩…)`, brak `$` przy KRW
-- [ ] 4.5 AAPL: pojedyncza waluta, brak regresji
-- [ ] 4.6 TSM (ADR): brak błędnych liczb — FV poprawny lub świadomie suppress; score na USD
+- [x] 4.4 000660.KS: cena i FV jako `$… (₩…)`, brak `$` przy KRW
+- [x] 4.5 AAPL: pojedyncza waluta, brak regresji — feea700
+- [x] 4.6 TSM (ADR): brak błędnych liczb — FV poprawny lub świadomie suppress; score na USD — feea700
 
 ### Phase 5: Rebuild peer medians + weryfikacja end-to-end
 
 #### Automated
-- [ ] 5.1 PHPStan level 6 — 0 błędów (regresja całości)
-- [ ] 5.2 Pełny suite phpunit zielony
+- [x] 5.1 PHPStan level 6 — 0 błędów (regresja całości)
+- [x] 5.2 Pełny suite phpunit zielony
 
 #### Manual
-- [ ] 5.3 Peer_medians pod 4.0; ValuationPillar nie cold-startuje
-- [ ] 5.4 Dashboard/screener spójne USD, brak dublowania
-- [ ] 5.5 Track-record 000660.KS spójny
-- [ ] 5.6 000660.KS produkcyjnie: dual-display, sensowny CVS i FV
+- [x] 5.3 Peer_medians pod 4.0; ValuationPillar nie cold-startuje
+- [x] 5.4 Dashboard/screener spójne USD, brak dublowania
+- [x] 5.5 Track-record 000660.KS spójny
+- [x] 5.6 000660.KS produkcyjnie: dual-display, sensowny CVS i FV
