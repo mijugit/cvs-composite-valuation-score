@@ -337,8 +337,8 @@ Jeden dodatkowy request chart per spółka nie-USD na pobranie kursu (cache per-
 ### Phase 5: Rebuild peer medians + weryfikacja end-to-end
 
 #### Automated
-- [x] 5.1 PHPStan level 6 — 0 błędów (regresja całości)
-- [x] 5.2 Pełny suite phpunit zielony
+- [x] 5.1 PHPStan level 6 — 0 błędów (regresja całości) — 556bb28
+- [x] 5.2 Pełny suite phpunit zielony — 556bb28
 
 #### Manual
 - [x] 5.3 Peer_medians pod 4.0; ValuationPillar nie cold-startuje

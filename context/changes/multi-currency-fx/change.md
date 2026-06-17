@@ -1,9 +1,9 @@
 ---
 change_id: multi-currency-fx
 title: Konwersja danych finansowych do USD + dual-currency display
-status: implementing
+status: implemented
 created: 2026-06-16
-updated: 2026-06-16
+updated: 2026-06-17
 ---
 
 ## Summary
