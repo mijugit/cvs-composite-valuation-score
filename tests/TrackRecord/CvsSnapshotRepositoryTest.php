@@ -737,4 +737,57 @@ class CvsSnapshotRepositoryTest extends TestCase
         $this->assertCount(1, $rows, 'corpus twin must not double the history series');
         $this->assertSame(CvsSnapshotRepository::ORIGIN_RESCORE, $rows[0]['origin']);
     }
+
+    // ------------------------------------------------------------------
+    // Phase 8 (slice 1): findTrajectory — versioned, rescore-only series
+    // ------------------------------------------------------------------
+
+    public function test_find_trajectory_returns_empty_when_no_history(): void
+    {
+        [$repo, ] = $this->makeVersionedRepo();
+        $rows = $repo->findTrajectory('AAPL', new DateTimeImmutable('2020-01-01'), '4.0');
+        $this->assertSame([], $rows);
+    }
+
+    public function test_find_trajectory_excludes_shadow_version_rows(): void
+    {
+        [$repo, ] = $this->makeVersionedRepo();
+
+        $base   = $this->passResult('AAPL');
+        $base['swing']['cvs'] = 74.0;
+        $shadow = $this->passResult('AAPL');
+        $shadow['swing']['cvs'] = 62.0;
+
+        $repo->save('AAPL', $base,   185.0, 'Technology', null, '4.0');
+        $repo->save('AAPL', $shadow, 185.0, 'Technology', null, '3.1');
+
+        $rows = $repo->findTrajectory('AAPL', new DateTimeImmutable('yesterday'), '4.0');
+
+        $this->assertCount(1, $rows, 'shadow (3.1) row must not appear in the headline trajectory');
+        $this->assertEquals(74.0, (float) $rows[0]['cvs_swing']);
+    }
+
+    public function test_find_trajectory_excludes_corpus_rows(): void
+    {
+        [$repo, ] = $this->makeVersionedRepo();
+
+        $repo->save('AAPL', $this->passResult('AAPL'), 185.0, 'Technology', null, '4.0', CvsSnapshotRepository::ORIGIN_RESCORE);
+        $repo->save('AAPL', $this->passResult('AAPL'), 184.0, 'Technology', null, '4.0', CvsSnapshotRepository::ORIGIN_CORPUS);
+
+        $rows = $repo->findTrajectory('AAPL', new DateTimeImmutable('yesterday'), '4.0');
+
+        $this->assertCount(1, $rows, 'corpus twin must not double the trajectory series');
+    }
+
+    public function test_find_trajectory_returns_date_and_swing_only(): void
+    {
+        [$repo, ] = $this->makeVersionedRepo();
+        $repo->save('AAPL', $this->passResult('AAPL'), 185.0, 'Technology', null, '4.0');
+
+        $rows = $repo->findTrajectory('AAPL', new DateTimeImmutable('yesterday'), '4.0');
+
+        $this->assertCount(1, $rows);
+        $this->assertArrayHasKey('score_date', $rows[0]);
+        $this->assertArrayHasKey('cvs_swing', $rows[0]);
+    }
 }

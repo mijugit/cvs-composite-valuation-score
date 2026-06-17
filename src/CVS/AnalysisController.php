@@ -15,7 +15,9 @@ use CVS\Pro\AiUsageRepository;
 use CVS\Pro\ProGate;
 use CVS\Pro\ProRepository;
 use CVS\TrackRecord\CvsSnapshotRepository;
+use CVS\TrackRecord\TrajectoryCalculator;
 use CVS\Translation\TranslationRepository;
+use DateTimeImmutable;
 use CVS\Watchlist\WatchlistRepository;
 
 /**
@@ -32,6 +34,8 @@ class AnalysisController
     private HistoryRepository    $history;
     private int                  $maxHistory;
     private string               $modelVersion;
+    private int                  $trajectoryWindowDays;
+    private int                  $trajectoryMinPoints;
 
     public function __construct()
     {
@@ -45,6 +49,9 @@ class AnalysisController
         // cvs-overlay-penalties shadow rows (3.1) from "latest snapshot" reads —
         // see CvsSnapshotRepository::findAllLatest().
         $this->modelVersion = (string) ($config['model_version'] ?? '');
+        // Phase 8 (slice 1): CVS trajectory sparkline knobs.
+        $this->trajectoryWindowDays = (int) ($config['trajectory']['window_days'] ?? 90);
+        $this->trajectoryMinPoints  = (int) ($config['trajectory']['min_points']  ?? 2);
     }
 
     // ------------------------------------------------------------------
@@ -167,6 +174,7 @@ class AnalysisController
                 'result'     => null,
                 'financials' => null,
                 'isWatched'  => $this->watchlist->isWatched($userId, $ticker),
+                'trajectory' => null,
                 'error'      => 'Nie udało się pobrać danych. Sprawdź symbol.',
             ]);
             return;
@@ -175,6 +183,7 @@ class AnalysisController
         $result    = $this->model->calculate($ticker, $financials);
         $userId    = (int) $_SESSION['user_id'];
         $isWatched = $this->watchlist->isWatched($userId, $ticker);
+        $trajectory = $this->buildTrajectory($ticker, $isWatched);
 
         $aiConfig    = require dirname(__DIR__, 2) . '/config/ai.php';
         $gate        = new ProGate(new ProRepository(), new AiUsageRepository(), $aiConfig);
@@ -205,8 +214,29 @@ class AnalysisController
             'alertsEnabled'        => $alertsEnabled,        // S-04
             'tickerAlertDisabled'  => $tickerAlertDisabled,  // S-04
             'cachedDescriptionPl'  => $cachedDescriptionPl,  // on-device translation cache
+            'trajectory'           => $trajectory,           // Phase 8 slice 1 — CVS sparkline
             'error'                => null,
         ]);
+    }
+
+    /**
+     * Build the CVS Swing trajectory summary for the detail page (Phase 8, slice 1).
+     *
+     * Only watched tickers carry a trajectory — snapshots are collected for the
+     * watchlist union (FR-001). Non-watched → null (template shows the empty state).
+     *
+     * @return array<string, mixed>|null
+     */
+    private function buildTrajectory(string $ticker, bool $isWatched): ?array
+    {
+        if (!$isWatched) {
+            return null;
+        }
+
+        $since = (new DateTimeImmutable())->modify('-' . $this->trajectoryWindowDays . ' days');
+        $rows  = (new CvsSnapshotRepository())->findTrajectory($ticker, $since, $this->modelVersion);
+
+        return TrajectoryCalculator::summarise($rows, $this->trajectoryMinPoints);
     }
 
     // ------------------------------------------------------------------
