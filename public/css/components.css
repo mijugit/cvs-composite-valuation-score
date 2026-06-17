@@ -259,3 +259,40 @@
 .result-card__signal--strong    { background: rgba(34,  197, 94,  .15); color: var(--c-success); }
 .result-card__signal--watchlist { background: rgba(250, 204, 21,  .15); color: var(--c-fund); }
 .result-card__signal--momentum  { background: rgba(64,  144, 224, .15); color: var(--c-primary); }
+
+/* --- CVS trajectory sparkline (Phase 8 slice 1) --- */
+.trajectory-block { margin-top: 1.25rem; }
+.trajectory-block__sub {
+    font-size: var(--text-xs);
+    color: var(--c-muted);
+    font-weight: 400;
+}
+.trajectory-deltas {
+    font-size: var(--text-sm);
+    color: var(--c-muted);
+    margin: .35rem 0 .5rem;
+}
+.trajectory-deltas__label { margin-right: .35rem; }
+.trajectory-delta {
+    font-weight: 600;
+    white-space: nowrap;
+}
+.trajectory-delta--up   { color: var(--c-success); }
+.trajectory-delta--down { color: var(--c-danger, #ef4444); }
+.trajectory-delta--flat { color: var(--c-muted); }
+.trajectory-chart {
+    position: relative;
+    height: 150px;
+    width: 100%;
+}
+.trajectory-link {
+    display: inline-block;
+    margin-top: .5rem;
+    font-size: var(--text-sm);
+    color: var(--c-primary);
+}
+.trajectory-empty {
+    font-size: var(--text-sm);
+    color: var(--c-muted);
+    margin: .35rem 0 0;
+}
