@@ -486,7 +486,19 @@
 
                 <!-- CVS trajectory (Phase 8 slice 1) -->
                 <div class="trajectory-block">
-                    <h3>Trajektoria CVS <span class="trajectory-block__sub">Swing · 90 dni</span></h3>
+                    <h3>Trajektoria CVS <span class="trajectory-block__sub">Swing · 90 dni</span>
+                        <span class="chart-hint" tabindex="0">ⓘ
+                            <span class="chart-hint__tooltip">
+                                <strong>Czym jest trajektoria CVS?</strong><br>
+                                Linia pokazuje, jak wynik <strong>CVS Swing</strong> (0–100) tej spółki
+                                zmieniał się w czasie — z dziennych pomiarów z ostatnich 90 dni.<br><br>
+                                <strong>Kierunek bywa ważniejszy niż poziom:</strong> linia rosnąca =
+                                poprawiające się przekonanie modelu, opadająca = słabnące.<br><br>
+                                <strong>d/d</strong> — zmiana od poprzedniego pomiaru.
+                                <strong>t/t</strong> — zmiana tydzień do tygodnia (b/d gdy brak punktu sprzed ~7 dni).
+                            </span>
+                        </span>
+                    </h3>
                     <?php if (!empty($trajectory) && !empty($trajectory['has_trajectory'])): ?>
                         <?php
                         $deltaChip = static function ($d): string {
