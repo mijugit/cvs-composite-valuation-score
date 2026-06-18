@@ -1243,6 +1243,26 @@
                     });
                 }
 
+                // Phase 8 slice 2 — ATR zone/stop overlay, converted to the chart's base=100 scale.
+                <?php if (!empty($execPlan) && !empty($execPlan['has_zone'])): ?>
+                var ep = <?= json_encode([
+                    'zone_low'   => $execPlan['zone_low'],
+                    'zone_high'  => $execPlan['zone_high'],
+                    'stop_swing' => $execPlan['stop_swing'],
+                    'stop_fund'  => $execPlan['stop_fund'],
+                ]) ?>;
+                if (tBase > 0) {
+                    var toIdx = function(v){ return v == null ? null : parseFloat((v / tBase * 100).toFixed(2)); };
+                    var flat  = function(val){ return labels.map(function(){ return val; }); };
+                    var zHigh = toIdx(ep.zone_high), zLow = toIdx(ep.zone_low);
+                    if (zHigh != null) datasets.push({ label:'Strefa (góra)', data:flat(zHigh), borderColor:'rgba(34,197,94,.55)', backgroundColor:'rgba(34,197,94,.08)', borderWidth:1, pointRadius:0, fill:'+1', borderDash:[4,3] });
+                    if (zLow  != null) datasets.push({ label:'Strefa (dół)',  data:flat(zLow),  borderColor:'rgba(34,197,94,.55)', backgroundColor:'transparent', borderWidth:1, pointRadius:0, borderDash:[4,3] });
+                    var sSwing = toIdx(ep.stop_swing), sFund = toIdx(ep.stop_fund);
+                    if (sSwing != null) datasets.push({ label:'Stop swing', data:flat(sSwing), borderColor:'rgba(239,68,68,.6)',  backgroundColor:'transparent', borderWidth:1, pointRadius:0, borderDash:[2,2] });
+                    if (sFund  != null) datasets.push({ label:'Stop fund',  data:flat(sFund),  borderColor:'rgba(239,68,68,.35)', backgroundColor:'transparent', borderWidth:1, pointRadius:0, borderDash:[2,2] });
+                }
+                <?php endif; ?>
+
                 new Chart(pCtx.getContext('2d'), {
                     type: 'line',
                     data: { labels: labels, datasets: datasets },
