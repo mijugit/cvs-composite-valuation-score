@@ -259,6 +259,19 @@ return [
         'min_points'  => 2,  // fewer points → empty-state instead of a chart
     ],
 
+    // --- ATR entry zones + stops (Phase 8, slice 2) ---
+    // Knobs for AtrZoneCalculator. Illustrative defaults — tune later.
+    'atr_zones' => [
+        'atr_period'     => 14,   // Wilder ATR lookback
+        'support_window' => 20,   // sessions for support = min low
+        'zone_atr_mult'  => 1.0,  // zone = [support, support + mult×ATR]
+        'fallback_k'     => 1.0,  // fallback zone = [price − k×ATR, price]
+        'stop_mult'      => [
+            'swing' => 1.5,       // tighter stop for swing
+            'fund'  => 3.0,       // wider stop for fundamental
+        ],
+    ],
+
     // --- Data source ---
     'data_source' => [
         'provider'        => 'yahoo_finance',
