@@ -113,6 +113,8 @@ class FinancialDataFetcher
 
         $closes    = $this->fetchChartData($ticker, '3y');
         $spyCloses = $this->fetchSpyCloses();
+        // Phase 8 (slice 2) — daily OHLC for ATR / entry-zone math (AtrZoneCalculator).
+        $dailyOhlc = $this->fetchDailyOhlc($ticker, '3mo');
 
         // Phase 5 (slice 2) — fetch-time reference date, determined ONCE here
         // and handed down to normalise()/EarningsCalendarParser. This is the
@@ -120,7 +122,7 @@ class FinancialDataFetcher
         // inside the parsing/scoring layers — keeps them pure and offline-testable.
         $referenceDate = new DateTimeImmutable();
 
-        $normalised = $this->normalise($raw, $closes, $spyCloses, $referenceDate, $fxRateToUsd);
+        $normalised = $this->normalise($raw, $closes, $spyCloses, $referenceDate, $fxRateToUsd, $dailyOhlc);
 
         if ($normalised === null) {
             return null;
@@ -260,6 +262,65 @@ class FinancialDataFetcher
         }
 
         return $filtered;
+    }
+
+    /**
+     * Fetch daily OHLC (high/low/close) via the chart endpoint for ATR / entry-zone math.
+     *
+     * Returns parallel float arrays (oldest first) with nulls dropped consistently across
+     * all three series (a row is kept only when high, low AND close are present), or an
+     * empty structure on any failure. Same v8 chart endpoint as fetchChartData, daily interval.
+     *
+     * @return array{high: float[], low: float[], close: float[]}
+     */
+    private function fetchDailyOhlc(string $ticker, string $range): array
+    {
+        $empty = ['high' => [], 'low' => [], 'close' => []];
+
+        $auth = $this->getCrumbAndCookie();
+        $url  = self::CHART_URL . urlencode($ticker)
+              . '?interval=1d&range=' . urlencode($range)
+              . '&crumb=' . urlencode($auth['crumb']);
+
+        $result = $this->curlGetWithHeaders($url, $auth['cookie'], []);
+        $body   = $result['body'] ?? null;
+        if ($body === null) {
+            return $empty;
+        }
+
+        try {
+            $decoded = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return $empty;
+        }
+
+        $quote = $decoded['chart']['result'][0]['indicators']['quote'][0] ?? null;
+        if (!is_array($quote)) {
+            return $empty;
+        }
+
+        $highs  = $quote['high']  ?? [];
+        $lows   = $quote['low']   ?? [];
+        $closes = $quote['close'] ?? [];
+        if (!is_array($highs) || !is_array($lows) || !is_array($closes)) {
+            return $empty;
+        }
+
+        $out = ['high' => [], 'low' => [], 'close' => []];
+        $count = min(count($highs), count($lows), count($closes));
+        for ($i = 0; $i < $count; $i++) {
+            $h = $highs[$i];
+            $l = $lows[$i];
+            $c = $closes[$i];
+            if ($h === null || $l === null || $c === null) {
+                continue; // incomplete session — drop the whole row to keep arrays aligned
+            }
+            $out['high'][]  = (float) $h;
+            $out['low'][]   = (float) $l;
+            $out['close'][] = (float) $c;
+        }
+
+        return $out;
     }
 
     /**
@@ -445,9 +506,10 @@ class FinancialDataFetcher
      * @param float[]              $spyCloses       Monthly SPY closes (oldest first)
      * @param DateTimeImmutable    $referenceDate   Fetch-time "now", injected (FR-015 determinism seam)
      * @param float|null           $fxRateToUsd     Multiplicative factor: usd = native × rate; null = unavailable
+     * @param array{high: float[], low: float[], close: float[]} $dailyOhlc  Daily OHLC (native; FX-converted to USD inside)
      * @return array<string, mixed>|null
      */
-    private function normalise(array $raw, array $closes, array $spyCloses, DateTimeImmutable $referenceDate, ?float $fxRateToUsd = null): ?array
+    private function normalise(array $raw, array $closes, array $spyCloses, DateTimeImmutable $referenceDate, ?float $fxRateToUsd = null, array $dailyOhlc = ['high' => [], 'low' => [], 'close' => []]): ?array
     {
         $ap   = $raw['assetProfile']            ?? [];
         $fin  = $raw['financialData']           ?? [];
@@ -563,6 +625,14 @@ class FinancialDataFetcher
             $closes = array_map(static fn(float $c): float => $c * $fxP, $closes);
         }
 
+        // Phase 8 (slice 2) — daily OHLC to USD (price scale, like monthly closes) so the
+        // ATR / entry-zone levels match current_price. fxP=1.0 for USD tickers and ADRs.
+        $dailyOhlcUsd = [
+            'high'  => array_map(static fn(float $x): float => $x * $fxP, $dailyOhlc['high']),
+            'low'   => array_map(static fn(float $x): float => $x * $fxP, $dailyOhlc['low']),
+            'close' => array_map(static fn(float $x): float => $x * $fxP, $dailyOhlc['close']),
+        ];
+
         // Convert FCF intermediates before deriving forward_fcf_est.
         $fcf          = $fxApply($fcf,          $fxF);
         $opCf         = $fxApply($opCf,         $fxF);
@@ -655,6 +725,9 @@ class FinancialDataFetcher
             // Price history (for MomentumPillar — base-100 index, dimensionless)
             'monthly_closes'             => $closes,
             'spy_closes'                 => $spyCloses,
+
+            // Phase 8 (slice 2) — daily OHLC in USD for ATR / entry-zone math (AtrZoneCalculator).
+            'daily_ohlc'                 => $dailyOhlcUsd,
 
             // Analyst forecast (S-09) — price targets + recommendation breakdown/trend.
             'forecast'                   => $forecast,

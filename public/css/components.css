@@ -296,3 +296,24 @@
     color: var(--c-muted);
     margin: .35rem 0 0;
 }
+
+/* --- Execution plan: ATR entry zone + stops (Phase 8 slice 2) --- */
+.exec-plan { margin-top: 1.25rem; }
+.exec-badge {
+    display: inline-block;
+    padding: .2rem .6rem;
+    border-radius: var(--radius-pill);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    margin: .25rem 0 .6rem;
+}
+.exec-badge--in    { background: rgba(34, 197, 94, .15);  color: var(--c-success); }
+.exec-badge--above { background: rgba(250, 204, 21, .15); color: var(--c-fund); }
+.exec-badge--below { background: rgba(239, 68, 68, .15);  color: var(--c-danger, #ef4444); }
+.exec-badge--flat  { background: rgba(255, 255, 255, .06); color: var(--c-muted); }
+.exec-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+.exec-table td { padding: .3rem .2rem; border-bottom: 1px solid var(--c-border); }
+.exec-table td:last-child { text-align: right; }
+.exec-note,
+.exec-disclaimer { font-size: var(--text-xs); color: var(--c-muted); margin: .4rem 0 0; }
+.exec-disclaimer { opacity: .8; }

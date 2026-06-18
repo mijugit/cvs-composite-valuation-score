@@ -529,6 +529,43 @@
                     <?php endif; ?>
                 </div>
 
+                <!-- Execution plan (Phase 8 slice 2) -->
+                <?php if (!empty($execPlan) && !empty($execPlan['has_zone'])): ?>
+                <?php
+                $epBadge = match ($execPlan['state'] ?? null) {
+                    'in_zone' => ['exec-badge--in',    '✓ Cena w strefie kupna'],
+                    'above'   => ['exec-badge--above', '↑ Powyżej strefy — czekaj na cofnięcie'],
+                    'below'   => ['exec-badge--below', '↓ Poniżej strefy (poniżej wsparcia)'],
+                    default   => ['exec-badge--flat',  '—'],
+                };
+                $usd = static fn($v): string => '$' . number_format((float) $v, 2);
+                ?>
+                <div class="exec-plan">
+                    <h3>Plan egzekucji <span class="trajectory-block__sub">ATR · strefa + stop</span>
+                        <span class="chart-hint" tabindex="0">ⓘ
+                            <span class="chart-hint__tooltip">
+                                <strong>Jak czytać plan egzekucji?</strong><br>
+                                <strong>Strefa kupna</strong> — sugerowany przedział akumulacji, kotwiczony o
+                                ostatnie wsparcie (min. z ~20 sesji) i poszerzony o zmienność (ATR-14).<br><br>
+                                <strong>Stop</strong> — poziom wyjścia oparty na zmienności (N×ATR pod strefą):
+                                ciaśniejszy dla swingu, szerszy dla podejścia fundamentalnego.<br><br>
+                                To warstwa ryzyka NAD wynikiem CVS — nie zmienia oceny modelu.
+                            </span>
+                        </span>
+                    </h3>
+                    <div class="exec-badge <?= $epBadge[0] ?>"><?= $epBadge[1] ?></div>
+                    <table class="exec-table">
+                        <tr><td>Strefa kupna</td><td><strong><?= $usd($execPlan['zone_low']) ?> – <?= $usd($execPlan['zone_high']) ?></strong></td></tr>
+                        <tr><td>Stop (swing)</td><td><?= $usd($execPlan['stop_swing']) ?></td></tr>
+                        <tr><td>Stop (fundamentalny)</td><td><?= $usd($execPlan['stop_fund']) ?></td></tr>
+                    </table>
+                    <?php if (($execPlan['source'] ?? '') === 'fallback'): ?>
+                    <p class="exec-note">Strefa zmiennościowa (brak wyraźnego wsparcia w oknie) — oparta na ATR wokół ceny.</p>
+                    <?php endif; ?>
+                    <p class="exec-disclaimer">Poziomy orientacyjne z danych cenowych — nie są rekomendacją. Inwestuj świadomie.</p>
+                </div>
+                <?php endif; ?>
+
                 <!-- Pillar table with weights -->
                 <h3>Składowe filary</h3>
                 <table class="pillar-table">
@@ -1205,6 +1242,26 @@
                         borderDash: [5, 3],
                     });
                 }
+
+                // Phase 8 slice 2 — ATR zone/stop overlay, converted to the chart's base=100 scale.
+                <?php if (!empty($execPlan) && !empty($execPlan['has_zone'])): ?>
+                var ep = <?= json_encode([
+                    'zone_low'   => $execPlan['zone_low'],
+                    'zone_high'  => $execPlan['zone_high'],
+                    'stop_swing' => $execPlan['stop_swing'],
+                    'stop_fund'  => $execPlan['stop_fund'],
+                ]) ?>;
+                if (tBase > 0) {
+                    var toIdx = function(v){ return v == null ? null : parseFloat((v / tBase * 100).toFixed(2)); };
+                    var flat  = function(val){ return labels.map(function(){ return val; }); };
+                    var zHigh = toIdx(ep.zone_high), zLow = toIdx(ep.zone_low);
+                    if (zHigh != null) datasets.push({ label:'Strefa (góra)', data:flat(zHigh), borderColor:'rgba(34,197,94,.55)', backgroundColor:'rgba(34,197,94,.08)', borderWidth:1, pointRadius:0, fill:'+1', borderDash:[4,3] });
+                    if (zLow  != null) datasets.push({ label:'Strefa (dół)',  data:flat(zLow),  borderColor:'rgba(34,197,94,.55)', backgroundColor:'transparent', borderWidth:1, pointRadius:0, borderDash:[4,3] });
+                    var sSwing = toIdx(ep.stop_swing), sFund = toIdx(ep.stop_fund);
+                    if (sSwing != null) datasets.push({ label:'Stop swing', data:flat(sSwing), borderColor:'rgba(239,68,68,.6)',  backgroundColor:'transparent', borderWidth:1, pointRadius:0, borderDash:[2,2] });
+                    if (sFund  != null) datasets.push({ label:'Stop fund',  data:flat(sFund),  borderColor:'rgba(239,68,68,.35)', backgroundColor:'transparent', borderWidth:1, pointRadius:0, borderDash:[2,2] });
+                }
+                <?php endif; ?>
 
                 new Chart(pCtx.getContext('2d'), {
                     type: 'line',
