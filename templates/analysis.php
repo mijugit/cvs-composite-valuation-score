@@ -529,6 +529,43 @@
                     <?php endif; ?>
                 </div>
 
+                <!-- Execution plan (Phase 8 slice 2) -->
+                <?php if (!empty($execPlan) && !empty($execPlan['has_zone'])): ?>
+                <?php
+                $epBadge = match ($execPlan['state'] ?? null) {
+                    'in_zone' => ['exec-badge--in',    '✓ Cena w strefie kupna'],
+                    'above'   => ['exec-badge--above', '↑ Powyżej strefy — czekaj na cofnięcie'],
+                    'below'   => ['exec-badge--below', '↓ Poniżej strefy (poniżej wsparcia)'],
+                    default   => ['exec-badge--flat',  '—'],
+                };
+                $usd = static fn($v): string => '$' . number_format((float) $v, 2);
+                ?>
+                <div class="exec-plan">
+                    <h3>Plan egzekucji <span class="trajectory-block__sub">ATR · strefa + stop</span>
+                        <span class="chart-hint" tabindex="0">ⓘ
+                            <span class="chart-hint__tooltip">
+                                <strong>Jak czytać plan egzekucji?</strong><br>
+                                <strong>Strefa kupna</strong> — sugerowany przedział akumulacji, kotwiczony o
+                                ostatnie wsparcie (min. z ~20 sesji) i poszerzony o zmienność (ATR-14).<br><br>
+                                <strong>Stop</strong> — poziom wyjścia oparty na zmienności (N×ATR pod strefą):
+                                ciaśniejszy dla swingu, szerszy dla podejścia fundamentalnego.<br><br>
+                                To warstwa ryzyka NAD wynikiem CVS — nie zmienia oceny modelu.
+                            </span>
+                        </span>
+                    </h3>
+                    <div class="exec-badge <?= $epBadge[0] ?>"><?= $epBadge[1] ?></div>
+                    <table class="exec-table">
+                        <tr><td>Strefa kupna</td><td><strong><?= $usd($execPlan['zone_low']) ?> – <?= $usd($execPlan['zone_high']) ?></strong></td></tr>
+                        <tr><td>Stop (swing)</td><td><?= $usd($execPlan['stop_swing']) ?></td></tr>
+                        <tr><td>Stop (fundamentalny)</td><td><?= $usd($execPlan['stop_fund']) ?></td></tr>
+                    </table>
+                    <?php if (($execPlan['source'] ?? '') === 'fallback'): ?>
+                    <p class="exec-note">Strefa zmiennościowa (brak wyraźnego wsparcia w oknie) — oparta na ATR wokół ceny.</p>
+                    <?php endif; ?>
+                    <p class="exec-disclaimer">Poziomy orientacyjne z danych cenowych — nie są rekomendacją. Inwestuj świadomie.</p>
+                </div>
+                <?php endif; ?>
+
                 <!-- Pillar table with weights -->
                 <h3>Składowe filary</h3>
                 <table class="pillar-table">

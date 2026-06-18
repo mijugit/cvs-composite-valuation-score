@@ -14,6 +14,7 @@ use CVS\History\HistoryRepository;
 use CVS\Pro\AiUsageRepository;
 use CVS\Pro\ProGate;
 use CVS\Pro\ProRepository;
+use CVS\Execution\AtrZoneCalculator;
 use CVS\TrackRecord\CvsSnapshotRepository;
 use CVS\TrackRecord\TrajectoryCalculator;
 use CVS\Translation\TranslationRepository;
@@ -36,6 +37,8 @@ class AnalysisController
     private string               $modelVersion;
     private int                  $trajectoryWindowDays;
     private int                  $trajectoryMinPoints;
+    /** @var array<string, mixed> */
+    private array                $atrZonesConfig;
 
     public function __construct()
     {
@@ -52,6 +55,8 @@ class AnalysisController
         // Phase 8 (slice 1): CVS trajectory sparkline knobs.
         $this->trajectoryWindowDays = (int) ($config['trajectory']['window_days'] ?? 90);
         $this->trajectoryMinPoints  = (int) ($config['trajectory']['min_points']  ?? 2);
+        // Phase 8 (slice 2): ATR entry-zone knobs (consumed by AtrZoneCalculator).
+        $this->atrZonesConfig = is_array($config['atr_zones'] ?? null) ? $config['atr_zones'] : [];
     }
 
     // ------------------------------------------------------------------
@@ -175,6 +180,7 @@ class AnalysisController
                 'financials' => null,
                 'isWatched'  => $this->watchlist->isWatched($userId, $ticker),
                 'trajectory' => null,
+                'execPlan'   => null,
                 'error'      => 'Nie udało się pobrać danych. Sprawdź symbol.',
             ]);
             return;
@@ -184,6 +190,11 @@ class AnalysisController
         $userId    = (int) $_SESSION['user_id'];
         $isWatched = $this->watchlist->isWatched($userId, $ticker);
         $trajectory = $this->buildTrajectory($ticker, $isWatched);
+
+        // Phase 8 (slice 2): ATR entry zone + stops from daily OHLC (read-only).
+        $execPlan = (!empty($financials['daily_ohlc']) && isset($financials['current_price']))
+            ? AtrZoneCalculator::compute($financials['daily_ohlc'], (float) $financials['current_price'], $this->atrZonesConfig)
+            : null;
 
         $aiConfig    = require dirname(__DIR__, 2) . '/config/ai.php';
         $gate        = new ProGate(new ProRepository(), new AiUsageRepository(), $aiConfig);
@@ -215,6 +226,7 @@ class AnalysisController
             'tickerAlertDisabled'  => $tickerAlertDisabled,  // S-04
             'cachedDescriptionPl'  => $cachedDescriptionPl,  // on-device translation cache
             'trajectory'           => $trajectory,           // Phase 8 slice 1 — CVS sparkline
+            'execPlan'             => $execPlan,             // Phase 8 slice 2 — ATR entry zone + stops
             'error'                => null,
         ]);
     }
