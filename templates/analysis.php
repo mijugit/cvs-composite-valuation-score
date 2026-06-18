@@ -484,6 +484,39 @@
                     <?php endif; ?>
                 </div>
 
+                <!-- CVS trajectory (Phase 8 slice 1) -->
+                <div class="trajectory-block">
+                    <h3>Trajektoria CVS <span class="trajectory-block__sub">Swing · 90 dni</span></h3>
+                    <?php if (!empty($trajectory) && !empty($trajectory['has_trajectory'])): ?>
+                        <?php
+                        $deltaChip = static function ($d): string {
+                            if ($d === null) {
+                                return '<span class="trajectory-delta trajectory-delta--flat">→ b/d</span>';
+                            }
+                            $d = (float) $d;
+                            if ($d > 0) {
+                                return '<span class="trajectory-delta trajectory-delta--up">▲ +' . number_format($d, 1) . '</span>';
+                            }
+                            if ($d < 0) {
+                                return '<span class="trajectory-delta trajectory-delta--down">▼ ' . number_format($d, 1) . '</span>';
+                            }
+                            return '<span class="trajectory-delta trajectory-delta--flat">→ 0.0</span>';
+                        };
+                        ?>
+                        <div class="trajectory-deltas">
+                            <span class="trajectory-deltas__label">Zmiana:</span>
+                            d/d <?= $deltaChip($trajectory['delta_daily']) ?>
+                            &nbsp; t/t <?= $deltaChip($trajectory['delta_weekly']) ?>
+                        </div>
+                        <div class="trajectory-chart"><canvas id="trajectory-chart"></canvas></div>
+                        <a class="trajectory-link" href="/track-record/<?= urlencode($ticker) ?>">Pełna historia CVS →</a>
+                    <?php elseif ($trajectory === null): ?>
+                        <p class="trajectory-empty">Dodaj tę spółkę do watchlisty, by CVS zbierał jej trajektorię w czasie.</p>
+                    <?php else: ?>
+                        <p class="trajectory-empty">Za mało danych — trajektoria pojawi się po kolejnych odświeżeniach (spółka jest obserwowana).</p>
+                    <?php endif; ?>
+                </div>
+
                 <!-- Pillar table with weights -->
                 <h3>Składowe filary</h3>
                 <table class="pillar-table">
@@ -1207,6 +1240,66 @@
                                     color: 'rgba(255,255,255,0.3)',
                                     font: { size: 10 },
                                 },
+                            },
+                        },
+                    },
+                });
+            });
+            </script>
+            <?php endif; ?>
+
+            <?php if (!empty($trajectory) && !empty($trajectory['has_trajectory'])): ?>
+            <script>
+            window.addEventListener('load', function () {
+                if (typeof Chart === 'undefined') return;
+                var tCtx = document.getElementById('trajectory-chart');
+                if (!tCtx) return;
+
+                var points = <?= json_encode($trajectory['points']) ?>;
+                if (!points.length) return;
+
+                var labels = points.map(function(p){
+                    var d = new Date(p.date);
+                    return d.toLocaleDateString('pl-PL', { day: '2-digit', month: 'short' });
+                });
+                var data = points.map(function(p){ return parseFloat(p.cvs); });
+
+                new Chart(tCtx.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'CVS Swing',
+                            data: data,
+                            borderColor: 'rgba(79, 142, 247, 0.9)',
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            pointRadius: 2,
+                            tension: 0.15,
+                        }],
+                    },
+                    options: {
+                        animation: false,
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(c){ return 'CVS ' + c.parsed.y.toFixed(1); },
+                                },
+                            },
+                        },
+                        scales: {
+                            x: {
+                                grid: { color: 'rgba(128,128,128,.08)' },
+                                ticks: { color: 'rgba(255,255,255,0.45)', font: { size: 10 }, maxRotation: 45 },
+                            },
+                            y: {
+                                min: 0,
+                                max: 100,
+                                grid: { color: 'rgba(128,128,128,.08)' },
+                                ticks: { color: 'rgba(255,255,255,0.45)', font: { size: 10 }, stepSize: 25 },
                             },
                         },
                     },

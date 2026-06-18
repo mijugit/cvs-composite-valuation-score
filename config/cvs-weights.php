@@ -252,6 +252,13 @@ return [
         'sell'       => 4.5, // mean ≤ 4.5 → Sprzedaj
     ],
 
+    // --- CVS trajectory (Phase 8, slice 1) ---
+    // Sparkline of headline CVS Swing over time on the analysis page.
+    'trajectory' => [
+        'window_days' => 90, // how far back the sparkline reaches
+        'min_points'  => 2,  // fewer points → empty-state instead of a chart
+    ],
+
     // --- Data source ---
     'data_source' => [
         'provider'        => 'yahoo_finance',

@@ -302,4 +302,27 @@ class CvsSnapshotRepository
         $stmt->execute([$ticker, $since->format('Y-m-d'), self::ORIGIN_RESCORE]);
         return $stmt->fetchAll() ?: [];
     }
+
+    /**
+     * CVS Swing trajectory series for a ticker since a given date (Phase 8, slice 1).
+     *
+     * Returns one clean headline line: filtered to ORIGIN_RESCORE AND the live
+     * model_version. The version filter is load-bearing — without it the JOIN-free
+     * read would return the shadow rows (3.1/3.2) that coexist for the same
+     * (ticker, score_date), producing multiple points per day (lessons.md: "Filtruj
+     * shadow model_version przy każdym odczycie"). origin filter keeps the
+     * calibration corpus out (corpus rows share live model_version values).
+     *
+     * @return array<int, array<string, mixed>> rows with score_date, cvs_swing — oldest first
+     */
+    public function findTrajectory(string $ticker, DateTimeImmutable $since, string $modelVersion): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT score_date, cvs_swing FROM cvs_snapshots
+             WHERE ticker = ? AND score_date >= ? AND origin = ? AND model_version = ?
+             ORDER BY score_date ASC'
+        );
+        $stmt->execute([strtoupper($ticker), $since->format('Y-m-d'), self::ORIGIN_RESCORE, $modelVersion]);
+        return $stmt->fetchAll() ?: [];
+    }
 }
