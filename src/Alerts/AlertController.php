@@ -14,13 +14,15 @@ use CVS\Core\Response;
  */
 class AlertController
 {
-    private AlertRepository $repo;
-    private UserRepository  $users;
+    private AlertRepository      $repo;
+    private UserRepository       $users;
+    private PriceAlertRepository $priceRepo;
 
     public function __construct()
     {
-        $this->repo  = new AlertRepository();
-        $this->users = new UserRepository();
+        $this->repo      = new AlertRepository();
+        $this->users     = new UserRepository();
+        $this->priceRepo = new PriceAlertRepository();
     }
 
     // ------------------------------------------------------------------
@@ -107,5 +109,30 @@ class AlertController
         $this->repo->setTickerDisabled($userId, $ticker, $newDisabled);
 
         Response::json(['ok' => true, 'disabled' => $newDisabled]);
+    }
+
+    // ------------------------------------------------------------------
+    // POST /alerts/price — toggle "price entered zone" alert (Phase 8 slice 3)
+    // ------------------------------------------------------------------
+
+    public function togglePrice(Request $req): void
+    {
+        AuthController::requireAuth();
+        if (!$req->verifyCsrf()) {
+            Response::json(['ok' => false, 'message' => 'CSRF error'], 403);
+            return;
+        }
+
+        $userId = (int) $_SESSION['user_id'];
+        $ticker = strtoupper(trim((string) ($req->input('ticker') ?? '')));
+        if ($ticker === '') {
+            Response::json(['ok' => false, 'message' => 'Ticker required'], 400);
+            return;
+        }
+
+        $new = !$this->priceRepo->isEnabled($userId, $ticker);
+        $this->priceRepo->setEnabled($userId, $ticker, $new);
+
+        Response::json(['ok' => true, 'enabled' => $new]);
     }
 }

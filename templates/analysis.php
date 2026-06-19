@@ -562,6 +562,18 @@
                     <?php if (($execPlan['source'] ?? '') === 'fallback'): ?>
                     <p class="exec-note">Strefa zmiennościowa (brak wyraźnego wsparcia w oknie) — oparta na ATR wokół ceny.</p>
                     <?php endif; ?>
+                    <?php $paGlobalOn = $alertsEnabled ?? false; $paOn = $priceAlertEnabled ?? false; ?>
+                    <div class="exec-alert-row">
+                        <button id="btn-price-alert" type="button"
+                                class="btn btn--sm <?= $paOn ? 'btn--secondary' : 'btn--ghost' ?>"
+                                data-ticker="<?= htmlspecialchars($ticker) ?>"
+                                data-enabled="<?= $paOn ? '1' : '0' ?>"
+                                <?= $paGlobalOn ? '' : 'disabled' ?>
+                                title="<?= $paGlobalOn ? 'Powiadom mailem, gdy cena wejdzie w strefę kupna' : 'Najpierw włącz alerty globalnie (dzwonek na panelu)' ?>">
+                            <?= $paOn ? '🔔 Alert ceny ON' : '🔕 Powiadom, gdy cena wejdzie w strefę' ?>
+                        </button>
+                        <?php if (!$paGlobalOn): ?><span class="exec-note">Włącz alerty globalnie (dzwonek na panelu), by uruchomić.</span><?php endif; ?>
+                    </div>
                     <p class="exec-disclaimer">Poziomy orientacyjne z danych cenowych — nie są rekomendacją. Inwestuj świadomie.</p>
                 </div>
                 <?php endif; ?>
@@ -1128,6 +1140,22 @@
                         btn.textContent  = d.disabled ? '🔕 Alerty OFF' : '🔔 Alerty ON';
                         btn.className    = 'btn btn--sm ' + (d.disabled ? 'btn--ghost' : 'btn--secondary');
                         btn.title        = d.disabled ? 'Włącz alerty dla tej spółki' : 'Wycisz alerty dla tej spółki';
+                    });
+                });
+
+                // Phase 8 slice 3 — "price entered zone" alert toggle.
+                document.getElementById('btn-price-alert')?.addEventListener('click', function () {
+                    var btn = this;
+                    if (btn.disabled) return;
+                    fetch('/alerts/price', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-Token': csrf},
+                        body: new URLSearchParams({_csrf: csrf, ticker: btn.dataset.ticker}),
+                    }).then(function (r) { return r.json(); }).then(function (d) {
+                        if (!d.ok) return;
+                        btn.dataset.enabled = d.enabled ? '1' : '0';
+                        btn.textContent = d.enabled ? '🔔 Alert ceny ON' : '🔕 Powiadom, gdy cena wejdzie w strefę';
+                        btn.className   = 'btn btn--sm ' + (d.enabled ? 'btn--secondary' : 'btn--ghost');
                     });
                 });
             })();

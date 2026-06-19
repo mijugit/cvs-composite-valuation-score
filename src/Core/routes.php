@@ -140,6 +140,7 @@ $router->get('/screener', fn($req) => $screener->index($req));
 
 $router->post('/alerts/global', fn($req) => $alertCtrl->toggleGlobal($req));
 $router->post('/alerts/ticker', fn($req) => $alertCtrl->toggleTicker($req));
+$router->post('/alerts/price',  fn($req) => $alertCtrl->togglePrice($req));
 
 // ------------------------------------------------------------------
 // On-device translation cache (Chrome Translator API / Built-in AI)
