@@ -48,8 +48,10 @@ $config = require ROOT_PATH . '/config/cvs-weights.php';
 
 use CVS\Alerts\AlertRepository;
 use CVS\Alerts\AlertService;
+use CVS\Alerts\PriceAlertRepository;
 use CVS\Api\FinancialDataFetcher;
 use CVS\Auth\UserRepository;
+use CVS\Execution\AtrZoneCalculator;
 use CVS\CVS\CVSModel;
 use CVS\Mail\MailService;
 use CVS\TrackRecord\CvsSnapshotRepository;
@@ -65,6 +67,9 @@ $model       = new CVSModel($config);
 // Phase 7 (slice 1): base + shadow dual-write extracted into the shared
 // SnapshotWriter (FR-002) — same logic, now reused by the peer-median crawl.
 $writer      = new SnapshotWriter();
+// Phase 8 (slice 3): per-ticker ATR zone cache for the price-alert cron.
+$priceAlertRepo = new PriceAlertRepository();
+$atrZonesCfg    = is_array($config['atr_zones'] ?? null) ? $config['atr_zones'] : [];
 
 $mailConfig  = require ROOT_PATH . '/config/mail.php';
 $alertSvc    = new AlertService(
@@ -104,6 +109,15 @@ foreach ($tickers as $ticker) {
     // Base (4.0) + shadow (3.1/3.2) rows in one call — shadow mode (FR-016/FR-019).
     // FX fields propagate to every version row (same stock, same point in time).
     $writer->persist($result, $price, $sector, $industry, CvsSnapshotRepository::ORIGIN_RESCORE, $companyName, $fxRateToUsd, $nativeCurrency, $nativePrice);
+
+    // Phase 8 (slice 3): cache the ATR entry zone per ticker (from already-fetched
+    // daily OHLC — zero extra Yahoo calls) so the light price-alert cron can read it.
+    if ($price !== null && !empty($financials['daily_ohlc'])) {
+        $zone = AtrZoneCalculator::compute($financials['daily_ohlc'], $price, $atrZonesCfg);
+        if ($zone['has_zone']) {
+            $priceAlertRepo->upsertZone($ticker, $zone, $fxRateToUsd);
+        }
+    }
 
     // S-04: check for state change and notify watching users.
     $alerted = $alertSvc->checkAndNotify($ticker, $result->toArray());
