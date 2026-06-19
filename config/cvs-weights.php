@@ -272,6 +272,14 @@ return [
         ],
     ],
 
+    // --- Price-threshold alerts (Phase 8, slice 3) ---
+    'price_alert' => [
+        // Hysteresis margin as a fraction of zone width: price must leave the zone by
+        // this buffer before the alert re-arms. 0.0 = re-arm on any exit.
+        'hysteresis_margin_frac' => 0.0,
+        'live_price_range'       => '1d', // chart range for the light price read
+    ],
+
     // --- Data source ---
     'data_source' => [
         'provider'        => 'yahoo_finance',

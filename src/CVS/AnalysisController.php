@@ -6,6 +6,7 @@ namespace CVS\CVS;
 
 use CVS\Ai\AiAnalysisRepository;
 use CVS\Alerts\AlertRepository;
+use CVS\Alerts\PriceAlertRepository;
 use CVS\Auth\AuthController;
 use CVS\Api\FinancialDataFetcher;
 use CVS\Core\Request;
@@ -209,6 +210,7 @@ class AnalysisController
         $alertRepo          = new AlertRepository();
         $alertsEnabled      = $alertRepo->isGlobalEnabled($userId);
         $tickerAlertDisabled = $alertRepo->isTickerDisabled($userId, $ticker);
+        $priceAlertEnabled  = (new PriceAlertRepository())->isEnabled($userId, $ticker);
 
         $translationRepo   = new TranslationRepository();
         $cachedDescriptionPl = $translationRepo->find($ticker, 'pl', 'long_description');
@@ -227,6 +229,7 @@ class AnalysisController
             'cachedDescriptionPl'  => $cachedDescriptionPl,  // on-device translation cache
             'trajectory'           => $trajectory,           // Phase 8 slice 1 — CVS sparkline
             'execPlan'             => $execPlan,             // Phase 8 slice 2 — ATR entry zone + stops
+            'priceAlertEnabled'    => $priceAlertEnabled,    // Phase 8 slice 3 — "price in zone" alert
             'error'                => null,
         ]);
     }

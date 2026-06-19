@@ -317,3 +317,4 @@
 .exec-note,
 .exec-disclaimer { font-size: var(--text-xs); color: var(--c-muted); margin: .4rem 0 0; }
 .exec-disclaimer { opacity: .8; }
+.exec-alert-row { margin-top: .7rem; display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }

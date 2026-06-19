@@ -265,6 +265,43 @@ class FinancialDataFetcher
     }
 
     /**
+     * Light current-price read (native currency) via the chart endpoint — for the
+     * price-alert cron (Phase 8 slice 3). One chart call, no quoteSummary. Returns the
+     * most recent non-null close, or null on any failure. Caller converts to USD using
+     * the fx rate stored alongside the zone.
+     */
+    public function fetchLatestPrice(string $ticker, string $range = '1d'): ?float
+    {
+        $auth = $this->getCrumbAndCookie();
+        $url  = self::CHART_URL . urlencode($ticker)
+              . '?interval=1d&range=' . urlencode($range)
+              . '&crumb=' . urlencode($auth['crumb']);
+
+        $result = $this->curlGetWithHeaders($url, $auth['cookie'], []);
+        $body   = $result['body'] ?? null;
+        if ($body === null) {
+            return null;
+        }
+
+        try {
+            $decoded = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return null;
+        }
+
+        $closes = $decoded['chart']['result'][0]['indicators']['quote'][0]['close'] ?? null;
+        if (!is_array($closes)) {
+            return null;
+        }
+        foreach (array_reverse($closes) as $c) {
+            if ($c !== null) {
+                return (float) $c;
+            }
+        }
+        return null;
+    }
+
+    /**
      * Fetch daily OHLC (high/low/close) via the chart endpoint for ATR / entry-zone math.
      *
      * Returns parallel float arrays (oldest first) with nulls dropped consistently across
