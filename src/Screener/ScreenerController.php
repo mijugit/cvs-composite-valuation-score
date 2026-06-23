@@ -15,7 +15,8 @@ class ScreenerController
 {
     private ScreenerRepository $repo;
 
-    private const VALID_SORTS = ['swing', 'fund', 'date'];
+    private const VALID_SORTS = ['swing', 'fund', 'date', 'ticker', 'price', 'atr'];
+    private const VALID_ATR   = ['in_zone', 'above', 'below'];
 
     public function __construct()
     {
@@ -36,6 +37,9 @@ class ScreenerController
         $signal   = $req->query('signal') !== null ? trim((string) $req->query('signal')) : null;
         $minSwing = max(0, min(100, (int) ($req->query('min_swing') ?? 0)));
         $sector   = $req->query('sector') !== null ? trim((string) $req->query('sector')) : null;
+        $atr      = in_array($req->query('atr'), self::VALID_ATR, true)
+            ? (string) $req->query('atr')
+            : null;
         $sort     = in_array($req->query('sort'), self::VALID_SORTS, true)
             ? (string) $req->query('sort')
             : 'swing';
@@ -45,7 +49,7 @@ class ScreenerController
         $signal = $signal !== '' ? $signal : null;
         $sector = $sector !== '' ? $sector : null;
 
-        $rows      = $this->repo->getFiltered($reco, $signal, $minSwing, $sector, $sort);
+        $rows      = $this->repo->getFiltered($reco, $signal, $minSwing, $sector, $sort, $atr);
         $lastScored = $this->repo->getLastScoredAt();
         $sectors   = $this->repo->getDistinctSectors();
 
@@ -57,6 +61,7 @@ class ScreenerController
             'filter_signal'    => $signal,
             'filter_min_swing' => $minSwing,
             'filter_sector'    => $sector,
+            'filter_atr'       => $atr,
             'sort'        => $sort,
         ]);
     }

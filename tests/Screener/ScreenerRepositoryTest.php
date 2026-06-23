@@ -222,4 +222,35 @@ class ScreenerRepositoryTest extends TestCase
         $this->assertArrayHasKey('atr_state', $rows[0]);
         $this->assertNull($rows[0]['atr_state']);
     }
+
+    private function seedZones(PDO $db): void
+    {
+        $db->exec('CREATE TABLE ticker_zone (ticker TEXT PRIMARY KEY, zone_low REAL, zone_high REAL, stop_swing REAL, stop_fund REAL, fx_rate_to_usd REAL, source TEXT, computed_at TEXT NOT NULL)');
+        $this->insertPriced($db, 'INZ', 100.0); // in zone
+        $this->insertPriced($db, 'ABV', 120.0); // above
+        $this->insertPriced($db, 'BLW', 90.0);  // below
+        $z = $db->prepare('INSERT INTO ticker_zone (ticker, zone_low, zone_high, computed_at) VALUES (?, 99.0, 101.0, date(\'now\'))');
+        foreach (['INZ', 'ABV', 'BLW'] as $t) {
+            $z->execute([$t]);
+        }
+    }
+
+    public function test_get_filtered_by_atr_state(): void
+    {
+        $repo = $this->makeRepo();
+        $this->seedZones($this->dbOf($repo));
+
+        $res = $repo->getFiltered(null, null, 0, null, 'swing', 'in_zone');
+        $this->assertCount(1, $res);
+        $this->assertSame('INZ', $res[0]['ticker']);
+    }
+
+    public function test_sort_by_atr_ranks_in_zone_then_below_then_above(): void
+    {
+        $repo = $this->makeRepo();
+        $this->seedZones($this->dbOf($repo));
+
+        $res = $repo->getFiltered(null, null, 0, null, 'atr');
+        $this->assertSame(['INZ', 'BLW', 'ABV'], array_column($res, 'ticker'));
+    }
 }

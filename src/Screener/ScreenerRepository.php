@@ -56,12 +56,26 @@ class ScreenerRepository
         ?string $signal   = null,
         int     $minSwing = 0,
         ?string $sector   = null,
-        string  $sort     = 'swing'
+        string  $sort     = 'swing',
+        ?string $atr      = null
     ): array {
         $rows = $this->findAllLatest();
 
         // Filter: only quality_gate passed.
         $rows = array_filter($rows, fn($r) => (int) $r['quality_gate'] === 1);
+
+        // Enrich each row with ATR zone state (needed both for the ATR filter below
+        // and the ATR column in the view). price_at_snapshot and the zone are both USD
+        // and written by the same rescore run, so the comparison is consistent.
+        $zones = $this->findZoneMap();
+        foreach ($rows as &$row) {
+            $ticker = strtoupper((string) ($row['ticker'] ?? ''));
+            $price  = $row['price_at_snapshot'] ?? null;
+            $row['atr_state'] = ($price !== null && isset($zones[$ticker]))
+                ? $this->classifyAtrState((float) $price, $zones[$ticker]['low'], $zones[$ticker]['high'])
+                : null;
+        }
+        unset($row);
 
         // Filter: rekomendacja.
         if ($reco !== null && $reco !== '') {
@@ -90,28 +104,24 @@ class ScreenerRepository
             $rows = array_filter($rows, fn($r) => ($r['sector'] ?? null) === $sector);
         }
 
-        // Sort.
+        // Filter: ATR zone state (in_zone / above / below).
+        if ($atr !== null && $atr !== '') {
+            $rows = array_filter($rows, fn($r) => ($r['atr_state'] ?? null) === $atr);
+        }
+
+        // Sort. ATR ranks by actionability for entries: in zone, then below, then above.
+        $atrRank = static fn (?string $s): int => ['in_zone' => 0, 'below' => 1, 'above' => 2][$s] ?? 3;
         $rows = array_values($rows);
-        usort($rows, function (array $a, array $b) use ($sort): int {
+        usort($rows, function (array $a, array $b) use ($sort, $atrRank): int {
             return match ($sort) {
-                'fund'  => (float) ($b['cvs_fund']  ?? 0) <=> (float) ($a['cvs_fund']  ?? 0),
-                'date'  => ($b['score_date'] ?? '') <=> ($a['score_date'] ?? ''),
-                default => (float) ($b['cvs_swing'] ?? 0) <=> (float) ($a['cvs_swing'] ?? 0),
+                'fund'   => (float) ($b['cvs_fund']  ?? 0) <=> (float) ($a['cvs_fund']  ?? 0),
+                'date'   => ($b['score_date'] ?? '') <=> ($a['score_date'] ?? ''),
+                'ticker' => strcmp((string) ($a['ticker'] ?? ''), (string) ($b['ticker'] ?? '')),
+                'price'  => (float) ($b['price_at_snapshot'] ?? 0) <=> (float) ($a['price_at_snapshot'] ?? 0),
+                'atr'    => $atrRank($a['atr_state'] ?? null) <=> $atrRank($b['atr_state'] ?? null),
+                default  => (float) ($b['cvs_swing'] ?? 0) <=> (float) ($a['cvs_swing'] ?? 0),
             };
         });
-
-        // Phase 8 follow-up: enrich each row with the price's state vs its ATR
-        // accumulation zone (from ticker_zone). price_at_snapshot and the zone are
-        // both USD and written by the same rescore run, so the comparison is consistent.
-        $zones = $this->findZoneMap();
-        foreach ($rows as &$row) {
-            $ticker = strtoupper((string) ($row['ticker'] ?? ''));
-            $price  = $row['price_at_snapshot'] ?? null;
-            $row['atr_state'] = ($price !== null && isset($zones[$ticker]))
-                ? $this->classifyAtrState((float) $price, $zones[$ticker]['low'], $zones[$ticker]['high'])
-                : null;
-        }
-        unset($row);
 
         return $rows;
     }
