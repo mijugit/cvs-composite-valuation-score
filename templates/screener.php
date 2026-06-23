@@ -59,6 +59,20 @@ $earningsChip = static function (?string $state, ?int $daysTo, ?int $daysSince):
         default      => '<span style="color:var(--c-muted);">—</span>',
     };
 };
+
+// Phase 8 follow-up — ATR zone state chip (price vs accumulation zone).
+$atrChip = static function (?string $state): string {
+    return match ($state) {
+        'in_zone' => '<span class="signal-pill signal-pill--strong" title="Cena w strefie akumulacji ATR — sprzyjający moment wejścia">✓ w strefie</span>',
+        'above'   => '<span class="signal-pill signal-pill--watchlist" title="Cena powyżej strefy akumulacji — rozważ czekanie na cofnięcie">↑ powyżej</span>',
+        'below'   => '<span class="signal-pill" style="background:rgba(239,68,68,.15);color:var(--c-danger,#ef4444);" title="Cena poniżej strefy akumulacji (poniżej wsparcia)">↓ poniżej</span>',
+        default   => '<span style="color:var(--c-muted);" title="Brak danych strefy ATR dla tej spółki">—</span>',
+    };
+};
+
+// Helper: column-header info hint (ⓘ tooltip), reusing the .chart-hint pattern.
+$hint = static fn (string $text): string =>
+    ' <span class="chart-hint" tabindex="0">ⓘ<span class="chart-hint__tooltip">' . $text . '</span></span>';
 ?>
 
 <div style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:.5rem;">
@@ -149,11 +163,12 @@ $earningsChip = static function (?string $state, ?int $daysTo, ?int $daysSince):
         <thead>
             <tr>
                 <th>Ticker</th>
-                <th><?= $sortLink('swing', 'CVS Swing') ?></th>
-                <th><?= $sortLink('fund',  'CVS Fund') ?></th>
-                <th>Rekomendacja</th>
-                <th>Sygnał</th>
-                <th>Wyniki</th>
+                <th><?= $sortLink('swing', 'CVS Swing') . $hint('Złożony wynik 0–100 w horyzoncie swing (1–4 mies.). Wyżej = lepiej.') ?></th>
+                <th><?= $sortLink('fund',  'CVS Fund') . $hint('Złożony wynik 0–100 w horyzoncie fundamentalnym (6–12 mies.).') ?></th>
+                <th>Rekomendacja<?= $hint('Etykieta od SILNE KUPUJ do UNIKAJ wynikająca z wyniku CVS Swing.') ?></th>
+                <th>Sygnał<?= $hint('Złoty sygnał: ⭐⭐ wartość + momentum, ⭐ obserwuj (setup fundamentalny), ↑ momentum.') ?></th>
+                <th>Wyniki<?= $hint('Bliskość publikacji wyników kwartalnych (📅 za N dni / w oknie / N dni temu).') ?></th>
+                <th>ATR<?= $hint('Pozycja ceny względem strefy akumulacji ATR: ✓ w strefie kupna, ↑ powyżej (czekaj na cofnięcie), ↓ poniżej (pod wsparciem).') ?></th>
                 <th>Sektor</th>
                 <th>Cena</th>
                 <th><?= $sortLink('date', 'Data') ?></th>
@@ -194,6 +209,7 @@ $earningsChip = static function (?string $state, ?int $daysTo, ?int $daysSince):
                 isset($row['days_to_earnings'])    ? (int) $row['days_to_earnings']    : null,
                 isset($row['days_since_earnings']) ? (int) $row['days_since_earnings'] : null
             ) ?></td>
+            <td><?= $atrChip($row['atr_state'] ?? null) ?></td>
             <td style="font-size:var(--text-sm);color:var(--c-muted);"><?= $sec ?></td>
             <td style="font-size:var(--text-sm);"><?= $price ?></td>
             <td style="font-size:var(--text-xs);color:var(--c-muted);"><?= $date ?></td>

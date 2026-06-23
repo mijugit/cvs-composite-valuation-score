@@ -100,7 +100,57 @@ class ScreenerRepository
             };
         });
 
+        // Phase 8 follow-up: enrich each row with the price's state vs its ATR
+        // accumulation zone (from ticker_zone). price_at_snapshot and the zone are
+        // both USD and written by the same rescore run, so the comparison is consistent.
+        $zones = $this->findZoneMap();
+        foreach ($rows as &$row) {
+            $ticker = strtoupper((string) ($row['ticker'] ?? ''));
+            $price  = $row['price_at_snapshot'] ?? null;
+            $row['atr_state'] = ($price !== null && isset($zones[$ticker]))
+                ? $this->classifyAtrState((float) $price, $zones[$ticker]['low'], $zones[$ticker]['high'])
+                : null;
+        }
+        unset($row);
+
         return $rows;
+    }
+
+    /**
+     * Map ticker → {low, high} from the ATR zone cache. Returns an empty map if the
+     * table is absent (pre-migration / test schema) so the screener degrades gracefully.
+     *
+     * @return array<string, array{low: float, high: float}>
+     */
+    private function findZoneMap(): array
+    {
+        try {
+            $stmt = $this->db->query(
+                'SELECT ticker, zone_low, zone_high FROM ticker_zone WHERE zone_low IS NOT NULL AND zone_high IS NOT NULL'
+            );
+        } catch (\PDOException) {
+            return [];
+        }
+        if ($stmt === false) {
+            return [];
+        }
+        $map = [];
+        foreach ($stmt->fetchAll() as $z) {
+            $map[strtoupper((string) $z['ticker'])] = [
+                'low'  => (float) $z['zone_low'],
+                'high' => (float) $z['zone_high'],
+            ];
+        }
+        return $map;
+    }
+
+    /** Classify a price against the accumulation zone: in_zone / above / below. */
+    private function classifyAtrState(float $price, float $low, float $high): string
+    {
+        if ($price >= $low && $price <= $high) {
+            return 'in_zone';
+        }
+        return $price > $high ? 'above' : 'below';
     }
 
     /**
