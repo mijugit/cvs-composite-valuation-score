@@ -16,7 +16,7 @@ class TrackRecordController
     private TrackRecordRepository $repo;
     private string $liveModelVersion;
 
-    private const VALID_HORIZONS = [30, 60, 90];
+    private const VALID_HORIZONS = [7, 15, 30, 60, 90];
     private const DEFAULT_HORIZON = 30;
 
     public function __construct()
@@ -50,12 +50,20 @@ class TrackRecordController
             $byTicker[$ticker][] = $row;
         }
 
+        // Honest empty-state: tracking effectively starts when the live model_version
+        // began being written (not at the first-ever snapshot — older versions/currency
+        // basis differ and are excluded from evaluation).
+        $trackingStart = $this->repo->getEarliestLiveSnapshotDate(
+            $this->liveModelVersion !== '' ? $this->liveModelVersion : null
+        );
+
         Response::view('track-record', [
-            'evaluations' => $enriched,
-            'byTicker'    => $byTicker,
-            'stats'       => $stats,
-            'horizon'     => $horizon,
-            'horizons'    => self::VALID_HORIZONS,
+            'evaluations'   => $enriched,
+            'byTicker'      => $byTicker,
+            'stats'         => $stats,
+            'horizon'       => $horizon,
+            'horizons'      => self::VALID_HORIZONS,
+            'trackingStart' => $trackingStart,
         ]);
     }
 
