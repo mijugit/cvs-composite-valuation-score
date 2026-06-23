@@ -168,4 +168,58 @@ class ScreenerRepositoryTest extends TestCase
 
         $this->assertSame(['Technology'], $repo->getDistinctSectors(), 'corpus-only sectors must not flood the dropdown');
     }
+
+    // ------------------------------------------------------------------
+    // ATR zone state enrichment (Phase 8 follow-up)
+    // ------------------------------------------------------------------
+
+    private function dbOf(ScreenerRepository $repo): PDO
+    {
+        $ref = new \ReflectionProperty(ScreenerRepository::class, 'db');
+        $ref->setAccessible(true);
+        return $ref->getValue($repo);
+    }
+
+    private function insertPriced(PDO $db, string $ticker, float $price): void
+    {
+        $db->prepare('
+            INSERT INTO cvs_snapshots (ticker, score_date, price_at_snapshot, cvs_swing, cvs_fund, reco_swing, quality_gate, origin)
+            VALUES (?, date(\'now\'), ?, 80.0, 70.0, \'SILNE KUPUJ\', 1, \'rescore\')
+        ')->execute([$ticker, $price]);
+    }
+
+    public function test_get_filtered_enriches_atr_state(): void
+    {
+        $repo = $this->makeRepo();
+        $db   = $this->dbOf($repo);
+        $db->exec('CREATE TABLE ticker_zone (ticker TEXT PRIMARY KEY, zone_low REAL, zone_high REAL, stop_swing REAL, stop_fund REAL, fx_rate_to_usd REAL, source TEXT, computed_at TEXT NOT NULL)');
+
+        $this->insertPriced($db, 'INZ', 100.0); // in [99,101]
+        $this->insertPriced($db, 'ABV', 120.0); // above
+        $this->insertPriced($db, 'BLW', 90.0);  // below
+        $this->insertPriced($db, 'NOZ', 50.0);  // no zone row → null
+
+        $z = $db->prepare('INSERT INTO ticker_zone (ticker, zone_low, zone_high, computed_at) VALUES (?, ?, ?, date(\'now\'))');
+        foreach (['INZ', 'ABV', 'BLW'] as $t) {
+            $z->execute([$t, 99.0, 101.0]);
+        }
+
+        $byTicker = array_column($repo->getFiltered(), 'atr_state', 'ticker');
+        $this->assertSame('in_zone', $byTicker['INZ']);
+        $this->assertSame('above',   $byTicker['ABV']);
+        $this->assertSame('below',   $byTicker['BLW']);
+        $this->assertNull($byTicker['NOZ']);
+    }
+
+    public function test_atr_state_null_when_zone_table_absent(): void
+    {
+        // makeRepo() builds no ticker_zone table — findZoneMap must degrade gracefully.
+        $repo = $this->makeRepo();
+        $this->insertPriced($this->dbOf($repo), 'AAPL', 100.0);
+
+        $rows = $repo->getFiltered();
+        $this->assertCount(1, $rows);
+        $this->assertArrayHasKey('atr_state', $rows[0]);
+        $this->assertNull($rows[0]['atr_state']);
+    }
 }
