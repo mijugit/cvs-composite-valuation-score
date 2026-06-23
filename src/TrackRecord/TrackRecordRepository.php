@@ -44,7 +44,8 @@ class TrackRecordRepository
         [$cutoffOld, $cutoffRecent] = $this->dateCutoffs($horizonDays);
 
         $versionFilter = $modelVersion !== null ? 'AND old.model_version = ?' : '';
-        $latestVersionFilter = $modelVersion !== null ? 'AND model_version = ?' : '';
+        $latestVersionFilter  = $modelVersion !== null ? 'AND model_version = ?'   : '';
+        $latestVersionFilterR = $modelVersion !== null ? 'AND r.model_version = ?' : '';
         // Phase 7 (slice 1, FR-003): both join sides hard-filter to ORIGIN_RESCORE —
         // corpus rows share live model_version values, so without this filter the
         // full-universe corpus would inflate hit-rate statistics with tickers no
@@ -71,13 +72,23 @@ class TrackRecordRepository
                 ) AS price_change_pct
             FROM cvs_snapshots old
             INNER JOIN (
-                SELECT ticker, MAX(price_at_snapshot) AS price_now
-                FROM cvs_snapshots
-                WHERE score_date >= ?
-                  AND price_at_snapshot IS NOT NULL
-                  AND origin = '{$o}'
-                  {$latestVersionFilter}
-                GROUP BY ticker
+                -- 'now' = price of the MOST RECENT snapshot in the window, not MAX(price).
+                -- UNIQUE(ticker, score_date, model_version, origin) guarantees one row per
+                -- (ticker, latest date) for the live version → exactly one price_now per ticker.
+                SELECT r.ticker, r.price_at_snapshot AS price_now
+                FROM cvs_snapshots r
+                INNER JOIN (
+                    SELECT ticker, MAX(score_date) AS md
+                    FROM cvs_snapshots
+                    WHERE score_date >= ?
+                      AND price_at_snapshot IS NOT NULL
+                      AND origin = '{$o}'
+                      {$latestVersionFilter}
+                    GROUP BY ticker
+                ) mx ON mx.ticker = r.ticker AND mx.md = r.score_date
+                WHERE r.origin = '{$o}'
+                  AND r.price_at_snapshot IS NOT NULL
+                  {$latestVersionFilterR}
             ) latest ON latest.ticker = old.ticker
             WHERE old.score_date <= ?
               AND old.price_at_snapshot IS NOT NULL
@@ -89,11 +100,12 @@ class TrackRecordRepository
 
         $params = [$cutoffRecent];
         if ($modelVersion !== null) {
-            $params[] = $modelVersion; // for latestVersionFilter
+            $params[] = $modelVersion; // inner mx version filter
+            $params[] = $modelVersion; // outer r version filter
         }
         $params[] = $cutoffOld;
         if ($modelVersion !== null) {
-            $params[] = $modelVersion; // for versionFilter
+            $params[] = $modelVersion; // for versionFilter (old leg)
         }
 
         $stmt->execute($params);
@@ -111,7 +123,8 @@ class TrackRecordRepository
         [$cutoffOld, $cutoffRecent] = $this->dateCutoffs($horizonDays);
 
         $versionFilter = $modelVersion !== null ? 'AND old.model_version = ?' : '';
-        $latestVersionFilter = $modelVersion !== null ? 'AND model_version = ?' : '';
+        $latestVersionFilter  = $modelVersion !== null ? 'AND model_version = ?'   : '';
+        $latestVersionFilterR = $modelVersion !== null ? 'AND r.model_version = ?' : '';
         // Phase 7 (slice 1, FR-003): see getEvaluations() — same origin guard.
         $o = CvsSnapshotRepository::ORIGIN_RESCORE;
 
@@ -134,14 +147,22 @@ class TrackRecordRepository
                 ) AS price_change_pct
             FROM cvs_snapshots old
             INNER JOIN (
-                SELECT ticker, MAX(price_at_snapshot) AS price_now
-                FROM cvs_snapshots
-                WHERE score_date >= ?
-                  AND price_at_snapshot IS NOT NULL
-                  AND ticker = ?
-                  AND origin = '{$o}'
-                  {$latestVersionFilter}
-                GROUP BY ticker
+                -- 'now' = price of the MOST RECENT snapshot in the window (not MAX price).
+                SELECT r.ticker, r.price_at_snapshot AS price_now
+                FROM cvs_snapshots r
+                INNER JOIN (
+                    SELECT ticker, MAX(score_date) AS md
+                    FROM cvs_snapshots
+                    WHERE score_date >= ?
+                      AND price_at_snapshot IS NOT NULL
+                      AND ticker = ?
+                      AND origin = '{$o}'
+                      {$latestVersionFilter}
+                    GROUP BY ticker
+                ) mx ON mx.ticker = r.ticker AND mx.md = r.score_date
+                WHERE r.origin = '{$o}'
+                  AND r.price_at_snapshot IS NOT NULL
+                  {$latestVersionFilterR}
             ) latest ON latest.ticker = old.ticker
             WHERE old.ticker = ?
               AND old.score_date <= ?
@@ -154,12 +175,13 @@ class TrackRecordRepository
 
         $params = [$cutoffRecent, $ticker];
         if ($modelVersion !== null) {
-            $params[] = $modelVersion; // for latestVersionFilter
+            $params[] = $modelVersion; // inner mx version filter
+            $params[] = $modelVersion; // outer r version filter
         }
         $params[] = $ticker;
         $params[] = $cutoffOld;
         if ($modelVersion !== null) {
-            $params[] = $modelVersion; // for versionFilter
+            $params[] = $modelVersion; // for versionFilter (old leg)
         }
 
         $stmt->execute($params);
@@ -200,6 +222,23 @@ class TrackRecordRepository
         return TrackRecordCalculator::summarise(
             TrackRecordCalculator::enrichWithResult($evaluations)
         );
+    }
+
+    /**
+     * Earliest user-facing snapshot date for the live model version (with a price).
+     * Drives the honest empty-state copy — the tracking clock effectively starts when
+     * the live version began being written, not at the first-ever snapshot.
+     */
+    public function getEarliestLiveSnapshotDate(?string $modelVersion = null): ?string
+    {
+        $o  = CvsSnapshotRepository::ORIGIN_RESCORE;
+        $vf = $modelVersion !== null ? 'AND model_version = ?' : '';
+        $stmt = $this->db->prepare(
+            "SELECT MIN(score_date) FROM cvs_snapshots WHERE origin = '{$o}' AND price_at_snapshot IS NOT NULL {$vf}"
+        );
+        $stmt->execute($modelVersion !== null ? [$modelVersion] : []);
+        $val = $stmt->fetchColumn();
+        return $val !== false && $val !== null ? (string) $val : null;
     }
 
     // ------------------------------------------------------------------

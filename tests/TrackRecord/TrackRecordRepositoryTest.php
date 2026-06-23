@@ -151,4 +151,57 @@ class TrackRecordRepositoryTest extends TestCase
         $this->assertCount(1, $pairsTicker);
         $this->assertSame('3.1', $pairsTicker[0]['model_version']);
     }
+
+    // ------------------------------------------------------------------
+    // 'now' = latest snapshot (not MAX price in window)
+    // ------------------------------------------------------------------
+
+    public function test_price_now_uses_latest_not_max(): void
+    {
+        [$repo, $pdo] = $this->makeRepo();
+        $this->insert($pdo, 'AAPL', $this->daysAgo(35), 100.0); // old leg
+        $this->insert($pdo, 'AAPL', $this->daysAgo(5),  130.0); // higher, but NOT latest
+        $this->insert($pdo, 'AAPL', $this->daysAgo(0),  110.0); // latest
+
+        $pairs = $repo->getEvaluations(30);
+        $this->assertCount(1, $pairs);
+        $this->assertEquals(110.0, (float) $pairs[0]['price_now'], 'price_now must be the latest snapshot, not the max in the window');
+        $this->assertEquals(10.0, (float) $pairs[0]['price_change_pct']);
+    }
+
+    public function test_get_for_ticker_price_now_uses_latest_not_max(): void
+    {
+        [$repo, $pdo] = $this->makeRepo();
+        $this->insert($pdo, 'AAPL', $this->daysAgo(35), 100.0);
+        $this->insert($pdo, 'AAPL', $this->daysAgo(5),  130.0);
+        $this->insert($pdo, 'AAPL', $this->daysAgo(0),  110.0);
+
+        $pairs = $repo->getForTicker('AAPL', 30);
+        $this->assertNotEmpty($pairs);
+        $this->assertEquals(110.0, (float) $pairs[0]['price_now']);
+    }
+
+    public function test_short_horizon_pairs_when_old_leg_recent(): void
+    {
+        // 15-day horizon: an 18-day-old snapshot becomes a valid 'old' leg.
+        [$repo, $pdo] = $this->makeRepo();
+        $this->insert($pdo, 'AAPL', $this->daysAgo(18), 100.0);
+        $this->insert($pdo, 'AAPL', $this->daysAgo(0),  112.0);
+
+        $this->assertSame([], $repo->getEvaluations(30), '30d horizon: 18-day-old leg is too recent');
+        $pairs15 = $repo->getEvaluations(15);
+        $this->assertCount(1, $pairs15, '15d horizon: 18-day-old leg qualifies');
+        $this->assertEquals(12.0, (float) $pairs15[0]['price_change_pct']);
+    }
+
+    public function test_get_earliest_live_snapshot_date(): void
+    {
+        [$repo, $pdo] = $this->makeRepo();
+        $this->insert($pdo, 'AAPL', $this->daysAgo(20), 100.0, 'rescore', '4.0');
+        $this->insert($pdo, 'AAPL', $this->daysAgo(10), 105.0, 'rescore', '4.0');
+        $this->insert($pdo, 'OLD',  $this->daysAgo(40), 50.0,  'rescore', '3.0'); // older version — excluded
+        $this->insert($pdo, 'CORP', $this->daysAgo(50), 10.0,  'corpus',  '4.0'); // corpus — excluded
+
+        $this->assertSame($this->daysAgo(20), $repo->getEarliestLiveSnapshotDate('4.0'));
+    }
 }

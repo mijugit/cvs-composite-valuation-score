@@ -5,6 +5,7 @@
  *            hit_rate_pct: float|null, avg_change_pct: float|null} $stats */
 /** @var int $horizon */
 /** @var int[] $horizons */
+/** @var string|null $trackingStart */
 
 $resultChip = static function (string $result): string {
     return match ($result) {
@@ -58,9 +59,13 @@ $resultChip = static function (string $result): string {
         Brak ocenionych rekomendacji dla horyzontu <?= $horizon ?> dni.
     </p>
     <p style="color:var(--c-muted);font-size:var(--text-sm);">
-        Snapshoty CVS gromadzone są od 2026-06-01.
-        Pierwsze oceny pojawią się ~<?= $horizon ?> dni po starcie, tj. ok.
-        <strong><?= (new DateTimeImmutable('2026-06-01'))->modify("+{$horizon} days")->format('d.m.Y') ?></strong>.
+        <?php if (!empty($trackingStart)): ?>
+        Snapshoty bieżącej wersji modelu zbierane są od <?= htmlspecialchars((new DateTimeImmutable($trackingStart))->format('d.m.Y')) ?>.
+        Pierwsze oceny dla tego horyzontu pojawią się ~<?= $horizon ?> dni po starcie, tj. ok.
+        <strong><?= (new DateTimeImmutable($trackingStart))->modify("+{$horizon} days")->format('d.m.Y') ?></strong>.
+        <?php else: ?>
+        Brak snapshotów bieżącej wersji modelu — oceny pojawią się po pierwszym przebiegu re-scoringu.
+        <?php endif; ?>
     </p>
 </div>
 <?php else: ?>
