@@ -6,6 +6,7 @@
 /** @var string|null $filter_signal */
 /** @var int $filter_min_swing */
 /** @var string|null $filter_sector */
+/** @var string|null $filter_atr */
 /** @var string $sort */
 
 $recoOptions = [
@@ -24,13 +25,14 @@ $signalLabels = [
 ];
 
 // Helper: sort link with arrow indicator
-$sortLink = static function (string $col, string $label) use ($sort, $filter_reco, $filter_signal, $filter_min_swing, $filter_sector): string {
+$sortLink = static function (string $col, string $label) use ($sort, $filter_reco, $filter_signal, $filter_min_swing, $filter_sector, $filter_atr): string {
     $arrow = $col === $sort ? ' ↓' : '';
     $params = http_build_query(array_filter([
         'reco'      => $filter_reco,
         'signal'    => $filter_signal,
         'min_swing' => $filter_min_swing > 0 ? $filter_min_swing : null,
         'sector'    => $filter_sector,
+        'atr'       => $filter_atr,
         'sort'      => $col,
     ], fn($v) => $v !== null && $v !== ''));
     return '<a href="/screener?' . $params . '" style="color:inherit;text-decoration:none;">'
@@ -133,6 +135,16 @@ $hint = static fn (string $text): string =>
         </div>
         <?php endif; ?>
 
+        <div class="form-group" style="margin:0;min-width:160px;">
+            <label style="font-size:var(--text-xs);">Strefa ATR</label>
+            <select name="atr">
+                <option value="">— Wszystkie —</option>
+                <option value="in_zone" <?= $filter_atr === 'in_zone' ? 'selected' : '' ?>>✓ W strefie kupna</option>
+                <option value="above"   <?= $filter_atr === 'above'   ? 'selected' : '' ?>>↑ Powyżej strefy</option>
+                <option value="below"   <?= $filter_atr === 'below'   ? 'selected' : '' ?>>↓ Poniżej strefy</option>
+            </select>
+        </div>
+
         <input type="hidden" name="sort" value="<?= htmlspecialchars($sort) ?>">
 
         <div style="display:flex;gap:.4rem;">
@@ -162,15 +174,15 @@ $hint = static fn (string $text): string =>
     <table class="pillar-table" style="width:100%;">
         <thead>
             <tr>
-                <th>Ticker</th>
+                <th><?= $sortLink('ticker', 'Ticker') ?></th>
                 <th><?= $sortLink('swing', 'CVS Swing') . $hint('Złożony wynik 0–100 w horyzoncie swing (1–4 mies.). Wyżej = lepiej.') ?></th>
                 <th><?= $sortLink('fund',  'CVS Fund') . $hint('Złożony wynik 0–100 w horyzoncie fundamentalnym (6–12 mies.).') ?></th>
                 <th>Rekomendacja<?= $hint('Etykieta od SILNE KUPUJ do UNIKAJ wynikająca z wyniku CVS Swing.') ?></th>
                 <th>Sygnał<?= $hint('Złoty sygnał: ⭐⭐ wartość + momentum, ⭐ obserwuj (setup fundamentalny), ↑ momentum.') ?></th>
                 <th>Wyniki<?= $hint('Bliskość publikacji wyników kwartalnych (📅 za N dni / w oknie / N dni temu).') ?></th>
-                <th>ATR<?= $hint('Pozycja ceny względem strefy akumulacji ATR: ✓ w strefie kupna, ↑ powyżej (czekaj na cofnięcie), ↓ poniżej (pod wsparciem).') ?></th>
+                <th><?= $sortLink('atr', 'ATR') . $hint('Pozycja ceny względem strefy akumulacji ATR: ✓ w strefie kupna, ↑ powyżej (czekaj na cofnięcie), ↓ poniżej (pod wsparciem). Sortowanie: najpierw w strefie, potem poniżej, potem powyżej.') ?></th>
                 <th>Sektor</th>
-                <th>Cena</th>
+                <th><?= $sortLink('price', 'Cena') ?></th>
                 <th><?= $sortLink('date', 'Data') ?></th>
             </tr>
         </thead>

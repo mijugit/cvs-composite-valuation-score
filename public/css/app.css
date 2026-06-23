@@ -613,6 +613,14 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
     vertical-align: middle;
 }
 
+/* Screener header hints: th is bold+uppercase — normalise the ⓘ marker so it reads
+   the same small/light as the hints on the analysis page. */
+.pillar-table th .chart-hint {
+    font-size: var(--text-xs);
+    font-weight: 400;
+    text-transform: none;
+}
+
 .chart-hint__tooltip {
     display: none;
     position: absolute;
