@@ -9,9 +9,13 @@ use CVS\Auth\AuthController;
 use CVS\Core\Request;
 use CVS\Core\Response;
 use CVS\CVS\CVSModel;
+use CVS\Execution\AtrZoneCalculator;
 use CVS\Pro\AiUsageRepository;
 use CVS\Pro\ProGate;
 use CVS\Pro\ProRepository;
+use CVS\TrackRecord\CvsSnapshotRepository;
+use CVS\TrackRecord\TrajectoryCalculator;
+use DateTimeImmutable;
 
 /**
  * Handles POST /analysis/{ticker}/generate-ai.
@@ -126,8 +130,21 @@ class AiAnalysisController
         // Calculate CVS implied fair value (sector-median-parity price).
         $cvsFairPrice = $this->calcFairPrice($financials);
 
+        // Phase 8 enrichment — CVS trajectory + ATR execution plan for the prompt.
+        $modelVersion = (string) ($this->cvsConfig['model_version'] ?? '');
+        $trajWindow   = (int) ($this->cvsConfig['trajectory']['window_days'] ?? 90);
+        $trajMin      = (int) ($this->cvsConfig['trajectory']['min_points']  ?? 2);
+        $since        = (new DateTimeImmutable())->modify('-' . $trajWindow . ' days');
+        $trajRows     = (new CvsSnapshotRepository())->findTrajectory($ticker, $since, $modelVersion);
+        $trajectory   = TrajectoryCalculator::summarise($trajRows, $trajMin);
+
+        $atrCfg   = is_array($this->cvsConfig['atr_zones'] ?? null) ? $this->cvsConfig['atr_zones'] : [];
+        $execPlan = (!empty($financials['daily_ohlc']) && isset($financials['current_price']))
+            ? AtrZoneCalculator::compute($financials['daily_ohlc'], (float) $financials['current_price'], $atrCfg)
+            : null;
+
         // Call AI service.
-        $aiResult = $this->service->generate($ticker, $cvsResult, $financials, $cvsFairPrice);
+        $aiResult = $this->service->generate($ticker, $cvsResult, $financials, $cvsFairPrice, $trajectory, $execPlan);
 
         if (!$aiResult->ok) {
             Response::json([
