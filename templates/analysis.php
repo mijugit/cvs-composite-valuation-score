@@ -222,7 +222,7 @@
             };
 
             // Helper: format raw financial values (B/M/K + ratio %)
-            $ratioKeys = ['gross_margins', 'revenue_growth', 'return_on_equity'];
+            $ratioKeys = ['gross_margins', 'revenue_growth', 'return_on_equity', 'operating_margin', 'profit_margin', 'short_pct_float', 'institutional_ownership'];
             $fmtRaw = static function (string $key, $val) use ($ratioKeys): string {
                 if (is_bool($val)) return $val ? 'tak' : 'nie';
                 if (!is_numeric($val)) return htmlspecialchars((string)$val);
@@ -578,6 +578,60 @@
                 </div>
                 <?php endif; ?>
 
+                <!-- Market metrics mini-card (P/E trailing vs forward, Beta, Short %) -->
+                <?php
+                $mPe       = $financials['pe_ratio']        ?? null;
+                $mFwdPe    = $financials['forward_pe']      ?? null;
+                $mBeta     = $financials['beta']            ?? null;
+                $mShortPct = $financials['short_pct_float'] ?? null;
+                $mShortRatio = $financials['short_ratio']   ?? null;
+                $hasMarketMetrics = $mPe !== null || $mFwdPe !== null || $mBeta !== null || $mShortPct !== null;
+                ?>
+                <?php if ($hasMarketMetrics): ?>
+                <div class="exec-plan" style="margin-top:.75rem;">
+                    <h3>Wskaźniki rynkowe
+                        <span class="chart-hint" tabindex="0">ⓘ
+                            <span class="chart-hint__tooltip">
+                                <strong>P/E trailing</strong> — cena do zysku z ostatnich 12 miesięcy.<br>
+                                <strong>P/E forward</strong> — cena do prognozowanego zysku; niższy od trailing = rynek oczekuje wzrostu zysków.<br><br>
+                                <strong>Beta</strong> — wrażliwość na ruchy rynku. Beta 2.0 = akcja porusza się 2× silniej niż indeks w obu kierunkach. Ważne przy planowaniu stopu.<br><br>
+                                <strong>Short % float</strong> — odsetek akcji w wolnym obrocie obstawionych na spadek. Wysoki (>15%) może oznaczać potencjał short squeeze lub sygnał ostrzegawczy.
+                            </span>
+                        </span>
+                    </h3>
+                    <table class="exec-table">
+                        <?php if ($mPe !== null || $mFwdPe !== null): ?>
+                        <tr>
+                            <td>P/E trailing / forward</td>
+                            <td>
+                                <strong><?= $mPe !== null ? number_format((float) $mPe, 1) : '—' ?></strong>
+                                <?php if ($mFwdPe !== null): ?>
+                                <span style="color:var(--c-muted);font-size:var(--text-sm)"> / <?= number_format((float) $mFwdPe, 1) ?> fwd</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <?php endif; ?>
+                        <?php if ($mBeta !== null): ?>
+                        <tr>
+                            <td>Beta</td>
+                            <td><strong><?= number_format((float) $mBeta, 2) ?></strong></td>
+                        </tr>
+                        <?php endif; ?>
+                        <?php if ($mShortPct !== null): ?>
+                        <tr>
+                            <td>Short % float<?= $mShortRatio !== null ? ' / days to cover' : '' ?></td>
+                            <td>
+                                <strong><?= number_format((float) $mShortPct * 100, 1) ?>%</strong>
+                                <?php if ($mShortRatio !== null): ?>
+                                <span style="color:var(--c-muted);font-size:var(--text-sm)"> / <?= number_format((float) $mShortRatio, 1) ?>d</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <?php endif; ?>
+                    </table>
+                </div>
+                <?php endif; ?>
+
                 <!-- Pillar table with weights -->
                 <h3>Składowe filary</h3>
                 <table class="pillar-table">
@@ -671,12 +725,21 @@
                                 'free_cash_flow_adjusted' => 'FCF adjusted (OpCF fallback)',
                                 'total_debt'          => 'Dług całkowity ($)',
                                 'cash'                => 'Gotówka ($)',
-                                'gross_margins'       => 'Marża brutto',
-                                'revenue_growth'      => 'Wzrost przychodów',
-                                'return_on_equity'    => 'ROE',
-                                'forward_eps'         => 'EPS forward',
-                                'trailing_eps'        => 'EPS trailing',
-                                'sector'              => 'Sektor',
+                                'gross_margins'          => 'Marża brutto',
+                                'operating_margin'       => 'Marża operacyjna',
+                                'profit_margin'          => 'Marża netto',
+                                'revenue_growth'         => 'Wzrost przychodów',
+                                'return_on_equity'       => 'ROE',
+                                'pe_ratio'               => 'P/E trailing',
+                                'forward_pe'             => 'P/E forward',
+                                'peg_ratio'              => 'PEG ratio',
+                                'ev_ebitda'              => 'EV/EBITDA',
+                                'beta'                   => 'Beta',
+                                'short_pct_float'        => 'Short % float',
+                                'institutional_ownership' => 'Institutional ownership',
+                                'forward_eps'            => 'EPS forward',
+                                'trailing_eps'           => 'EPS trailing',
+                                'sector'                 => 'Sektor',
                             ];
                             foreach ($rawFields as $key => $label):
                                 $val = $financials[$key] ?? null;
