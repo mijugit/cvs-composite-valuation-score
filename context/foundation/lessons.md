@@ -42,6 +42,32 @@
 
 **Applies to:** Każde `exec()` w kontrolerach webowych gdy czas wykonania > 1s.
 
+## Skrypty CLI/cron: nie używaj `error_log()` — pisz do własnego pliku logów
+
+**Context:** `bin/check_price_alerts.php`, `bin/rescore.php`, `bin/refresh_peer_medians.php`. Odkryto 2026-06-25.
+
+**Problem:** `error_log()` w PHP CLI wysyła wiadomości do systemowego logu PHP (ścieżka z `php.ini`) — **nie** na stdout ani stderr widoczne w przekierowaniu crona. Cron CF zbiera stdout do pliku, który pozostaje pusty mimo poprawnie działającego skryptu. Przez to:
+- nie widać czy cron w ogóle się uruchomił
+- wyjątki z DB/sieci lecą w `/dev/null` (brak `try/catch`) i są całkowicie niewidoczne
+- debugowanie wymaga dostępu do systemowych logów serwera (brak dostępu na CF shared hosting)
+
+W tym przypadku ukryło to realny bug: `TypeError` w `PriceAlertService::buildHtml()` (stop_swing jako string zamiast float z PDO) — skrypt crashował cicho przez tygodnie.
+
+**Rule:**
+1. **Zawsze** otwieraj dedykowany plik logów na początku każdego skryptu CLI/cron:
+   ```php
+   $logFile = ROOT_PATH . '/logs/<script>.log';
+   $log = static function (string $msg) use ($logFile): void {
+       file_put_contents($logFile, '[' . date('Y-m-d H:i:s') . '] ' . $msg . PHP_EOL, FILE_APPEND | LOCK_EX);
+   };
+   $log('<script>: start');
+   ```
+2. **Zawsze** owijaj główną logikę w `try/catch (Throwable $e)` z wpisem do logu + `exit(1)`.
+3. **Nigdy** `error_log()` w skryptach CLI — niewidoczne na CF shared hosting.
+4. **Zawsze** cast kolumn numerycznych z PDO przed przekazaniem do typed PHP: `(float) $row['stop_swing']`, `(int) $row['id']` itp. PDO z MySQL zwraca `string` dla DOUBLE/INT gdy `ATTR_STRINGIFY_FETCHES` nie jest wyłączone.
+
+**Applies to:** Każdy nowy skrypt w `bin/` oraz każda nowa metoda w klasach wywoływanych przez cron.
+
 ## Filtruj shadow model_version przy każdym odczycie "latest snapshot"
 
 - **Context**: Repozytoria czytające "latest snapshot" z cvs_snapshots (CvsSnapshotRepository, ScreenerRepository i każdy nowy odczyt MAX(score_date)).
