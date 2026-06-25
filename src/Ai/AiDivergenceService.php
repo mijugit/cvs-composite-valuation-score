@@ -82,6 +82,11 @@ it is the theoretical stock price at which the company's EV/FCF multiple would e
 the sector median — i.e., the "sector-parity price" derived from the model's own
 inputs (Forward FCF², Net Debt, Shares Outstanding). Note whether the current price
 is at a premium or discount to this implied fair value.
+When the premium exceeds 40%, go one step further: anchor the premium in the available
+fundamentals. For instance, if ROE is single-digit while the premium is 80%+, state
+plainly that justifying this price requires a dramatic, sustained FCF ramp-up — and
+size that roughly against the provided revenue growth rate. This is not a prediction;
+it is a calibration of what the market is pricing in.
 
 ## 2. Opinia rynku (analitycy)
 Summarize what analysts collectively think: their consensus recommendation, price
@@ -89,7 +94,13 @@ targets (low/mean/high), and upside/downside potential relative to current price
 If no analyst data is provided, state clearly that analyst coverage is unavailable.
 
 ## 3. Analiza rozjazdu
-Explain concisely WHY the CVS model and analysts disagree. Identify the specific
+CRITICAL CHECK FIRST: If the analyst mean price target is BELOW the current market
+price, flag this at the very start of this section in bold — even when the consensus
+label is "Buy" or "Strong Buy". Example: "**Uwaga: konsensus 48 analityków implikuje
+potencjalny spadek X% od obecnej ceny — sygnał CVS 'Silne Kupuj' jest w jawnej
+sprzeczności z tym kierunkiem.**" Do not soften or bury this observation; it is the
+most decision-relevant tension in the entire analysis.
+Then explain concisely WHY the CVS model and analysts disagree. Identify the specific
 pillar or metric driving the gap. For example: the model may score Valuation high
 (cheap on EV/FCF) while analysts see a Growth risk that lowers their targets —
 or Momentum is strong but analysts expect mean-reversion. Be specific and grounded
@@ -118,8 +129,13 @@ restate the zone/stop numbers (the user already sees them on a separate card).
 Interpret what the state means in the context of the CVS verdict: e.g. if the price
 is far ABOVE the accumulation zone, even a "SILNE KUPUJ" suggests waiting for a
 pullback rather than chasing; if the price is IN the zone, the setup and the score
-align. Tie the horizon (swing vs fundamental) to the stop distances. If no execution
-plan data is provided, state that price-level guidance is unavailable and skip specifics.
+align. Tie the horizon (swing vs fundamental) to the stop distances.
+Always express stop distances as BOTH absolute price AND percentage from current price —
+e.g. "stop swingowy $387 = -25% od obecnej ceny $518". A swing stop exceeding 15%
+from current price is effectively a fundamental-horizon stop: name it as such and
+explain the risk/reward implication (how far would the price need to move in your
+favour to make the setup worthwhile at this stop distance).
+If no execution plan data is provided, state that price-level guidance is unavailable and skip specifics.
 
 OUTPUT REQUIREMENTS:
 - Write entirely in Polish. Use formal but accessible language suitable for
