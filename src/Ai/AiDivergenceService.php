@@ -44,7 +44,7 @@ class AiDivergenceService
         float  $subsectorDiffThreshold = 0.15
     ): AiResult {
         $system  = $this->buildSystemPrompt();
-        $message = $this->buildUserMessage(
+        $message = $this->buildDataBlock(
             $ticker, $cvsResult, $financials, $cvsFairPrice, $trajectory, $execPlan, $subsectorDiffThreshold
         );
 
@@ -133,16 +133,15 @@ SYSTEM;
     }
 
     /**
-     * @param array<string, mixed> $cvsResult
-     * @param array<string, mixed> $financials
-     */
-    /**
+     * Build the data block string used both by generate() and by ExportPromptBuilder.
+     * Public so the export feature can reuse the exact same package without duplication.
+     *
      * @param array<string, mixed>      $cvsResult
      * @param array<string, mixed>      $financials
      * @param array<string, mixed>|null $trajectory
      * @param array<string, mixed>|null $execPlan
      */
-    private function buildUserMessage(
+    public function buildDataBlock(
         string $ticker,
         array  $cvsResult,
         array  $financials,
