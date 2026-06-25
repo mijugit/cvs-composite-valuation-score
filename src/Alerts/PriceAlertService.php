@@ -110,7 +110,8 @@ class PriceAlertService
             if ($decision['action'] === 'send') {
                 $user = $this->users->findById($a['user_id']);
                 if ($user !== null && !empty($user['email'])) {
-                    $html = $this->buildHtml($ticker, (float) $zone['zone_low'], (float) $zone['zone_high'], $price, $zone['stop_swing'] ?? null);
+                    $stopSwing = $zone['stop_swing'] !== null ? (float) $zone['stop_swing'] : null;
+                    $html = $this->buildHtml($ticker, (float) $zone['zone_low'], (float) $zone['zone_high'], $price, $stopSwing);
                     $this->mail->send((string) $user['email'], sprintf('CVS Alert: %s — cena w strefie kupna', $ticker), $html);
                 }
                 $this->repo->updateState($a['user_id'], $ticker, 'in', true);
