@@ -1,9 +1,10 @@
 ---
 change-id: ai-catalyst-enrichment
 title: "Wzbogacenie analizy AI o świeże katalizatory rynkowe (newsy/wydarzenia)"
-status: implementing
+status: implemented
 created: 2026-06-25
 updated: 2026-06-25
+implemented_at: 2026-06-25
 ---
 
 # AI Catalyst Enrichment

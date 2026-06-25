@@ -339,9 +339,9 @@ Brak. Zero zmian w schemacie bazy, zero migracji.
 
 #### Automated
 
-- [x] 3.1 Pełny suite zielony: `vendor/bin/phpunit`
-- [x] 3.2 PHPStan level 6 zielony: `composer stan`
-- [x] 3.3 Składnia szablonu OK: `php -l templates/analysis.php`
+- [x] 3.1 Pełny suite zielony: `vendor/bin/phpunit` — 527c85e
+- [x] 3.2 PHPStan level 6 zielony: `composer stan` — 527c85e
+- [x] 3.3 Składnia szablonu OK: `php -l templates/analysis.php` — 527c85e
 
 #### Manual
 
