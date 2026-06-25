@@ -31,6 +31,18 @@ if (PHP_SAPI !== 'cli') {
 
 define('ROOT_PATH', dirname(__DIR__));
 
+$logFile = ROOT_PATH . '/logs/refresh_peer_medians.log';
+if (!is_dir(ROOT_PATH . '/logs')) {
+    mkdir(ROOT_PATH . '/logs', 0755, true);
+}
+
+$log = static function (string $msg) use ($logFile): void {
+    $line = '[' . (new DateTimeImmutable())->format('Y-m-d H:i:s') . '] ' . $msg . PHP_EOL;
+    file_put_contents($logFile, $line, FILE_APPEND | LOCK_EX);
+};
+
+$log('refresh_peer_medians: start');
+
 require ROOT_PATH . '/vendor/autoload.php';
 
 // Load .env (same pattern as bin/rescore.php).
@@ -78,7 +90,7 @@ if ($forceSector !== null) {
     /** @var list<string> $allScheduledSectors */
     $allScheduledSectors = array_values(array_unique(array_merge(...array_values($schedule))));
     if (!in_array($forceSector, $allScheduledSectors, true)) {
-        error_log(sprintf(
+        $log(sprintf(
             'refresh_peer_medians: unknown sector "%s" — valid sectors: %s',
             $forceSector,
             implode(', ', $allScheduledSectors)
@@ -86,17 +98,17 @@ if ($forceSector !== null) {
         exit(1);
     }
     $todaysSectors = [$forceSector];
-    error_log(sprintf('refresh_peer_medians: manual override — processing sector: %s', $forceSector));
+    $log(sprintf('refresh_peer_medians: manual override — processing sector: %s', $forceSector));
 } else {
     $dayOfWeek     = (int) date('N'); // 1=Mon … 7=Sun
     $todaysSectors = $schedule[$dayOfWeek] ?? [];
 
     if (empty($todaysSectors)) {
-        error_log(sprintf('refresh_peer_medians: day %d has no sectors scheduled — nothing to do.', $dayOfWeek));
+        $log(sprintf('refresh_peer_medians: day %d has no sectors scheduled — nothing to do.', $dayOfWeek));
         exit(0);
     }
 
-    error_log(sprintf(
+    $log(sprintf(
         'refresh_peer_medians: day %d — processing sectors: %s',
         $dayOfWeek,
         implode(', ', $todaysSectors)
@@ -109,7 +121,7 @@ if ($forceSector !== null) {
 
 $tickersFile = ROOT_PATH . '/public/data/tickers.json';
 if (!file_exists($tickersFile)) {
-    error_log('refresh_peer_medians: tickers.json not found — aborting.');
+    $log('refresh_peer_medians: tickers.json not found — aborting.');
     exit(1);
 }
 
@@ -154,7 +166,7 @@ foreach ($todaysSectors as $targetSector) {
         $financials = $fetcher->fetch($ticker);
 
         if ($financials === null) {
-            error_log(sprintf('refresh_peer_medians: fetch failed for %s — skipping', $ticker));
+            $log(sprintf('refresh_peer_medians: fetch failed for %s — skipping', $ticker));
             $totalFailed++;
             continue;
         }
@@ -220,7 +232,7 @@ foreach ($todaysSectors as $targetSector) {
                 $totalGateFailed++;
             }
         } catch (\Throwable $e) {
-            error_log(sprintf('refresh_peer_medians: corpus snapshot failed for %s — %s', $ticker, $e->getMessage()));
+            $log(sprintf('refresh_peer_medians: corpus snapshot failed for %s — %s', $ticker, $e->getMessage()));
             $totalCorpusFailed++;
         }
 
@@ -272,7 +284,7 @@ foreach ($todaysSectors as $targetSector) {
         }
     }
 
-    error_log(sprintf(
+    $log(sprintf(
         'refresh_peer_medians: sector "%s" flushed — buckets: %d industry, %d sector',
         $targetSector,
         isset($buckets['industry']) ? count($buckets['industry']) : 0,
@@ -280,7 +292,7 @@ foreach ($todaysSectors as $targetSector) {
     ));
 }
 
-error_log(sprintf(
+$log(sprintf(
     'refresh_peer_medians: done — fetched=%d failed=%d skipped=%d median_rows_saved=%d corpus_scored=%d corpus_gate_failed=%d corpus_errors=%d version=%s',
     $totalSuccess,
     $totalFailed,

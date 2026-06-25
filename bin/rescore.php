@@ -23,6 +23,18 @@ if (PHP_SAPI !== 'cli') {
 
 define('ROOT_PATH', dirname(__DIR__));
 
+$logFile = ROOT_PATH . '/logs/rescore.log';
+if (!is_dir(ROOT_PATH . '/logs')) {
+    mkdir(ROOT_PATH . '/logs', 0755, true);
+}
+
+$log = static function (string $msg) use ($logFile): void {
+    $line = '[' . (new DateTimeImmutable())->format('Y-m-d H:i:s') . '] ' . $msg . PHP_EOL;
+    file_put_contents($logFile, $line, FILE_APPEND | LOCK_EX);
+};
+
+$log('rescore: start');
+
 require ROOT_PATH . '/vendor/autoload.php';
 
 // Load .env (same logic as public/index.php).
@@ -78,10 +90,15 @@ $alertSvc    = new AlertService(
     new UserRepository()
 );
 
-$tickers = $watchlist->findAllDistinctTickers();
+try {
+    $tickers = $watchlist->findAllDistinctTickers();
+} catch (Throwable $e) {
+    $log(sprintf('rescore: ERROR fetching watchlist — %s in %s:%d', $e->getMessage(), $e->getFile(), $e->getLine()));
+    exit(1);
+}
 
 if (count($tickers) === 0) {
-    error_log('rescore: watchlist union is empty — nothing to score');
+    $log('rescore: watchlist union is empty — nothing to score');
     exit(0);
 }
 
@@ -92,7 +109,7 @@ foreach ($tickers as $ticker) {
     $financials = $fetcher->fetch($ticker);
 
     if ($financials === null) {
-        error_log(sprintf('rescore: fetch failed for %s — skipping', $ticker));
+        $log(sprintf('rescore: fetch failed for %s — skipping', $ticker));
         $failed++;
         continue;
     }
@@ -122,18 +139,17 @@ foreach ($tickers as $ticker) {
     // S-04: check for state change and notify watching users.
     $alerted = $alertSvc->checkAndNotify($ticker, $result->toArray());
     if ($alerted > 0) {
-        error_log(sprintf('rescore: alert sent for %s to %d user(s)', $ticker, $alerted));
+        $log(sprintf('rescore: alert sent for %s to %d user(s)', $ticker, $alerted));
     }
 
     $success++;
 }
 
-error_log(sprintf(
-    'rescore: done — success=%d failed=%d total=%d date=%s',
+$log(sprintf(
+    'rescore: done — success=%d failed=%d total=%d',
     $success,
     $failed,
-    count($tickers),
-    (new DateTimeImmutable())->format('Y-m-d H:i:s')
+    count($tickers)
 ));
 
 exit(0);
