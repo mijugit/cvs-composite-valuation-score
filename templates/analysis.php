@@ -839,6 +839,11 @@
                             <span class="ai-analysis-card__date">
                                 Analiza z <?= htmlspecialchars(substr((string) $cachedAi['generated_at'], 0, 10)) ?>
                             </span>
+                            <button id="btn-share-prompt" class="btn btn--ghost btn--sm"
+                                    data-ticker="<?= htmlspecialchars($ticker) ?>"
+                                    title="Eksportuj prompt do własnego modelu AI">
+                                ↗ Share for your LLM
+                            </button>
                         <?php endif; ?>
                         <?php if (!empty($canGenerateAi) && empty($cachedAi)): ?>
                             <button id="btn-generate-ai" class="btn btn--primary btn--sm"
@@ -949,6 +954,37 @@
                     <button id="btn-ai-cancel" class="btn btn--ghost btn--sm" style="margin-top:1rem;">
                         Anuluj
                     </button>
+                </div>
+            </div>
+
+            <!-- Share-it-for-your-LLM export modal -->
+            <div id="share-modal" class="ai-modal" hidden>
+                <div class="ai-modal__inner" style="max-width:660px;width:95vw;">
+                    <h3 style="margin-bottom:.75rem;font-size:var(--text-base);">
+                        Prompt do własnego modelu AI
+                    </h3>
+                    <p style="color:var(--c-muted);font-size:var(--text-sm);margin-bottom:1rem;">
+                        Skopiuj gotowy prompt i wklej do ChatGPT, Gemini, Claude lub innego modelu.
+                        Możesz go edytować przed skopiowaniem.
+                    </p>
+                    <div style="display:flex;gap:.5rem;margin-bottom:.75rem;">
+                        <button id="btn-lang-pl" class="btn btn--primary btn--sm" data-lang="pl">PL</button>
+                        <button id="btn-lang-en" class="btn btn--ghost btn--sm" data-lang="en">EN</button>
+                    </div>
+                    <div id="share-spinner" style="text-align:center;padding:1rem;display:none;">
+                        <div class="ai-modal__spinner" style="display:inline-block;"></div>
+                    </div>
+                    <textarea id="share-prompt-text" rows="14"
+                              style="width:100%;box-sizing:border-box;font-family:monospace;font-size:var(--text-sm);resize:vertical;border:1px solid var(--c-border);border-radius:4px;padding:.5rem;background:var(--c-bg-secondary,var(--c-bg));color:var(--c-text);"
+                              placeholder="Ładowanie promptu…" readonly></textarea>
+                    <div style="display:flex;gap:.5rem;margin-top:.75rem;justify-content:flex-end;">
+                        <button id="btn-copy-prompt" class="btn btn--primary btn--sm">Kopiuj do schowka</button>
+                        <button id="btn-share-close" class="btn btn--ghost btn--sm">Zamknij</button>
+                    </div>
+                    <p id="share-copy-feedback"
+                       style="display:none;color:var(--c-success,#22c55e);font-size:var(--text-sm);margin-top:.5rem;text-align:right;">
+                        ✓ Skopiowano do schowka!
+                    </p>
                 </div>
             </div>
 
@@ -1125,6 +1161,91 @@
                 if (btnCancel) {
                     btnCancel.addEventListener('click', hideModal);
                 }
+
+                // ── Share-it-for-your-LLM ────────────────────────────────────────
+                var shareModal    = document.getElementById('share-modal');
+                var shareTextEl   = document.getElementById('share-prompt-text');
+                var shareSpinnerEl = document.getElementById('share-spinner');
+                var shareFeedback = document.getElementById('share-copy-feedback');
+                var currentLang   = 'pl';
+
+                function setLangButtons(lang) {
+                    var pl = document.getElementById('btn-lang-pl');
+                    var en = document.getElementById('btn-lang-en');
+                    if (!pl || !en) return;
+                    pl.className = lang === 'pl' ? 'btn btn--primary btn--sm' : 'btn btn--ghost btn--sm';
+                    en.className = lang === 'en' ? 'btn btn--primary btn--sm' : 'btn btn--ghost btn--sm';
+                }
+
+                function fetchSharePrompt(lang) {
+                    currentLang = lang;
+                    setLangButtons(lang);
+                    if (shareTextEl)    { shareTextEl.value = ''; shareTextEl.style.display = 'none'; shareTextEl.setAttribute('readonly', ''); }
+                    if (shareSpinnerEl) { shareSpinnerEl.style.display = 'block'; }
+                    if (shareFeedback)  { shareFeedback.style.display = 'none'; }
+
+                    var ticker = document.getElementById('btn-share-prompt')?.dataset.ticker ?? '';
+                    fetch('/analysis/' + encodeURIComponent(ticker) + '/share-prompt', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type':     'application/x-www-form-urlencoded',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-Token':     csrf,
+                        },
+                        body: new URLSearchParams({ _csrf: csrf, lang: lang }),
+                    })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        if (shareSpinnerEl) shareSpinnerEl.style.display = 'none';
+                        if (shareTextEl) {
+                            shareTextEl.style.display = '';
+                            if (data.ok) {
+                                shareTextEl.value = data.prompt;
+                                shareTextEl.removeAttribute('readonly');
+                            } else {
+                                shareTextEl.value = '⚠️ ' + (data.message ?? 'Błąd pobierania promptu.');
+                            }
+                        }
+                    })
+                    .catch(function () {
+                        if (shareSpinnerEl) shareSpinnerEl.style.display = 'none';
+                        if (shareTextEl) {
+                            shareTextEl.style.display = '';
+                            shareTextEl.value = '⚠️ Błąd sieci. Sprawdź połączenie i spróbuj ponownie.';
+                        }
+                    });
+                }
+
+                document.getElementById('btn-share-prompt')?.addEventListener('click', function () {
+                    shareModal.hidden = false;
+                    fetchSharePrompt(currentLang);
+                });
+
+                document.getElementById('btn-lang-pl')?.addEventListener('click', function () { fetchSharePrompt('pl'); });
+                document.getElementById('btn-lang-en')?.addEventListener('click', function () { fetchSharePrompt('en'); });
+
+                document.getElementById('btn-share-close')?.addEventListener('click', function () {
+                    shareModal.hidden = true;
+                });
+
+                document.getElementById('btn-copy-prompt')?.addEventListener('click', function () {
+                    var text = shareTextEl?.value ?? '';
+                    if (!text || text.startsWith('⚠️')) return;
+                    function showFeedback() {
+                        if (shareFeedback) { shareFeedback.style.display = 'block'; setTimeout(function () { shareFeedback.style.display = 'none'; }, 2500); }
+                    }
+                    if (navigator.clipboard && window.isSecureContext) {
+                        navigator.clipboard.writeText(text).then(showFeedback).catch(function () {
+                            shareTextEl.select();
+                            document.execCommand('copy');
+                            showFeedback();
+                        });
+                    } else {
+                        shareTextEl.select();
+                        document.execCommand('copy');
+                        showFeedback();
+                    }
+                });
 
                 // Per-ticker alert toggle
                 document.getElementById('btn-alert-ticker')?.addEventListener('click', function () {

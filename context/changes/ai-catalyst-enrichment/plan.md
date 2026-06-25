@@ -325,9 +325,9 @@ Brak. Zero zmian w schemacie bazy, zero migracji.
 
 #### Automated
 
-- [x] 2.1 Testy endpointu przechodzą: `vendor/bin/phpunit tests/Ai`
-- [x] 2.2 Pełny suite zielony: `vendor/bin/phpunit`
-- [x] 2.3 PHPStan level 6 zielony: `composer stan`
+- [x] 2.1 Testy endpointu przechodzą: `vendor/bin/phpunit tests/Ai` — 96393cc
+- [x] 2.2 Pełny suite zielony: `vendor/bin/phpunit` — 96393cc
+- [x] 2.3 PHPStan level 6 zielony: `composer stan` — 96393cc
 
 #### Manual
 
@@ -339,9 +339,9 @@ Brak. Zero zmian w schemacie bazy, zero migracji.
 
 #### Automated
 
-- [ ] 3.1 Pełny suite zielony: `vendor/bin/phpunit`
-- [ ] 3.2 PHPStan level 6 zielony: `composer stan`
-- [ ] 3.3 Składnia szablonu OK: `php -l templates/analysis.php`
+- [x] 3.1 Pełny suite zielony: `vendor/bin/phpunit`
+- [x] 3.2 PHPStan level 6 zielony: `composer stan`
+- [x] 3.3 Składnia szablonu OK: `php -l templates/analysis.php`
 
 #### Manual
 
