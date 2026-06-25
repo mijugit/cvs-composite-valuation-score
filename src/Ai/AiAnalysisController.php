@@ -18,35 +18,52 @@ use CVS\TrackRecord\TrajectoryCalculator;
 use DateTimeImmutable;
 
 /**
- * Handles POST /analysis/{ticker}/generate-ai.
+ * Handles POST /analysis/{ticker}/generate-ai and POST /analysis/{ticker}/share-prompt.
  *
- * Flow: auth → PRO gate → cache check → generate → log → save → respond.
- * Always returns JSON; never throws. Guardrail: failure returns ok:false,
- * page stays functional.
+ * generate(): auth → PRO gate → cache check → Claude → log → save → respond.
+ * sharePrompt(): auth → cache check → rebuild data block → assemble export prompt → respond.
+ * Always returns JSON; never throws.
  */
 class AiAnalysisController
 {
     private AiAnalysisRepository $aiRepo;
-    private ProGate               $gate;
+    private ?ProGate              $gate;
     private FinancialDataFetcher  $fetcher;
     private CVSModel              $model;
     private AiDivergenceService   $service;
-    private AiUsageRepository     $usageRepo;
+    private ?AiUsageRepository    $usageRepo;
     /** @var array<string, mixed> */
     private array $cvsConfig;
 
-    /** @param array<string, mixed> $aiConfig Full config/ai.php */
-    public function __construct(array $aiConfig)
-    {
-        $this->aiRepo    = new AiAnalysisRepository();
-        $proRepo         = new ProRepository();
-        $this->usageRepo = new AiUsageRepository();
-        $this->gate      = new ProGate($proRepo, $this->usageRepo, $aiConfig);
-
+    /**
+     * @param array<string, mixed>   $aiConfig Full config/ai.php
+     *
+     * Optional parameters allow injecting test doubles without hitting the
+     * database. When all four are provided the PRO gate (generate-only) is
+     * skipped; sharePrompt() never needs it.
+     */
+    public function __construct(
+        array $aiConfig,
+        ?AiAnalysisRepository $aiRepo   = null,
+        ?FinancialDataFetcher  $fetcher  = null,
+        ?CVSModel              $model    = null,
+        ?AiDivergenceService   $service  = null
+    ) {
         $this->cvsConfig = require dirname(__DIR__, 2) . '/config/cvs-weights.php';
-        $this->fetcher   = new FinancialDataFetcher($this->cvsConfig['data_source']);
-        $this->model     = new CVSModel($this->cvsConfig);
-        $this->service   = new AiDivergenceService(ClaudeClientFactory::fromConfig($aiConfig));
+        $this->aiRepo    = $aiRepo   ?? new AiAnalysisRepository();
+        $this->fetcher   = $fetcher  ?? new FinancialDataFetcher($this->cvsConfig['data_source']);
+        $this->model     = $model    ?? new CVSModel($this->cvsConfig);
+        $this->service   = $service  ?? new AiDivergenceService(ClaudeClientFactory::fromConfig($aiConfig));
+
+        // PRO gate only needed by generate(); skip when test doubles are injected.
+        if ($aiRepo === null && $fetcher === null && $model === null && $service === null) {
+            $proRepo         = new ProRepository();
+            $this->usageRepo = new AiUsageRepository();
+            $this->gate      = new ProGate($proRepo, $this->usageRepo, $aiConfig);
+        } else {
+            $this->gate      = null;
+            $this->usageRepo = null;
+        }
     }
 
     // ------------------------------------------------------------------
@@ -77,7 +94,11 @@ class AiAnalysisController
         $minHours     = (int) ($aiConfig['pro']['refresh_min_hours']  ?? 24);
         $isForceRefresh = ((string) $req->input('force', '')) === '1';
 
-        // PRO gate check.
+        // PRO gate check (gate is null only when test doubles are injected).
+        if ($this->gate === null || $this->usageRepo === null) {
+            Response::json(['ok' => false, 'message' => 'Controller not configured for AI generation.'], 500);
+            return;
+        }
         if (!$this->gate->canGenerate($userId)) {
             $usage = $this->gate->getUsage($userId);
             if ($usage['today'] >= $usage['daily_limit']) {
@@ -172,6 +193,84 @@ class AiAnalysisController
             'content'      => $aiResult->text,
             'generated_at' => $generatedAt,
         ]);
+    }
+
+    // ------------------------------------------------------------------
+    // POST /analysis/{ticker}/share-prompt
+    // ------------------------------------------------------------------
+
+    /**
+     * Build and return a one-directional export prompt the user can paste
+     * into any external LLM. No PRO gate — available to any logged-in user
+     * who already has a cached AI analysis for the ticker.
+     */
+    public function sharePrompt(Request $req): void
+    {
+        AuthController::requireAuth();
+
+        if (!$req->verifyCsrf()) {
+            Response::json(['ok' => false, 'message' => 'Błąd CSRF.'], 403);
+            return;
+        }
+
+        $ticker = strtoupper(trim((string) $req->param('ticker', '')));
+        if ($ticker === '') {
+            Response::json(['ok' => false, 'message' => 'Brak symbolu spółki.'], 400);
+            return;
+        }
+
+        $lang = strtolower(trim((string) $req->input('lang', 'pl')));
+
+        // Require an existing cached AI analysis — we enrich it, not replace it.
+        $cached = $this->aiRepo->findByTicker($ticker);
+        if ($cached === null) {
+            Response::json([
+                'ok'      => false,
+                'message' => 'Najpierw wygeneruj analizę AI dla tej spółki.',
+            ], 409);
+            return;
+        }
+
+        // Fetch fresh financial data to build the CVS data block.
+        $financials = $this->fetcher->fetch($ticker);
+        if ($financials === null) {
+            Response::json([
+                'ok'      => false,
+                'message' => 'Nie udało się pobrać danych rynkowych. Spróbuj ponownie.',
+            ], 503);
+            return;
+        }
+
+        $cvsResult    = $this->model->calculate($ticker, $financials)->toArray();
+        $cvsFairPrice = $this->calcFairPrice($financials);
+
+        $modelVersion = (string) ($this->cvsConfig['model_version'] ?? '');
+        $trajWindow   = (int) ($this->cvsConfig['trajectory']['window_days'] ?? 90);
+        $trajMin      = (int) ($this->cvsConfig['trajectory']['min_points']  ?? 2);
+        $since        = (new DateTimeImmutable())->modify('-' . $trajWindow . ' days');
+        $trajRows     = (new CvsSnapshotRepository())->findTrajectory($ticker, $since, $modelVersion);
+        $trajectory   = TrajectoryCalculator::summarise($trajRows, $trajMin);
+
+        $atrCfg   = is_array($this->cvsConfig['atr_zones'] ?? null) ? $this->cvsConfig['atr_zones'] : [];
+        $execPlan = (!empty($financials['daily_ohlc']) && isset($financials['current_price']))
+            ? AtrZoneCalculator::compute($financials['daily_ohlc'], (float) $financials['current_price'], $atrCfg)
+            : null;
+
+        $dataBlock = $this->service->buildDataBlock(
+            $ticker, $cvsResult, $financials, $cvsFairPrice, $trajectory, $execPlan
+        );
+
+        $sector = (string) ($financials['sector'] ?? 'Unknown');
+
+        $prompt = (new ExportPromptBuilder())->build(
+            $ticker,
+            $sector,
+            $dataBlock,
+            (string) ($cached['content'] ?? ''),
+            $lang
+        );
+
+        Response::json(['ok' => true, 'prompt' => $prompt, 'lang' => $lang]);
     }
 
     /**

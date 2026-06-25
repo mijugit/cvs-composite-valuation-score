@@ -312,9 +312,9 @@ Brak. Zero zmian w schemacie bazy, zero migracji.
 
 #### Automated
 
-- [x] 1.1 Testy jednostkowe buildera przechodzą: `vendor/bin/phpunit tests/Ai/ExportPromptBuilderTest.php`
-- [x] 1.2 Pełny suite zielony: `vendor/bin/phpunit`
-- [x] 1.3 PHPStan level 6 zielony: `composer stan`
+- [x] 1.1 Testy jednostkowe buildera przechodzą: `vendor/bin/phpunit tests/Ai/ExportPromptBuilderTest.php` — 27f3e0c
+- [x] 1.2 Pełny suite zielony: `vendor/bin/phpunit` — 27f3e0c
+- [x] 1.3 PHPStan level 6 zielony: `composer stan` — 27f3e0c
 
 #### Manual
 
@@ -325,9 +325,9 @@ Brak. Zero zmian w schemacie bazy, zero migracji.
 
 #### Automated
 
-- [ ] 2.1 Testy endpointu przechodzą: `vendor/bin/phpunit tests/Ai`
-- [ ] 2.2 Pełny suite zielony: `vendor/bin/phpunit`
-- [ ] 2.3 PHPStan level 6 zielony: `composer stan`
+- [x] 2.1 Testy endpointu przechodzą: `vendor/bin/phpunit tests/Ai`
+- [x] 2.2 Pełny suite zielony: `vendor/bin/phpunit`
+- [x] 2.3 PHPStan level 6 zielony: `composer stan`
 
 #### Manual
 

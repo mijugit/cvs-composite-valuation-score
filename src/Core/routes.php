@@ -119,7 +119,8 @@ $router->post('/pro/request',             fn($req) => $pro->sendRequest($req));
 // AI Analysis (S-01)
 // ------------------------------------------------------------------
 
-$router->post('/analysis/{ticker}/generate-ai', fn($req) => $aiAnalysis->generate($req));
+$router->post('/analysis/{ticker}/generate-ai',  fn($req) => $aiAnalysis->generate($req));
+$router->post('/analysis/{ticker}/share-prompt', fn($req) => $aiAnalysis->sharePrompt($req));
 
 // ------------------------------------------------------------------
 // Track Record (S-02)
