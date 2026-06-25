@@ -372,11 +372,35 @@ SYSTEM;
         $lines[] = '';
         $lines[] = 'RAW MULTIPLES & QUALITY METRICS:';
         $lines[] = '- Trailing P/E: ' . $num($financials['pe_ratio'] ?? null);
-        $lines[] = '- EV/EBITDA: ' . $num($financials['ev_ebitda'] ?? null);
-        $lines[] = '- P/S (TTM): ' . $num($financials['ps_ratio'] ?? null);
-        $lines[] = '- Revenue growth: ' . $pct($financials['revenue_growth'] ?? null);
-        $lines[] = '- Return on equity: ' . $pct($financials['return_on_equity'] ?? null);
+        $lines[] = '- Forward P/E: '  . $num($financials['forward_pe'] ?? null);
+        $lines[] = '- PEG ratio: '    . $num($financials['peg_ratio'] ?? null);
+        $lines[] = '- EV/EBITDA: '    . $num($financials['ev_ebitda'] ?? null);
+        $lines[] = '- P/S (TTM): '    . $num($financials['ps_ratio'] ?? null);
+        $lines[] = '- Revenue growth: '    . $pct($financials['revenue_growth'] ?? null);
+        $lines[] = '- Operating margin: '  . $pct($financials['operating_margin'] ?? null);
+        $lines[] = '- Net profit margin: ' . $pct($financials['profit_margin'] ?? null);
+        $lines[] = '- Return on equity: '  . $pct($financials['return_on_equity'] ?? null);
         $lines[] = '- Net debt / EBITDA: ' . $netDebtEbitda;
+
+        $lines[] = '';
+        $lines[] = 'MARKET STRUCTURE:';
+        $lines[] = '- Beta (market sensitivity): ' . $num($financials['beta'] ?? null);
+        $lines[] = '- Short % of float: '   . $pct($financials['short_pct_float'] ?? null);
+        $lines[] = '- Short ratio (days to cover): ' . $num($financials['short_ratio'] ?? null, 1);
+        if (isset($financials['float_shares'])) {
+            $floatM  = number_format((float) $financials['float_shares'] / 1_000_000, 1);
+            $lines[] = "- Float: {$floatM}M shares";
+        } else {
+            $lines[] = '- Float: N/A';
+        }
+        $lines[] = '- Institutional ownership: ' . $pct($financials['institutional_ownership'] ?? null);
+        $recChange = $financials['recommendation_change'] ?? null;
+        if ($recChange !== null) {
+            $sign = (int) $recChange >= 0 ? '+' : '';
+            $lines[] = "- Analyst recommendation change (vs last month): {$sign}{$recChange} bullish analysts";
+        } else {
+            $lines[] = '- Analyst recommendation change (vs last month): N/A';
+        }
 
         return implode("\n", $lines);
     }

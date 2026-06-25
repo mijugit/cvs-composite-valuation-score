@@ -744,12 +744,23 @@ class FinancialDataFetcher
             'forward_fcf_est'            => $forwardFcfEst,
 
             // Quality ratios (dimensionless — no conversion)
-            'return_on_equity'           => $v($fin['returnOnEquity'] ?? []),
+            'return_on_equity'           => $v($fin['returnOnEquity']    ?? []),
+            'operating_margin'           => $v($fin['operatingMargins']  ?? []),
+            'profit_margin'              => $v($fin['profitMargins']      ?? []),
 
             // Valuation multiples (dimensionless — no conversion)
             'pe_ratio'                   => $v($sd['trailingPE']    ?? []),
+            'forward_pe'                 => $v($ks['forwardPE']     ?? []),
             'ps_ratio'                   => $v($ks['priceToSalesTrailing12Months'] ?? []),
             'ev_ebitda'                  => $v($ks['enterpriseToEbitda'] ?? []),
+            'peg_ratio'                  => $v($ks['pegRatio']      ?? []),
+
+            // Market structure (dimensionless / shares — no conversion)
+            'beta'                       => $v($ks['beta']                       ?? []),
+            'short_pct_float'            => $v($ks['shortPercentOfFloat']        ?? []),
+            'short_ratio'                => $v($ks['shortRatio']                 ?? []),
+            'float_shares'               => $v($ks['floatShares']               ?? []),
+            'institutional_ownership'    => $v($ks['heldPercentInstitutions']   ?? []),
 
             // EV / Sector fields
             'shares_outstanding'         => $v($ks['sharesOutstanding']         ?? []),
@@ -768,6 +779,20 @@ class FinancialDataFetcher
 
             // Analyst forecast (S-09) — price targets + recommendation breakdown/trend.
             'forecast'                   => $forecast,
+
+            // Recommendation momentum: change in (strongBuy+buy) count vs prior month.
+            // Positive = more analysts turned bullish this month; negative = turned bearish.
+            // Derived from recommendationTrend[0m] vs [-1m] — zero extra API calls.
+            'recommendation_change'      => (static function () use ($forecast): ?int {
+                $cur  = null;
+                $prev = null;
+                foreach ($forecast['trend'] as $row) {
+                    if ($row['period'] === '0m')  { $cur  = $row; }
+                    if ($row['period'] === '-1m') { $prev = $row; }
+                }
+                if ($cur === null || $prev === null) { return null; }
+                return ($cur['strong_buy'] + $cur['buy']) - ($prev['strong_buy'] + $prev['buy']);
+            })(),
 
             // Phase 5 (slice 1) — overlay signal inputs (shadow model_version 3.1).
             // eps_revision_pct:      +1q EPS estimate revision, fraction (e.g. -0.13 = -13%); null = no coverage/data.
