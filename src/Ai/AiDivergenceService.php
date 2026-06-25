@@ -92,6 +92,13 @@ it is a calibration of what the market is pricing in.
 Summarize what analysts collectively think: their consensus recommendation, price
 targets (low/mean/high), and upside/downside potential relative to current price.
 If no analyst data is provided, state clearly that analyst coverage is unavailable.
+Also examine the SPREAD between the low and high price targets. If the high target
+exceeds the mean by more than 35%, note that the consensus mean is likely being pulled
+down by stale pre-event estimates — the high-end target is often more forward-looking
+and reflects analysts who have already incorporated recent catalysts. Conversely, a
+tight spread (high/low within 20% of mean) signals unusually high analyst conviction.
+Never treat the mean target as the only number that matters; the distribution tells
+its own story.
 
 ## 3. Analiza rozjazdu
 CRITICAL CHECK FIRST: If the analyst mean price target is BELOW the current market
@@ -113,6 +120,13 @@ earnings surprises / PEAD (recent beat/miss streak), and the CVS TRAJECTORY
 (is the score rising or falling, d/d and w/w) — i.e. whether the divergence is
 widening or closing over time. A cheap valuation pillar combined with negative
 revisions is a classic value-trap pattern worth flagging.
+MOMENTUM DIAGNOSTIC: When the Momentum pillar score exceeds 90/100, add a brief
+assessment of its likely source based on the available data. Strong revision breadth
+(>0.5), consecutive EPS beats, and accelerating revenue growth suggest the momentum
+is fundamentally grounded (real re-rating). Weak fundamentals + high momentum with
+flat revisions is a FOMO/rotation pattern — more fragile and more likely to reverse
+sharply. Name which pattern you see; this is the single biggest risk factor in
+high-momentum setups.
 
 ## 4. Komu wierzyć i w jakim horyzoncie
 Provide a practical take: under what conditions and in which time horizon would
@@ -135,6 +149,15 @@ e.g. "stop swingowy $387 = -25% od obecnej ceny $518". A swing stop exceeding 15
 from current price is effectively a fundamental-horizon stop: name it as such and
 explain the risk/reward implication (how far would the price need to move in your
 favour to make the setup worthwhile at this stop distance).
+ATR ZONE REALISM: When the current price is more than 20% above the upper bound of
+the accumulation zone, explicitly state the percentage correction that returning to
+the zone would require, and contextualize it against the 52-week position. A stock
+at 85–100% of its 52-week range with Momentum >90 reaching its ATR zone would
+require a major sector-level event or fundamental deterioration — do not present
+waiting for the zone as a routine or likely near-term scenario. Offer an alternative
+framing: what level would constitute a meaningful but realistic pullback entry (e.g.,
+a 10-12% correction vs a 35% correction), and which of those is consistent with the
+CVS Swing horizon.
 If no execution plan data is provided, state that price-level guidance is unavailable and skip specifics.
 
 OUTPUT REQUIREMENTS:
