@@ -430,33 +430,33 @@ Note: `Database::reconnect()` should be called before any long query sequence (S
 
 #### Automated
 
-- [x] 3.1 php -l src/Portfolio/DecisionService.php passes
-- [x] 3.2 PHPStan level 6 passes for all Portfolio classes
-- [x] 3.3 generate() — success on first call: ok=true, retryCount=0
-- [x] 3.4 generate() — Timeout on first, success on second: ok=true, retryCount=1
-- [x] 3.5 generate() — parse error on first, parseable on second: ok=true, retryCount=1
-- [x] 3.6 generate() — both calls fail: ok=false, retryCount=1, failureKind set
-- [x] 3.7 updateLlmRecord() called exactly once per generate() regardless of outcome
-- [x] 3.8 sleep() between attempts fires when first attempt failed
+- [x] 3.1 php -l src/Portfolio/DecisionService.php passes — 98d2f8c
+- [x] 3.2 PHPStan level 6 passes for all Portfolio classes — 98d2f8c
+- [x] 3.3 generate() — success on first call: ok=true, retryCount=0 — 98d2f8c
+- [x] 3.4 generate() — Timeout on first, success on second: ok=true, retryCount=1 — 98d2f8c
+- [x] 3.5 generate() — parse error on first, parseable on second: ok=true, retryCount=1 — 98d2f8c
+- [x] 3.6 generate() — both calls fail: ok=false, retryCount=1, failureKind set — 98d2f8c
+- [x] 3.7 updateLlmRecord() called exactly once per generate() regardless of outcome — 98d2f8c
+- [x] 3.8 sleep() between attempts fires when first attempt failed — 98d2f8c
 
 #### Manual
 
-- [x] 3.9 Real Claude API call returns valid JSON matching expected schema
-- [x] 3.10 llm_raw_response in DB is full LLM text, not truncated
-- [x] 3.11 retry_count=0 on first-attempt success; retry_count=1 on retry
+- [x] 3.9 Real Claude API call returns valid JSON matching expected schema — 98d2f8c
+- [x] 3.10 llm_raw_response in DB is full LLM text, not truncated — 98d2f8c
+- [x] 3.11 retry_count=0 on first-attempt success; retry_count=1 on retry — 98d2f8c
 
 ### Phase 4: Wiring — bin/portfolio-rebalance.php
 
 #### Automated
 
-- [ ] 4.1 php -l bin/portfolio-rebalance.php passes
-- [ ] 4.2 PHPStan level 6 passes
+- [x] 4.1 php -l bin/portfolio-rebalance.php passes
+- [x] 4.2 PHPStan level 6 passes
 - [ ] 4.3 Saturday run: market_closed in log, no portfolio DB writes
 
 #### Manual
 
-- [ ] 4.4 Valid window run: rebalance_cycle status=completed, llm_decision_json populated, portfolio_state.cash updated, portfolio_transactions rows present
-- [ ] 4.5 Invalid API key run: status=llm_failed, llm_failure_kind=auth, portfolio unchanged
-- [ ] 4.6 retry_count=1 in DB when retry was needed
-- [ ] 4.7 NO_ACTION decision: cycle completed, no executed transactions
-- [ ] 4.8 Database::reconnect() causes no errors after LLM call
+- [x] 4.4 Valid window run: rebalance_cycle status=completed, llm_decision_json populated, portfolio_state.cash updated, portfolio_transactions rows present
+- [x] 4.5 Invalid API key run: status=llm_failed, llm_failure_kind=auth, portfolio unchanged
+- [x] 4.6 retry_count=1 in DB when retry was needed
+- [x] 4.7 NO_ACTION decision: cycle completed, no executed transactions
+- [x] 4.8 Database::reconnect() causes no errors after LLM call

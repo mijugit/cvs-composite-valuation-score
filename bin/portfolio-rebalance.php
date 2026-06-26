@@ -56,7 +56,11 @@ if (file_exists($envFile)) {
 
 use CVS\Core\Database;
 use CVS\Portfolio\CycleRepository;
+use CVS\Portfolio\DecisionService;
 use CVS\Portfolio\MarketCalendar;
+use CVS\Portfolio\PortfolioRepository;
+use CVS\Portfolio\PortfolioService;
+use CVS\Screener\ScreenerRepository;
 
 $config = require ROOT_PATH . '/config/portfolio.php';
 
@@ -94,15 +98,43 @@ if ($id === null) {
 $log('cycle ' . $cycleDate . ' started (id=' . $id . ')');
 
 // --- Rebalance engine ---
+// Reconnect before heavy queries: CF drops idle connections after the ~20s LLM call.
+Database::reconnect();
+$db = Database::connection();
+
+$aiConfig       = require ROOT_PATH . '/config/ai.php';
+$mergedLlmConfig = array_merge($aiConfig, $config['llm']);
+
+$portfolioRepo   = new PortfolioRepository($db);
+$portfolioService = new PortfolioService($db, $cycleRepo);
+$decisionService  = new DecisionService($cycleRepo, $mergedLlmConfig, $config);
+$screenerRepo    = new ScreenerRepository($db);
+
+// Gather inputs.
+$portfolioState = $portfolioRepo->getCurrentState();
+$holdings       = $portfolioRepo->getCurrentHoldings();
+$screenerRows   = $screenerRepo->getFiltered(); // no filters = all quality-gate-passed tickers
+
+$log('cycle ' . $cycleDate . ' calling LLM (' . count($screenerRows) . ' screener rows)');
+
+// Call LLM — DecisionService writes audit record before returning.
+$result = $decisionService->generate($id, $portfolioState, $holdings, $screenerRows);
+
+if (!$result['ok']) {
+    $log('cycle ' . $cycleDate . ' LLM FAILED after ' . $result['retryCount'] . ' retry, kind=' . ($result['failureKind'] ?? 'unknown'));
+    $cycleRepo->updateStatus($id, 'llm_failed');
+    exit(1);
+}
+
+$log('cycle ' . $cycleDate . ' LLM OK, ' . count($result['decisions']) . ' decisions');
+
+// Execute portfolio — atomic transaction inside PortfolioService.
 try {
-    // F-03: wire CVS\Portfolio\DecisionService and CVS\Portfolio\PortfolioService here.
-    // Replace this stub once llm-decision-contract-and-retry (F-03) is implemented.
-    $log('engine stub: no-op (F-03 not yet implemented)');
-    $cycleRepo->updateStatus($id, 'completed');
+    $portfolioService->executeCycle($id, $result['decisions']);
     $log('cycle ' . $cycleDate . ' completed');
 } catch (Throwable $e) {
     $cycleRepo->updateStatus($id, 'failed');
-    $log('cycle ' . $cycleDate . ' FAILED: ' . $e->getMessage());
+    $log('cycle ' . $cycleDate . ' EXECUTION FAILED: ' . $e->getMessage());
     exit(1);
 }
 
