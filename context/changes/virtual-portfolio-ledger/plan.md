@@ -374,17 +374,17 @@ Implement the atomic write model. `PortfolioService::executeCycle()` is the sing
 
 #### Automated
 
-- [x] 3.1 php -l src/Portfolio/PortfolioService.php passes
-- [x] 3.2 PHPStan level 6 passes
-- [x] 3.3 executeCycle() BUY: cash reduced, holding created, transaction logged, cycle updated
-- [x] 3.4 executeCycle() BUY with insufficient cash: skip logged, cash unchanged
-- [x] 3.5 executeCycle() exception mid-cycle: ROLLBACK verified (all tables unchanged)
-- [x] 3.6 Two BUYs same ticker: quantity summed, avg_entry_price is weighted average
-- [x] 3.7 Full SELL: portfolio_holdings row deleted or quantity=0
-- [x] 3.8 ensureInitialized() throws when portfolio_state empty
+- [x] 3.1 php -l src/Portfolio/PortfolioService.php passes — 55fe202
+- [x] 3.2 PHPStan level 6 passes — 55fe202
+- [x] 3.3 executeCycle() BUY: cash reduced, holding created, transaction logged, cycle updated — 55fe202
+- [x] 3.4 executeCycle() BUY with insufficient cash: skip logged, cash unchanged — 55fe202
+- [x] 3.5 executeCycle() exception mid-cycle: ROLLBACK verified (all tables unchanged) — 55fe202
+- [x] 3.6 Two BUYs same ticker: quantity summed, avg_entry_price is weighted average — 55fe202
+- [x] 3.7 Full SELL: portfolio_holdings row deleted or quantity=0 — 55fe202
+- [x] 3.8 ensureInitialized() throws when portfolio_state empty — 55fe202
 
 #### Manual
 
-- [x] 3.9 Mixed cycle (BUY + SELL + HOLD + SKIP): all four tables consistent after execution
-- [x] 3.10 portfolio_value_usd in rebalance_cycle matches manual calculation
-- [x] 3.11 Forced exception mid-cycle: no partial writes in any table
+- [x] 3.9 Mixed cycle (BUY + SELL + HOLD + SKIP): all four tables consistent after execution — 55fe202
+- [x] 3.10 portfolio_value_usd in rebalance_cycle matches manual calculation — 55fe202
+- [x] 3.11 Forced exception mid-cycle: no partial writes in any table — 55fe202
