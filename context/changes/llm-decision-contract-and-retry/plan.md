@@ -403,7 +403,7 @@ Note: `Database::reconnect()` should be called before any long query sequence (S
 
 #### Manual
 
-- [ ] 1.3 llm_raw_response confirmed as TEXT (not VARCHAR)
+- [x] 1.3 llm_raw_response confirmed as TEXT (not VARCHAR)
 
 ### Phase 2: DecisionParser (JSON Schema Validation)
 

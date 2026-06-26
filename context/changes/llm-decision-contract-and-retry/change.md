@@ -1,7 +1,7 @@
 ---
 id: llm-decision-contract-and-retry
 title: "F-03: LLM decision contract and retry safety"
-status: planned
+status: implementing
 created: 2026-06-26
 updated: 2026-06-26
 roadmap_ref: F-03
