@@ -449,14 +449,14 @@ Note: `Database::reconnect()` should be called before any long query sequence (S
 
 #### Automated
 
-- [x] 4.1 php -l bin/portfolio-rebalance.php passes
-- [x] 4.2 PHPStan level 6 passes
+- [x] 4.1 php -l bin/portfolio-rebalance.php passes — 05020e3
+- [x] 4.2 PHPStan level 6 passes — 05020e3
 - [ ] 4.3 Saturday run: market_closed in log, no portfolio DB writes
 
 #### Manual
 
-- [x] 4.4 Valid window run: rebalance_cycle status=completed, llm_decision_json populated, portfolio_state.cash updated, portfolio_transactions rows present
-- [x] 4.5 Invalid API key run: status=llm_failed, llm_failure_kind=auth, portfolio unchanged
-- [x] 4.6 retry_count=1 in DB when retry was needed
-- [x] 4.7 NO_ACTION decision: cycle completed, no executed transactions
-- [x] 4.8 Database::reconnect() causes no errors after LLM call
+- [x] 4.4 Valid window run: rebalance_cycle status=completed, llm_decision_json populated, portfolio_state.cash updated, portfolio_transactions rows present — 05020e3
+- [x] 4.5 Invalid API key run: status=llm_failed, llm_failure_kind=auth, portfolio unchanged — 05020e3
+- [x] 4.6 retry_count=1 in DB when retry was needed — 05020e3
+- [x] 4.7 NO_ACTION decision: cycle completed, no executed transactions — 05020e3
+- [x] 4.8 Database::reconnect() causes no errors after LLM call — 05020e3
