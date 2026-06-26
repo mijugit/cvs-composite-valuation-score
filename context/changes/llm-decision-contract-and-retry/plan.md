@@ -403,28 +403,28 @@ Note: `Database::reconnect()` should be called before any long query sequence (S
 
 #### Manual
 
-- [x] 1.3 llm_raw_response confirmed as TEXT (not VARCHAR)
+- [x] 1.3 llm_raw_response confirmed as TEXT (not VARCHAR) — 9258a0c
 
 ### Phase 2: DecisionParser (JSON Schema Validation)
 
 #### Automated
 
-- [ ] 2.1 php -l src/Portfolio/DecisionParser.php passes
-- [ ] 2.2 PHPStan level 6 passes for DecisionParser
-- [ ] 2.3 Valid BUY JSON → returns correct array
-- [ ] 2.4 Valid NO_ACTION single-element → accepted
-- [ ] 2.5 Empty array [] → throws InvalidArgumentException
-- [ ] 2.6 Missing action field → throws
-- [ ] 2.7 Unknown action "MAYBE" → throws
-- [ ] 2.8 BUY with null quantity → throws
-- [ ] 2.9 HOLD with non-null quantity → throws
-- [ ] 2.10 Duplicate tickers → last wins, no exception
-- [ ] 2.11 reason > 500 chars → truncated silently
-- [ ] 2.12 Non-JSON string → throws
+- [x] 2.1 php -l src/Portfolio/DecisionParser.php passes
+- [x] 2.2 PHPStan level 6 passes for DecisionParser
+- [x] 2.3 Valid BUY JSON → returns correct array
+- [x] 2.4 Valid NO_ACTION single-element → accepted
+- [x] 2.5 Empty array [] → throws InvalidArgumentException
+- [x] 2.6 Missing action field → throws
+- [x] 2.7 Unknown action "MAYBE" → throws
+- [x] 2.8 BUY with null quantity → throws
+- [x] 2.9 HOLD with non-null quantity → throws
+- [x] 2.10 Duplicate tickers → last wins, no exception
+- [x] 2.11 reason > 500 chars → truncated silently
+- [x] 2.12 Non-JSON string → throws
 
 #### Manual
 
-- [ ] 2.13 Real LLM JSON response parsed; all fields normalised correctly
+- [x] 2.13 Real LLM JSON response parsed; all fields normalised correctly
 
 ### Phase 3: DecisionService + CycleRepository Extension
 
