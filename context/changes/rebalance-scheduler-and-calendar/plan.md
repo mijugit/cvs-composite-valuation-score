@@ -348,29 +348,29 @@ The engine stub comment must be a clear F-03 hook, not an empty block, so future
 
 #### Automated
 
-- [x] 2.1 `php -l src/Portfolio/MarketCalendar.php` passes
-- [x] 2.2 `php -l src/Portfolio/CycleRepository.php` passes
-- [x] 2.3 PHPStan level 6 passes for src/Portfolio/
-- [x] 2.4 MarketCalendar unit tests pass (Saturday, holiday, in-window, out-of-window, both DST offsets)
+- [x] 2.1 `php -l src/Portfolio/MarketCalendar.php` passes — 86cc9ae
+- [x] 2.2 `php -l src/Portfolio/CycleRepository.php` passes — 86cc9ae
+- [x] 2.3 PHPStan level 6 passes for src/Portfolio/ — 86cc9ae
+- [x] 2.4 MarketCalendar unit tests pass (Saturday, holiday, in-window, out-of-window, both DST offsets) — 86cc9ae
 
 #### Manual
 
-- [x] 2.5 DST transition date 2026-03-10 verified: 20:35 Warsaw → 15:35 ET → isInRebalanceWindow true
+- [x] 2.5 DST transition date 2026-03-10 verified: 20:35 Warsaw → 15:35 ET → isInRebalanceWindow true — 86cc9ae
 
 ### Phase 3: bin/portfolio-rebalance.php CLI entry point
 
 #### Automated
 
-- [ ] 3.1 `php -l bin/portfolio-rebalance.php` passes
+- [x] 3.1 `php -l bin/portfolio-rebalance.php` passes
 - [ ] 3.2 Script run on Saturday exits 0, logs market_closed
-- [ ] 3.3 Script run outside window exits 0, logs outside_rebalance_window
+- [x] 3.3 Script run outside window exits 0, logs outside_rebalance_window
 - [ ] 3.4 Second invocation same day exits 0, logs already_started
-- [ ] 3.5 PHPStan level 6 passes for Portfolio namespace
+- [x] 3.5 PHPStan level 6 passes for Portfolio namespace
 
 #### Manual
 
 - [ ] 3.6 Valid trading day in-window run: log shows started + completed, DB row status = completed
-- [ ] 3.7 Log file format matches [YYYY-MM-DD HH:MM:SS] pattern
+- [x] 3.7 Log file format matches [YYYY-MM-DD HH:MM:SS] pattern
 - [ ] 3.8 Second same-day run: already_started in log, no new DB row
 - [ ] 3.9 Next-day run: new DB row created
 - [ ] 3.10 NYSE holiday (2026-01-01): market_closed in log, no DB row
