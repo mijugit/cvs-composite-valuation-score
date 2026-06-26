@@ -352,8 +352,8 @@ Implement the atomic write model. `PortfolioService::executeCycle()` is the sing
 
 #### Manual
 
-- [ ] 1.6 SHOW CREATE TABLE for all new tables — types, nullability, indexes match plan
-- [ ] 1.7 Migration 026 seed INSERT is idempotent-safe (INSERT IGNORE or guard documented)
+- [x] 1.6 SHOW CREATE TABLE for all new tables — types, nullability, indexes match plan
+- [x] 1.7 Migration 026 seed INSERT is idempotent-safe (INSERT IGNORE or guard documented)
 
 ### Phase 2: PortfolioRepository (Read Model)
 

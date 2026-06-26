@@ -1,7 +1,7 @@
 ---
 id: virtual-portfolio-ledger
 title: "F-02: Virtual portfolio ledger contract"
-status: planned
+status: implementing
 created: 2026-06-26
 updated: 2026-06-26
 roadmap_ref: F-02
