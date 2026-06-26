@@ -1,7 +1,7 @@
 ---
 id: rebalance-scheduler-and-calendar
 title: "F-01: Rebalance scheduler and market calendar gate"
-status: implementing
+status: implemented
 created: 2026-06-26
 updated: 2026-06-26
 roadmap_ref: F-01

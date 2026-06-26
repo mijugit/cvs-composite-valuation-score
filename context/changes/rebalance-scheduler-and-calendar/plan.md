@@ -361,16 +361,16 @@ The engine stub comment must be a clear F-03 hook, not an empty block, so future
 
 #### Automated
 
-- [x] 3.1 `php -l bin/portfolio-rebalance.php` passes
+- [x] 3.1 `php -l bin/portfolio-rebalance.php` passes — 9fb423b
 - [ ] 3.2 Script run on Saturday exits 0, logs market_closed
-- [x] 3.3 Script run outside window exits 0, logs outside_rebalance_window
+- [x] 3.3 Script run outside window exits 0, logs outside_rebalance_window — 9fb423b
 - [ ] 3.4 Second invocation same day exits 0, logs already_started
-- [x] 3.5 PHPStan level 6 passes for Portfolio namespace
+- [x] 3.5 PHPStan level 6 passes for Portfolio namespace — 9fb423b
 
 #### Manual
 
 - [ ] 3.6 Valid trading day in-window run: log shows started + completed, DB row status = completed
-- [x] 3.7 Log file format matches [YYYY-MM-DD HH:MM:SS] pattern
+- [x] 3.7 Log file format matches [YYYY-MM-DD HH:MM:SS] pattern — 9fb423b
 - [ ] 3.8 Second same-day run: already_started in log, no new DB row
 - [ ] 3.9 Next-day run: new DB row created
 - [ ] 3.10 NYSE holiday (2026-01-01): market_closed in log, no DB row
