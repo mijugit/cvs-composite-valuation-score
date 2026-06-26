@@ -352,23 +352,23 @@ Implement the atomic write model. `PortfolioService::executeCycle()` is the sing
 
 #### Manual
 
-- [x] 1.6 SHOW CREATE TABLE for all new tables — types, nullability, indexes match plan
-- [x] 1.7 Migration 026 seed INSERT is idempotent-safe (INSERT IGNORE or guard documented)
+- [x] 1.6 SHOW CREATE TABLE for all new tables — types, nullability, indexes match plan — f917445
+- [x] 1.7 Migration 026 seed INSERT is idempotent-safe (INSERT IGNORE or guard documented) — f917445
 
 ### Phase 2: PortfolioRepository (Read Model)
 
 #### Automated
 
-- [ ] 2.1 php -l src/Portfolio/PortfolioRepository.php passes
-- [ ] 2.2 PHPStan level 6 passes for src/Portfolio/
-- [ ] 2.3 getCurrentState() returns seeded row with correct values
-- [ ] 2.4 getCurrentHoldings() returns empty array on fresh DB
-- [ ] 2.5 getCycleHistory() returns rows in DESC order with no LIMIT
-- [ ] 2.6 getCurrentState() throws RuntimeException when portfolio_state empty
+- [x] 2.1 php -l src/Portfolio/PortfolioRepository.php passes
+- [x] 2.2 PHPStan level 6 passes for src/Portfolio/
+- [x] 2.3 getCurrentState() returns seeded row with correct values
+- [x] 2.4 getCurrentHoldings() returns empty array on fresh DB
+- [x] 2.5 getCycleHistory() returns rows in DESC order with no LIMIT
+- [x] 2.6 getCurrentState() throws RuntimeException when portfolio_state empty
 
 #### Manual
 
-- [ ] 2.7 Query log confirms prepared statement pattern (no string interpolation in SQL)
+- [x] 2.7 Query log confirms prepared statement pattern (no string interpolation in SQL)
 
 ### Phase 3: PortfolioService + CycleRepository Extension (Write Model)
 
