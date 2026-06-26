@@ -409,41 +409,41 @@ Note: `Database::reconnect()` should be called before any long query sequence (S
 
 #### Automated
 
-- [x] 2.1 php -l src/Portfolio/DecisionParser.php passes
-- [x] 2.2 PHPStan level 6 passes for DecisionParser
-- [x] 2.3 Valid BUY JSON → returns correct array
-- [x] 2.4 Valid NO_ACTION single-element → accepted
-- [x] 2.5 Empty array [] → throws InvalidArgumentException
-- [x] 2.6 Missing action field → throws
-- [x] 2.7 Unknown action "MAYBE" → throws
-- [x] 2.8 BUY with null quantity → throws
-- [x] 2.9 HOLD with non-null quantity → throws
-- [x] 2.10 Duplicate tickers → last wins, no exception
-- [x] 2.11 reason > 500 chars → truncated silently
-- [x] 2.12 Non-JSON string → throws
+- [x] 2.1 php -l src/Portfolio/DecisionParser.php passes — 7917e6d
+- [x] 2.2 PHPStan level 6 passes for DecisionParser — 7917e6d
+- [x] 2.3 Valid BUY JSON → returns correct array — 7917e6d
+- [x] 2.4 Valid NO_ACTION single-element → accepted — 7917e6d
+- [x] 2.5 Empty array [] → throws InvalidArgumentException — 7917e6d
+- [x] 2.6 Missing action field → throws — 7917e6d
+- [x] 2.7 Unknown action "MAYBE" → throws — 7917e6d
+- [x] 2.8 BUY with null quantity → throws — 7917e6d
+- [x] 2.9 HOLD with non-null quantity → throws — 7917e6d
+- [x] 2.10 Duplicate tickers → last wins, no exception — 7917e6d
+- [x] 2.11 reason > 500 chars → truncated silently — 7917e6d
+- [x] 2.12 Non-JSON string → throws — 7917e6d
 
 #### Manual
 
-- [x] 2.13 Real LLM JSON response parsed; all fields normalised correctly
+- [x] 2.13 Real LLM JSON response parsed; all fields normalised correctly — 7917e6d
 
 ### Phase 3: DecisionService + CycleRepository Extension
 
 #### Automated
 
-- [ ] 3.1 php -l src/Portfolio/DecisionService.php passes
-- [ ] 3.2 PHPStan level 6 passes for all Portfolio classes
-- [ ] 3.3 generate() — success on first call: ok=true, retryCount=0
-- [ ] 3.4 generate() — Timeout on first, success on second: ok=true, retryCount=1
-- [ ] 3.5 generate() — parse error on first, parseable on second: ok=true, retryCount=1
-- [ ] 3.6 generate() — both calls fail: ok=false, retryCount=1, failureKind set
-- [ ] 3.7 updateLlmRecord() called exactly once per generate() regardless of outcome
-- [ ] 3.8 sleep() between attempts fires when first attempt failed
+- [x] 3.1 php -l src/Portfolio/DecisionService.php passes
+- [x] 3.2 PHPStan level 6 passes for all Portfolio classes
+- [x] 3.3 generate() — success on first call: ok=true, retryCount=0
+- [x] 3.4 generate() — Timeout on first, success on second: ok=true, retryCount=1
+- [x] 3.5 generate() — parse error on first, parseable on second: ok=true, retryCount=1
+- [x] 3.6 generate() — both calls fail: ok=false, retryCount=1, failureKind set
+- [x] 3.7 updateLlmRecord() called exactly once per generate() regardless of outcome
+- [x] 3.8 sleep() between attempts fires when first attempt failed
 
 #### Manual
 
-- [ ] 3.9 Real Claude API call returns valid JSON matching expected schema
-- [ ] 3.10 llm_raw_response in DB is full LLM text, not truncated
-- [ ] 3.11 retry_count=0 on first-attempt success; retry_count=1 on retry
+- [x] 3.9 Real Claude API call returns valid JSON matching expected schema
+- [x] 3.10 llm_raw_response in DB is full LLM text, not truncated
+- [x] 3.11 retry_count=0 on first-attempt success; retry_count=1 on retry
 
 ### Phase 4: Wiring — bin/portfolio-rebalance.php
 

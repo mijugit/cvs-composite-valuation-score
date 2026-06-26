@@ -28,6 +28,21 @@ return [
     // Cron fires at 20:30 and 21:30 Warsaw; the script checks this window at runtime.
     'rebalance_window_minutes' => 30,
 
+    // --- LLM configuration for portfolio rebalance calls ---
+    // Overrides config/ai.php for portfolio-specific behaviour.
+    // Merged via array_merge($aiConfig, $portfolioConfig['llm']) in bin/portfolio-rebalance.php.
+    'llm' => [
+        'max_retries'         => 0,     // service-level retry owns the policy (DecisionService)
+        'max_tokens'          => 2048,
+        'timeout'             => 20,    // per-attempt seconds
+        'total_timeout'       => 25,
+        'retry_base_delay_ms' => 0,     // irrelevant at max_retries=0
+        'retry_delay_seconds' => 2,     // flat delay between service-level attempts
+        'max_candidates'      => null,  // null = all screener tickers (set to N to cap)
+        'reason_max_chars'    => 500,   // max reason length enforced by DecisionParser
+        'system_prompt_ttl'   => '5m',  // CacheableSystem TTL
+    ],
+
     // --- NYSE non-trading days 2026-2027 ---
     // Format: 'YYYY-MM-DD'. Observed dates used when the holiday falls on a weekend.
     // Source: official NYSE holiday calendar. Extend each year as needed.

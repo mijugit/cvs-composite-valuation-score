@@ -66,6 +66,25 @@ class CycleRepository
     }
 
     /**
+     * Writes the F-03 LLM audit columns after every generate() call.
+     * Called OUTSIDE the portfolio DB transaction (audit must persist even on rollback).
+     */
+    public function updateLlmRecord(
+        int     $id,
+        int     $retryCount,
+        string  $rawResponse,
+        ?string $failureKind,
+        ?string $decisionJson,
+    ): void {
+        $stmt = $this->db->prepare(
+            'UPDATE rebalance_cycle
+             SET retry_count = ?, llm_raw_response = ?, llm_failure_kind = ?, llm_decision_json = ?
+             WHERE id = ?'
+        );
+        $stmt->execute([$retryCount, $rawResponse, $failureKind, $decisionJson, $id]);
+    }
+
+    /**
      * Writes the F-02 financial summary columns at cycle end.
      * Called inside the open DB transaction in PortfolioService::executeCycle().
      */
