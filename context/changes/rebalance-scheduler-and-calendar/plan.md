@@ -335,27 +335,27 @@ The engine stub comment must be a clear F-03 hook, not an empty block, so future
 #### Automated
 
 - [ ] 1.1 Migration 024 applies cleanly on fresh schema
-- [x] 1.2 `php -l config/portfolio.php` passes
-- [x] 1.3 Config returns all required keys (initial_capital_usd, market, rebalance_window_minutes, holidays)
+- [x] 1.2 `php -l config/portfolio.php` passes — d405663
+- [x] 1.3 Config returns all required keys (initial_capital_usd, market, rebalance_window_minutes, holidays) — d405663
 - [ ] 1.4 Duplicate cycle_date insert rejected with unique key error
 
 #### Manual
 
-- [x] 1.5 All 2025–2027 NYSE holidays verified against official NYSE calendar
-- [x] 1.6 rebalance_window_minutes = 30 and initial_capital_usd = 10000.0 confirmed in config
+- [x] 1.5 All 2025–2027 NYSE holidays verified against official NYSE calendar — d405663
+- [x] 1.6 rebalance_window_minutes = 30 and initial_capital_usd = 10000.0 confirmed in config — d405663
 
 ### Phase 2: MarketCalendar service and CycleRepository
 
 #### Automated
 
-- [ ] 2.1 `php -l src/Portfolio/MarketCalendar.php` passes
-- [ ] 2.2 `php -l src/Portfolio/CycleRepository.php` passes
-- [ ] 2.3 PHPStan level 6 passes for src/Portfolio/
-- [ ] 2.4 MarketCalendar unit tests pass (Saturday, holiday, in-window, out-of-window, both DST offsets)
+- [x] 2.1 `php -l src/Portfolio/MarketCalendar.php` passes
+- [x] 2.2 `php -l src/Portfolio/CycleRepository.php` passes
+- [x] 2.3 PHPStan level 6 passes for src/Portfolio/
+- [x] 2.4 MarketCalendar unit tests pass (Saturday, holiday, in-window, out-of-window, both DST offsets)
 
 #### Manual
 
-- [ ] 2.5 DST transition date 2026-03-10 verified: 20:35 Warsaw → 15:35 ET → isInRebalanceWindow true
+- [x] 2.5 DST transition date 2026-03-10 verified: 20:35 Warsaw → 15:35 ET → isInRebalanceWindow true
 
 ### Phase 3: bin/portfolio-rebalance.php CLI entry point
 
