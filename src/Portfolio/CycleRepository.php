@@ -9,8 +9,8 @@ use PDO;
 /**
  * Data-access layer for the rebalance_cycle table.
  *
- * F-01 scope: gate operations only (find, insert, update status).
- * F-02 will extend this class with updateCycleSummary().
+ * F-01 scope: gate operations (find, insert, updateStatus).
+ * F-02 scope: updateCycleSummary() — financial summary at cycle end.
  * F-03 will extend it with updateLlmRecord().
  */
 class CycleRepository
@@ -43,7 +43,7 @@ class CycleRepository
     {
         $stmt = $this->db->prepare(
             'INSERT IGNORE INTO rebalance_cycle (cycle_date, status, started_at)
-             VALUES (?, \'started\', NOW())'
+             VALUES (?, \'started\', CURRENT_TIMESTAMP)'
         );
         $stmt->execute([$cycleDate]);
 
@@ -55,13 +55,43 @@ class CycleRepository
     }
 
     /**
-     * Updates the status and sets finished_at = NOW().
+     * Updates the status and sets finished_at = CURRENT_TIMESTAMP.
      */
     public function updateStatus(int $id, string $status): void
     {
         $stmt = $this->db->prepare(
-            'UPDATE rebalance_cycle SET status = ?, finished_at = NOW() WHERE id = ?'
+            'UPDATE rebalance_cycle SET status = ?, finished_at = CURRENT_TIMESTAMP WHERE id = ?'
         );
         $stmt->execute([$status, $id]);
+    }
+
+    /**
+     * Writes the F-02 financial summary columns at cycle end.
+     * Called inside the open DB transaction in PortfolioService::executeCycle().
+     */
+    public function updateCycleSummary(
+        int     $id,
+        float   $cashBefore,
+        float   $cashAfter,
+        float   $portfolioValueUsd,
+        int     $executedCount,
+        int     $skippedCount,
+        ?string $notes,
+    ): void {
+        $stmt = $this->db->prepare(
+            'UPDATE rebalance_cycle
+             SET cash_before = ?, cash_after = ?, portfolio_value_usd = ?,
+                 executed_count = ?, skipped_count = ?, notes = ?
+             WHERE id = ?'
+        );
+        $stmt->execute([
+            round($cashBefore, 2),
+            round($cashAfter, 2),
+            round($portfolioValueUsd, 2),
+            $executedCount,
+            $skippedCount,
+            $notes,
+            $id,
+        ]);
     }
 }

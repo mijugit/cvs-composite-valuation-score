@@ -359,32 +359,32 @@ Implement the atomic write model. `PortfolioService::executeCycle()` is the sing
 
 #### Automated
 
-- [x] 2.1 php -l src/Portfolio/PortfolioRepository.php passes
-- [x] 2.2 PHPStan level 6 passes for src/Portfolio/
-- [x] 2.3 getCurrentState() returns seeded row with correct values
-- [x] 2.4 getCurrentHoldings() returns empty array on fresh DB
-- [x] 2.5 getCycleHistory() returns rows in DESC order with no LIMIT
-- [x] 2.6 getCurrentState() throws RuntimeException when portfolio_state empty
+- [x] 2.1 php -l src/Portfolio/PortfolioRepository.php passes — df43354
+- [x] 2.2 PHPStan level 6 passes for src/Portfolio/ — df43354
+- [x] 2.3 getCurrentState() returns seeded row with correct values — df43354
+- [x] 2.4 getCurrentHoldings() returns empty array on fresh DB — df43354
+- [x] 2.5 getCycleHistory() returns rows in DESC order with no LIMIT — df43354
+- [x] 2.6 getCurrentState() throws RuntimeException when portfolio_state empty — df43354
 
 #### Manual
 
-- [x] 2.7 Query log confirms prepared statement pattern (no string interpolation in SQL)
+- [x] 2.7 Query log confirms prepared statement pattern (no string interpolation in SQL) — df43354
 
 ### Phase 3: PortfolioService + CycleRepository Extension (Write Model)
 
 #### Automated
 
-- [ ] 3.1 php -l src/Portfolio/PortfolioService.php passes
-- [ ] 3.2 PHPStan level 6 passes
-- [ ] 3.3 executeCycle() BUY: cash reduced, holding created, transaction logged, cycle updated
-- [ ] 3.4 executeCycle() BUY with insufficient cash: skip logged, cash unchanged
-- [ ] 3.5 executeCycle() exception mid-cycle: ROLLBACK verified (all tables unchanged)
-- [ ] 3.6 Two BUYs same ticker: quantity summed, avg_entry_price is weighted average
-- [ ] 3.7 Full SELL: portfolio_holdings row deleted or quantity=0
-- [ ] 3.8 ensureInitialized() throws when portfolio_state empty
+- [x] 3.1 php -l src/Portfolio/PortfolioService.php passes
+- [x] 3.2 PHPStan level 6 passes
+- [x] 3.3 executeCycle() BUY: cash reduced, holding created, transaction logged, cycle updated
+- [x] 3.4 executeCycle() BUY with insufficient cash: skip logged, cash unchanged
+- [x] 3.5 executeCycle() exception mid-cycle: ROLLBACK verified (all tables unchanged)
+- [x] 3.6 Two BUYs same ticker: quantity summed, avg_entry_price is weighted average
+- [x] 3.7 Full SELL: portfolio_holdings row deleted or quantity=0
+- [x] 3.8 ensureInitialized() throws when portfolio_state empty
 
 #### Manual
 
-- [ ] 3.9 Mixed cycle (BUY + SELL + HOLD + SKIP): all four tables consistent after execution
-- [ ] 3.10 portfolio_value_usd in rebalance_cycle matches manual calculation
-- [ ] 3.11 Forced exception mid-cycle: no partial writes in any table
+- [x] 3.9 Mixed cycle (BUY + SELL + HOLD + SKIP): all four tables consistent after execution
+- [x] 3.10 portfolio_value_usd in rebalance_cycle matches manual calculation
+- [x] 3.11 Forced exception mid-cycle: no partial writes in any table
