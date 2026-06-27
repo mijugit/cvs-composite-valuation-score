@@ -1,7 +1,7 @@
 ---
 id: portfolio-readonly-view
 title: "S-01: Portfolio read-only view"
-status: implementing
+status: implemented
 created: 2026-06-26
 updated: 2026-06-26
 roadmap_ref: S-01

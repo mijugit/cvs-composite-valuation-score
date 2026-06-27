@@ -275,14 +275,14 @@ Three side-by-side `.stat-card` divs (or equivalent inline blocks):
 
 #### Automated
 
-- [x] 2.1 php -l templates/portfolio.php passes
-- [x] 2.2 PHPStan level 6 still clean
+- [x] 2.1 php -l templates/portfolio.php passes — e04e068
+- [x] 2.2 PHPStan level 6 still clean — e04e068
 
 #### Manual
 
-- [x] 2.3 Empty state: 10 000 USD cash, "brak pozycji", "brak cyklu" message with next trading day
-- [x] 2.4 Summary card P&L delta shows 0.00 in neutral colour on initial state
-- [x] 2.5 After first cycle: holdings table populated, cycle status block visible
-- [x] 2.6 Holdings with snapshot → live price; without → avg_entry_price + (aprox)
-- [x] 2.7 No PHP warnings in production error log
-- [x] 2.8 Page renders correctly on mobile
+- [x] 2.3 Empty state: 10 000 USD cash, "brak pozycji", "brak cyklu" message with next trading day — e04e068
+- [x] 2.4 Summary card P&L delta shows 0.00 in neutral colour on initial state — e04e068
+- [x] 2.5 After first cycle: holdings table populated, cycle status block visible — e04e068
+- [x] 2.6 Holdings with snapshot → live price; without → avg_entry_price + (aprox) — e04e068
+- [x] 2.7 No PHP warnings in production error log — e04e068
+- [x] 2.8 Page renders correctly on mobile — e04e068
