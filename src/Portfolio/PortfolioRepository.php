@@ -62,7 +62,6 @@ class PortfolioRepository
                 ON  s.ticker        = h.ticker
                 AND s.model_version = ?
                 AND s.origin        = 'RESCORE'
-                AND s.market_mode   = 'swing'
                 AND s.scored_at     = (
                     SELECT MAX(s2.scored_at)
                     FROM cvs_snapshots s2
