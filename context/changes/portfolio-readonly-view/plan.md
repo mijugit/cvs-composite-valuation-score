@@ -259,30 +259,30 @@ Three side-by-side `.stat-card` divs (or equivalent inline blocks):
 
 #### Automated
 
-- [x] 1.1 php -l src/Portfolio/PortfolioController.php passes
-- [x] 1.2 php -l src/Portfolio/PortfolioRepository.php passes
-- [x] 1.3 PHPStan level 6 passes for src/Portfolio/
-- [x] 1.4 php -l templates/layout.php passes
+- [x] 1.1 php -l src/Portfolio/PortfolioController.php passes — 7b13ecc
+- [x] 1.2 php -l src/Portfolio/PortfolioRepository.php passes — 7b13ecc
+- [x] 1.3 PHPStan level 6 passes for src/Portfolio/ — 7b13ecc
+- [x] 1.4 php -l templates/layout.php passes — 7b13ecc
 
 #### Manual
 
-- [x] 1.5 GET /portfolio as logged-in user → HTTP 200, no PHP errors
-- [x] 1.6 GET /portfolio without session → redirect to /login
-- [x] 1.7 "Portfel" nav link appears between Screener and Track Record
-- [x] 1.8 Active state highlight on "Portfel" when on /portfolio
+- [x] 1.5 GET /portfolio as logged-in user → HTTP 200, no PHP errors — 7b13ecc
+- [x] 1.6 GET /portfolio without session → redirect to /login — 7b13ecc
+- [x] 1.7 "Portfel" nav link appears between Screener and Track Record — 7b13ecc
+- [x] 1.8 Active state highlight on "Portfel" when on /portfolio — 7b13ecc
 
 ### Phase 2: Template templates/portfolio.php
 
 #### Automated
 
-- [ ] 2.1 php -l templates/portfolio.php passes
-- [ ] 2.2 PHPStan level 6 still clean
+- [x] 2.1 php -l templates/portfolio.php passes
+- [x] 2.2 PHPStan level 6 still clean
 
 #### Manual
 
-- [ ] 2.3 Empty state: 10 000 USD cash, "brak pozycji", "brak cyklu" message with next trading day
-- [ ] 2.4 Summary card P&L delta shows 0.00 in neutral colour on initial state
-- [ ] 2.5 After first cycle: holdings table populated, cycle status block visible
-- [ ] 2.6 Holdings with snapshot → live price; without → avg_entry_price + (aprox)
-- [ ] 2.7 No PHP warnings in production error log
-- [ ] 2.8 Page renders correctly on mobile
+- [x] 2.3 Empty state: 10 000 USD cash, "brak pozycji", "brak cyklu" message with next trading day
+- [x] 2.4 Summary card P&L delta shows 0.00 in neutral colour on initial state
+- [x] 2.5 After first cycle: holdings table populated, cycle status block visible
+- [x] 2.6 Holdings with snapshot → live price; without → avg_entry_price + (aprox)
+- [x] 2.7 No PHP warnings in production error log
+- [x] 2.8 Page renders correctly on mobile
