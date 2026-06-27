@@ -20,6 +20,7 @@ use CVS\Admin\SectorsController;
 use CVS\Admin\TickersController;
 use CVS\Pro\ProController;
 use CVS\Translation\TranslationController;
+use CVS\Portfolio\PortfolioController;
 
 $auth        = new AuthController();
 $analysis    = new AnalysisController();
@@ -134,6 +135,13 @@ $router->get('/track-record/{ticker}', fn($req) => $trackRecord->show($req));
 // ------------------------------------------------------------------
 
 $router->get('/screener', fn($req) => $screener->index($req));
+
+// ------------------------------------------------------------------
+// Virtual Portfolio (S-01)
+// ------------------------------------------------------------------
+
+$portfolio = new PortfolioController();
+$router->get('/portfolio', fn($req) => $portfolio->index($req));
 
 // ------------------------------------------------------------------
 // Watchlist Alerts (S-04)

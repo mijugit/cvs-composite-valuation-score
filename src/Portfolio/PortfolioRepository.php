@@ -36,6 +36,64 @@ class PortfolioRepository
     }
 
     /**
+     * Returns holdings enriched with the latest snapshot price from cvs_snapshots.
+     *
+     * Uses LEFT JOIN so holdings without a matching snapshot still appear,
+     * falling back to avg_entry_price (price_is_snapshot = false).
+     *
+     * IMPORTANT: filters by model_version and origin='RESCORE' to avoid shadow rows
+     * (lesson: commit 442689d — unfiltered JOIN returns duplicate rows when shadow
+     * scoring writes multiple rows per ticker/date).
+     *
+     * @return array<int, array{ticker: string, quantity: int, avg_entry_price: float, live_price: float, price_is_snapshot: bool, value_usd: float, updated_at: string}>
+     */
+    public function getCurrentHoldingsWithPrice(string $liveModelVersion): array
+    {
+        $sql = "
+            SELECT
+                h.ticker,
+                h.quantity,
+                h.avg_entry_price,
+                h.updated_at,
+                COALESCE(s.price_at_snapshot, h.avg_entry_price) AS live_price,
+                (s.price_at_snapshot IS NOT NULL)                 AS price_is_snapshot
+            FROM portfolio_holdings h
+            LEFT JOIN cvs_snapshots s
+                ON  s.ticker        = h.ticker
+                AND s.model_version = ?
+                AND s.origin        = 'RESCORE'
+                AND s.market_mode   = 'swing'
+                AND s.scored_at     = (
+                    SELECT MAX(s2.scored_at)
+                    FROM cvs_snapshots s2
+                    WHERE s2.ticker        = h.ticker
+                      AND s2.model_version = ?
+                      AND s2.origin        = 'RESCORE'
+                )
+            WHERE h.quantity > 0
+            ORDER BY h.ticker ASC
+        ";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$liveModelVersion, $liveModelVersion]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return array_map(static function (array $row): array {
+            $livePrice = (float) $row['live_price'];
+            $quantity  = (int)   $row['quantity'];
+            return [
+                'ticker'           => (string) $row['ticker'],
+                'quantity'         => $quantity,
+                'avg_entry_price'  => (float) $row['avg_entry_price'],
+                'live_price'       => $livePrice,
+                'price_is_snapshot'=> (bool) $row['price_is_snapshot'],
+                'value_usd'        => round($quantity * $livePrice, 2),
+                'updated_at'       => (string) $row['updated_at'],
+            ];
+        }, $rows);
+    }
+
+    /**
      * Returns all current holdings with quantity > 0, ordered by ticker.
      *
      * @return array<int, array<string, mixed>>
