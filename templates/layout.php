@@ -22,6 +22,10 @@ $asset = static function (string $path): string {
     <link rel="stylesheet" href="<?= $asset('/css/app.css') ?>">
 </head>
 <body>
+<video class="bg-video" autoplay muted loop playsinline>
+    <source src="<?= $asset('/images/CVS.webm') ?>" type="video/webm">
+    <source src="<?= $asset('/images/CVS.mp4') ?>" type="video/mp4">
+</video>
 <header class="site-header">
     <div class="container">
         <a class="site-logo" href="/dashboard">CVS</a>

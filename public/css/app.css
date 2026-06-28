@@ -6,14 +6,14 @@
 /* Design tokens live in tokens.css (loaded before this file). */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* Atmospheric background — bull vs bear neon illustration.
-   Fixed, low opacity so it adds depth without dominating the dark theme. */
-body::before {
-    content: '';
+/* Animated video background — same opacity / stacking as the previous static illustration. */
+.bg-video {
     position: fixed;
     inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
     z-index: -1;
-    background: url('/images/BG_CVS.png') center / cover no-repeat;
     opacity: .25;
     pointer-events: none;
 }
