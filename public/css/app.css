@@ -60,7 +60,8 @@ button, a { -webkit-tap-highlight-color: rgba(64, 144, 224, .2); }
     align-items: center;
     gap: 1rem;
 }
-.site-logo { font-weight: 700; font-size: 1.25rem; color: var(--c-primary); }
+.site-logo { font-weight: 700; font-size: 1.25rem; color: var(--c-primary); display: inline-flex; align-items: center; gap: .4rem; }
+.site-logo__icon { display: block; flex-shrink: 0; }
 .site-tagline { font-size: .85rem; color: var(--c-muted); flex: 1; }
 .site-nav { display: flex; gap: 1rem; font-size: .9rem; align-items: center; }
 

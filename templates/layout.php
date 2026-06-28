@@ -28,7 +28,10 @@ $asset = static function (string $path): string {
 </video>
 <header class="site-header">
     <div class="container">
-        <a class="site-logo" href="/dashboard">CVS</a>
+        <a class="site-logo" href="/dashboard">
+            <img src="<?= $asset('/images/ikona.png') ?>" alt="" class="site-logo__icon" width="28" height="28">
+            CVS
+        </a>
         <span class="site-tagline">Composite Valuation Score</span>
         <?php if (!empty($_SESSION['user_id'])): ?>
         <button class="nav-toggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="site-nav">
