@@ -31,9 +31,10 @@ North star here means first user-visible proof that the full workflow works from
 | ---- | --------------------------------- | ---------------------------------------------------------- | ------------- | --------------------------- | -------- |
 | F-01 | rebalance-scheduler-and-calendar  | (foundation) deterministic schedule + market-open gate     | —             | FR-001, FR-002, FR-010      | ready    |
 | F-02 | virtual-portfolio-ledger          | (foundation) portfolio state and immutable cycle ledger    | —             | FR-011, NFR-002, NFR-005    | ready    |
-| F-03 | llm-decision-contract-and-retry   | (foundation) strict decision schema + one-retry policy     | F-01, F-02    | FR-005, FR-009, Guardrails  | proposed |
-| S-01 | portfolio-readonly-view           | user can see holdings, cash, latest cycle status           | F-02          | US-01, FR-012, FR-017       | ready    |
-| S-02 | first-autonomous-rebalance        | user can see first executed BUY/SELL/HOLD/NO_ACTION cycle | F-01, F-02, F-03 | US-03, FR-003, FR-004, FR-006, FR-007, FR-016 | ready    |
+| F-03 | llm-decision-contract-and-retry   | (foundation) strict decision schema + one-retry policy     | F-01, F-02    | FR-005, FR-009, Guardrails  | implemented |
+| S-01 | portfolio-readonly-view           | user can see holdings, cash, latest cycle status           | F-02          | US-01, FR-012, FR-017       | implemented |
+| S-02 | first-autonomous-rebalance        | user can see first executed BUY/SELL/HOLD/NO_ACTION cycle | F-01, F-02, F-03 | US-03, FR-003, FR-004, FR-006, FR-007, FR-016 | implemented |
+| H-01 | portfolio-strategy-hardening      | live CVS swing strategy, hard risk guards, P&L exits, retries, live UX | S-02 | FR-003–010, Guardrails, NFR-002 | implemented |
 | S-03 | full-history-and-reason-log       | user can browse full rebalance history with reasons        | S-02          | US-02, FR-011, FR-013       | proposed |
 | S-04 | screener-to-portfolio-link        | user can compare held vs recommended symbols               | S-01, S-02    | FR-015, Scope Modified      | proposed |
 | S-05 | portfolio-stats-and-performance   | user can see portfolio performance vs start capital        | S-02, S-03    | FR-014, Open Question #4    | proposed |
