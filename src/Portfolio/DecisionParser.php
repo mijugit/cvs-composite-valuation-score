@@ -102,16 +102,20 @@ final class DecisionParser
         }
 
         // --- quantity ---
-        // Normalise: treat 0 and missing as null (LLMs sometimes emit 0 for HOLD/NO_ACTION).
-        $rawQty   = isset($item['quantity']) ? (int) $item['quantity'] : null;
-        $quantity = ($rawQty !== null && $rawQty > 0) ? $rawQty : null;
-
+        // Normalise: positive int only for BUY/SELL; HOLD/NO_ACTION always null
+        // (LLMs sometimes emit 0 or a leftover quantity for non-trading actions —
+        // we silently drop it rather than failing the whole cycle).
         if (in_array($action, ['BUY', 'SELL'], true)) {
+            $rawQty   = isset($item['quantity']) ? (int) $item['quantity'] : null;
+            $quantity = ($rawQty !== null && $rawQty > 0) ? $rawQty : null;
             if ($quantity === null) {
                 throw new \InvalidArgumentException(
                     "Decision at index {$index} with action '{$action}' requires a positive integer 'quantity'."
                 );
             }
+        } else {
+            // HOLD / NO_ACTION never carry a tradable quantity.
+            $quantity = null;
         }
 
         // --- price_usd (optional, only relevant for BUY/SELL from future enhancements) ---

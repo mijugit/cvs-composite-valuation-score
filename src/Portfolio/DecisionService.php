@@ -113,32 +113,87 @@ class DecisionService
 
     private function buildSystemPrompt(): string
     {
-        return <<<'PROMPT'
-Jesteś autonomicznym zarządcą wirtualnego portfela akcji opartego na modelu CVS (Composite Valuation Score).
+        $s = $this->portfolioConfig['strategy'] ?? [];
 
-TWOJE ZADANIE:
-Otrzymujesz aktualny stan portfela oraz sygnały ze screenera CVS. Na tej podstawie generujesz decyzje rebalansowania.
+        $targetPos   = (int)   ($s['target_positions'] ?? 10);
+        $minPos      = (int)   ($s['min_positions'] ?? 8);
+        $maxPos      = (int)   ($s['max_positions'] ?? 12);
+        $targetW     = (float) ($s['target_weight_pct'] ?? 10.0);
+        $maxW        = (float) ($s['max_weight_pct'] ?? 15.0);
+        $maxSector   = (float) ($s['max_sector_pct'] ?? 40.0);
+        $minEmerging = (int)   ($s['min_emerging_positions'] ?? 2);
+        $signal      = (string)($s['buy_signal'] ?? 'strong');
+        $emLow       = (float) ($s['emerging_swing_low'] ?? 58.0);
+        $emHigh      = (float) ($s['emerging_swing_high'] ?? 72.0);
+        $sellBelow   = (float) ($s['sell_swing_below'] ?? 50.0);
 
-ZASADY BEZWZGLĘDNE:
-1. Odpowiadasz WYŁĄCZNIE poprawnym JSON array — bez żadnego tekstu przed ani po tablicy.
-2. Każdy element tablicy musi zawierać pola: action, ticker, quantity, reason.
-3. Dozwolone wartości action: BUY, SELL, HOLD, NO_ACTION.
-4. Gdy nie zlecasz żadnych transakcji, zwróć: [{"action":"NO_ACTION","ticker":null,"quantity":null,"reason":"..."}]
-5. NIE zwracaj pustej tablicy []. Zawsze zwróć co najmniej jeden element.
-6. Pole reason maksymalnie 400 znaków — zwięzłe uzasadnienie po polsku.
+        $tw   = rtrim(rtrim(number_format($targetW, 1, '.', ''), '0'), '.');
+        $mw   = rtrim(rtrim(number_format($maxW, 1, '.', ''), '0'), '.');
+        $msec = rtrim(rtrim(number_format($maxSector, 1, '.', ''), '0'), '.');
+        $emLowS  = rtrim(rtrim(number_format($emLow, 1, '.', ''), '0'), '.');
+        $emHighS = rtrim(rtrim(number_format($emHigh, 1, '.', ''), '0'), '.');
+        $sellS   = rtrim(rtrim(number_format($sellBelow, 1, '.', ''), '0'), '.');
+        $twFrac  = number_format($targetW / 100, 2, '.', '');
 
-OGRANICZENIA PORTFELA:
-- Portfel jest long-only (tylko pozycje długie, brak krótkiej sprzedaży).
-- Gotówka podana w wiadomości użytkownika to twój jedyny budżet na zakupy.
-- Jeśli chcesz kupić kilka spółek ale gotówki nie starczy, rankinguj je od najważniejszej — system wykona zakupy po kolei aż skończy się gotówka.
-- Quantity to liczba całkowita akcji (całe sztuki, brak ułamków).
+        return <<<PROMPT
+Jesteś autonomicznym zarządcą wirtualnego portfela akcji, działającym na bazie
+modelu CVS (Composite Valuation Score). Twoje decyzje są systematyczne, oparte
+na sygnałach CVS i twardych regułach konstrukcji portfela — nie na intuicji.
 
-FORMAT ODPOWIEDZI (przykład):
+═══════════════ METODOLOGIA CVS ═══════════════
+CVS ocenia spółkę w skali 0–100 w dwóch horyzontach:
+• CVS SWING (1–4 mies.): wycena 40% / momentum 45% / jakość 15% — TWÓJ GŁÓWNY horyzont
+• CVS FUND  (6–12 mies.): wycena 65% / momentum 15% / jakość 20% — filtr jakości/wartości
+
+Progi rekomendacji (te same dla swing i fund):
+• ≥ 72  → SILNE KUPUJ      • 58–72 → AKUMULUJ
+• 42–58 → NEUTRALNIE       • 28–42 → REDUKUJ      • < 28 → UNIKAJ
+
+GOLDEN SIGNAL (próg 58 na obu wymiarach):
+• strong    = swing ≥58 I fund ≥58  → momentum i wartość zgodne. JEDYNE źródło nowych zakupów.
+• watchlist = fund ≥58, swing <58   → setup bez momentum. NIE kupuj (czekaj).
+• momentum  = swing ≥58, fund <58   → drogie momentum. NIE kupuj (pułapka wartości).
+
+Wszystkie spółki w danych przeszły już Quality Gate (rentowność, płynność) — są inwestowalne.
+
+═══════════════ STRATEGIA (swing, 1–4 mies.) ═══════════════
+KONSTRUKCJA PORTFELA:
+• Cel: {$targetPos} pozycji (dopuszczalne {$minPos}–{$maxPos}).
+• Waga docelowa ~{$tw}% wartości portfela na spółkę. TWARDY limit: {$mw}% na spółkę.
+• TWARDY limit sektorowy: max {$msec}% wartości portfela w jednym sektorze.
+• MINIMUM {$minEmerging} pozycje muszą pochodzić z pasma "emerging" (CVS Swing {$emLowS}–{$emHighS}) —
+  to pretendenci do SILNE KUPUJ, łapani wcześnie. Nie buduj portfela wyłącznie z ≥{$emHighS}.
+
+KIEDY KUPUJESZ (BUY):
+• Tylko spółki z golden = {$signal}.
+• Ranking: najpierw najwyższa konwikcja, ale respektuj limit sektorowy i minimum emerging.
+• Quantity = część całkowita z ({$twFrac} × wartość_portfela / cena_USD). Gotówka to budżet —
+  rankinguj BUY od najważniejszego, system realizuje po kolei aż zabraknie gotówki.
+
+KIEDY SPRZEDAJESZ (SELL) — dotyczy TYLKO spółek, które już masz w portfelu:
+• CVS Swing spadł < {$sellS}, LUB
+• reko_swing = REDUKUJ albo UNIKAJ, LUB
+• golden signal zdegradował do momentum lub null (brak), LUB
+• pozycja przekroczyła {$mw}% portfela (przytnij do wagi docelowej).
+
+KIEDY TRZYMASZ (HOLD):
+• CVS Swing ≥ {$sellS}, nadal strong/watchlist, waga w paśmie. Brak podstaw do zmiany.
+
+═══════════════ FORMAT ODPOWIEDZI ═══════════════
+Odpowiadasz WYŁĄCZNIE poprawnym JSON array — zero tekstu przed/po, zero markdown, zero ```.
+Pola każdego elementu: action, ticker, quantity, reason.
+• action ∈ {BUY, SELL, HOLD, NO_ACTION}
+• quantity: liczba całkowita akcji dla BUY/SELL; null dla HOLD/NO_ACTION
+• reason: max 400 znaków, po polsku, z KONKRETNYMI liczbami CVS uzasadniającymi decyzję
+• Brak transakcji → [{"action":"NO_ACTION","ticker":null,"quantity":null,"reason":"..."}]
+• Nigdy nie zwracaj pustej tablicy [].
+
+PRZYKŁAD (wartości ilustracyjne):
 [
-  {"action":"BUY","ticker":"AAPL","quantity":5,"reason":"Wysoki CVS swing, mocny sygnał golden"},
-  {"action":"SELL","ticker":"MSFT","quantity":10,"reason":"CVS spadł poniżej progu, realizacja zysku"},
-  {"action":"HOLD","ticker":"NVDA","quantity":null,"reason":"CVS stabilny, brak podstaw do zmiany"},
-  {"action":"NO_ACTION","ticker":null,"quantity":null,"reason":"Brak atrakcyjnych kandydatów w obecnych warunkach"}
+  {"action":"BUY","ticker":"MU","quantity":12,"reason":"Swing 96 / Fund 93, strong dojrzały lider, sektor Technology. ~{$tw}% portfela."},
+  {"action":"BUY","ticker":"ABNB","quantity":8,"reason":"Swing 61 / Fund 83, strong EMERGING — pretendent do SILNE KUPUJ, wczesne wejście."},
+  {"action":"HOLD","ticker":"NVDA","quantity":null,"reason":"Swing 68 stabilny, strong, waga 11% w paśmie. Brak podstaw do zmiany."},
+  {"action":"SELL","ticker":"INTC","quantity":40,"reason":"Swing spadł do 44 (REDUKUJ), golden=null. Wyjście z pozycji."}
 ]
 
 Pamiętaj: TYLKO JSON, zero komentarzy poza tablicą.
@@ -152,51 +207,145 @@ PROMPT;
      */
     private function buildDataBlock(array $portfolioState, array $holdings, array $screenerRows): string
     {
-        $cash    = number_format((float) ($portfolioState['cash'] ?? 0), 2, '.', '');
-        $lines   = [];
+        $s          = $this->portfolioConfig['strategy'] ?? [];
+        $targetWPct = (float) ($s['target_weight_pct'] ?? 10.0);
+        $buySignal  = (string)($s['buy_signal'] ?? 'strong');
+        $emLow      = (float) ($s['emerging_swing_low'] ?? 58.0);
+        $emHigh     = (float) ($s['emerging_swing_high'] ?? 72.0);
 
+        $cashVal = (float) ($portfolioState['cash'] ?? 0);
+
+        // Price map (ticker → latest snapshot price) for valuing current holdings.
+        $priceMap = [];
+        foreach ($screenerRows as $row) {
+            $t = strtoupper((string) ($row['ticker'] ?? ''));
+            if ($t !== '' && isset($row['price_at_snapshot'])) {
+                $priceMap[$t] = (float) $row['price_at_snapshot'];
+            }
+        }
+
+        // Value holdings at snapshot price (fallback: avg entry). Sum → total portfolio value.
+        $heldTickers   = [];
+        $holdingsValue = 0.0;
+        foreach ($holdings as $h) {
+            $t   = strtoupper((string) ($h['ticker'] ?? ''));
+            $qty = (int) ($h['quantity'] ?? 0);
+            $px  = $priceMap[$t] ?? (float) ($h['avg_entry_price'] ?? 0);
+            $heldTickers[$t]  = true;
+            $holdingsValue   += $qty * $px;
+        }
+
+        $totalValue   = $cashVal + $holdingsValue;
+        $targetWeight = $totalValue * ($targetWPct / 100);
+
+        $lines   = [];
         $lines[] = '=== STAN PORTFELA ===';
-        $lines[] = "Dostępna gotówka: \${$cash} USD";
+        $lines[] = 'Wartość portfela: $' . number_format($totalValue, 2, '.', '')
+                 . ' (gotówka $' . number_format($cashVal, 2, '.', '')
+                 . ' + pozycje $' . number_format($holdingsValue, 2, '.', '') . ')';
+        $lines[] = 'Dostępna gotówka (budżet na zakupy): $' . number_format($cashVal, 2, '.', '');
+        $lines[] = 'Docelowa waga jednej pozycji (~' . rtrim(rtrim(number_format($targetWPct, 1, '.', ''), '0'), '.')
+                 . '%): $' . number_format($targetWeight, 2, '.', '');
         $lines[] = '';
 
         if (empty($holdings)) {
             $lines[] = 'Aktualne pozycje: BRAK (portfel w całości w gotówce)';
         } else {
-            $lines[] = 'Aktualne pozycje:';
+            $lines[] = 'Aktualne pozycje (kandydaci do HOLD/SELL):';
             foreach ($holdings as $h) {
-                $ticker   = (string) ($h['ticker'] ?? '');
+                $t        = strtoupper((string) ($h['ticker'] ?? ''));
                 $qty      = (int) ($h['quantity'] ?? 0);
                 $avgPrice = number_format((float) ($h['avg_entry_price'] ?? 0), 4, '.', '');
-                $lines[]  = "  {$ticker}: {$qty} szt. @ avg \${$avgPrice}";
+                $px       = $priceMap[$t] ?? (float) ($h['avg_entry_price'] ?? 0);
+                $val      = $qty * $px;
+                $pctPort  = $totalValue > 0 ? ($val / $totalValue * 100) : 0.0;
+
+                // Attach live CVS signal for the held name if present in the screener.
+                $row     = $this->findRow($screenerRows, $t);
+                $sigPart = $row !== null
+                    ? sprintf(
+                        ' | Swing %s / Fund %s | %s | golden=%s',
+                        (string) ($row['cvs_swing'] ?? '-'),
+                        (string) ($row['cvs_fund'] ?? '-'),
+                        (string) ($row['reco_swing'] ?? '-'),
+                        (string) ($row['golden_signal'] ?? 'null')
+                    )
+                    : ' | (brak aktualnego sygnału CVS w screenerze)';
+
+                $lines[] = sprintf(
+                    '  %s: %d szt. @ avg $%s | wart. $%s (%.1f%% portfela)%s',
+                    $t, $qty, $avgPrice, number_format($val, 2, '.', ''), $pctPort, $sigPart
+                );
+            }
+        }
+
+        // Candidate universe: golden = buy_signal, PLUS any held ticker (for SELL/HOLD context).
+        $candidates = [];
+        foreach ($screenerRows as $row) {
+            $t          = strtoupper((string) ($row['ticker'] ?? ''));
+            $isCandidate = (string) ($row['golden_signal'] ?? '') === $buySignal;
+            if ($isCandidate || isset($heldTickers[$t])) {
+                $candidates[] = $row;
             }
         }
 
         $lines[] = '';
-        $lines[] = '=== SYGNAŁY SCREENER CVS ===';
-        $lines[] = 'Ticker | CVS Swing | CVS Fund | Reko Swing | Reko Fund | Sygnał   | Sektor                  | Cena USD';
-        $lines[] = str_repeat('-', 110);
+        $lines[] = '=== KANDYDACI DO KUPNA (golden=' . $buySignal . ') + Twoje pozycje ===';
+        $lines[] = 'Pasmo EMERGING = swing ' . rtrim(rtrim(number_format($emLow, 1, '.', ''), '0'), '.')
+                 . '–' . rtrim(rtrim(number_format($emHigh, 1, '.', ''), '0'), '.')
+                 . ' (pretendenci do SILNE KUPUJ).';
+        $lines[] = 'Ticker | Swing | Fund  | Reko Swing | Sygnał    | Sektor                  | Cena USD | Pasmo';
+        $lines[] = str_repeat('-', 108);
 
-        foreach ($screenerRows as $row) {
-            $ticker      = str_pad((string) ($row['ticker'] ?? ''), 6);
-            $swing       = str_pad((string) ($row['cvs_swing'] ?? $row['cvs'] ?? '-'), 9);
-            $fund        = str_pad((string) ($row['cvs_fund'] ?? '-'), 8);
-            $recoSwing   = str_pad((string) ($row['reco_swing'] ?? $row['reco'] ?? '-'), 10);
-            $recoFund    = str_pad((string) ($row['reco_fund'] ?? '-'), 9);
-            $signal      = str_pad((string) ($row['golden_signal'] ?? '-'), 8);
-            $sector      = str_pad(mb_substr((string) ($row['sector'] ?? '-'), 0, 22), 24);
-            $price       = isset($row['price_at_snapshot']) && $row['price_at_snapshot'] !== null
-                ? number_format((float) $row['price_at_snapshot'], 2, '.', '')
-                : '-';
+        if (empty($candidates)) {
+            $lines[] = '(brak spółek z sygnałem ' . $buySignal . ' w bieżącym screenerze)';
+        } else {
+            foreach ($candidates as $row) {
+                $ticker    = str_pad((string) ($row['ticker'] ?? ''), 6);
+                $swingVal  = $row['cvs_swing'] ?? null;
+                $swing     = str_pad((string) ($swingVal ?? '-'), 5);
+                $fund      = str_pad((string) ($row['cvs_fund'] ?? '-'), 5);
+                $recoSwing = str_pad((string) ($row['reco_swing'] ?? '-'), 10);
+                $signal    = str_pad((string) ($row['golden_signal'] ?? 'null'), 9);
+                $sector    = str_pad(mb_substr((string) ($row['sector'] ?? '-'), 0, 22), 24);
+                $price     = isset($row['price_at_snapshot'])
+                    ? number_format((float) $row['price_at_snapshot'], 2, '.', '')
+                    : '-';
+                $band = ($swingVal !== null && (float) $swingVal >= $emLow && (float) $swingVal < $emHigh)
+                    ? 'EMERGING'
+                    : ((float) ($swingVal ?? 0) >= $emHigh ? 'dojrzały' : '-');
 
-            $lines[] = "{$ticker} | {$swing} | {$fund} | {$recoSwing} | {$recoFund} | {$signal} | {$sector} | \${$price}";
+                $lines[] = "{$ticker} | {$swing} | {$fund} | {$recoSwing} | {$signal} | {$sector} | \${$price} | {$band}";
+            }
         }
 
         $lines[] = '';
         $lines[] = '=== INSTRUKCJA ===';
-        $lines[] = "Wygeneruj decyzje rebalansowania dla powyższych spółek.";
-        $lines[] = "Budżet na zakupy: \${$cash} USD. Rankinguj BUY od najważniejszego.";
+        $lines[] = 'Zarządź portfelem zgodnie ze strategią swing z instrukcji systemowej:';
+        $lines[] = '- nowe BUY tylko z listy kandydatów (golden=' . $buySignal . '), rankinguj od najsilniejszego;';
+        $lines[] = '- zapewnij wymagane minimum pozycji z pasma EMERGING;';
+        $lines[] = '- respektuj twarde limity wagi pozycji i sektora;';
+        $lines[] = '- dla obecnych pozycji zdecyduj HOLD/SELL wg reguł wyjścia;';
+        $lines[] = '- quantity licz względem docelowej wagi $' . number_format($targetWeight, 2, '.', '') . ' i ceny spółki.';
         $lines[] = 'Odpowiedz wyłącznie poprawnym JSON array zgodnie z formatem z instrukcji systemowej.';
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * Find a screener row by ticker (case-insensitive). Returns null if absent.
+     *
+     * @param array<int, array<string, mixed>> $rows
+     * @return array<string, mixed>|null
+     */
+    private function findRow(array $rows, string $ticker): ?array
+    {
+        $needle = strtoupper($ticker);
+        foreach ($rows as $row) {
+            if (strtoupper((string) ($row['ticker'] ?? '')) === $needle) {
+                return $row;
+            }
+        }
+        return null;
     }
 }

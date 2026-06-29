@@ -111,10 +111,13 @@ class DecisionParserTest extends TestCase
         $this->parser->parse('[{"action":"BUY","ticker":"AAPL","quantity":0}]');
     }
 
-    public function testHoldWithNonNullQuantityThrows(): void
+    public function testHoldWithNonNullQuantityIsNormalisedToNull(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->parser->parse('[{"action":"HOLD","ticker":"AAPL","quantity":5}]');
+        // A stray quantity on HOLD must not fail the cycle — it is silently dropped.
+        $result = $this->parser->parse('[{"action":"HOLD","ticker":"AAPL","quantity":5}]');
+
+        $this->assertSame('HOLD', $result[0]['action']);
+        $this->assertNull($result[0]['quantity']);
     }
 
     public function testBuyWithMissingTickerThrows(): void

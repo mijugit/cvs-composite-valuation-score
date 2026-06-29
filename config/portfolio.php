@@ -29,6 +29,32 @@ return [
     // prevents accidental off-hours execution (weekends, before open, after close).
     'rebalance_window_minutes' => 390,
 
+    // --- Swing strategy parameters (FR-010: tune here, never hardcode in logic) ---
+    // Drives both the LLM system prompt (DecisionService::buildSystemPrompt) and the
+    // candidate pre-filter / position-sizing data block (DecisionService::buildDataBlock).
+    // Swing thresholds mirror config/cvs-weights.php['thresholds'] (accumulate=58,
+    // strong_buy=72) so the portfolio speaks the same language as the CVS model.
+    'strategy' => [
+        'target_positions'       => 10,      // ideal number of holdings
+        'min_positions'          => 8,       // soft floor
+        'max_positions'          => 12,      // soft ceiling
+        'target_weight_pct'      => 10.0,    // ~equal-weight target per position
+        'max_weight_pct'         => 15.0,    // HARD cap per single stock
+        'max_sector_pct'         => 40.0,    // HARD cap per sector (anti tech-pile-in)
+        'min_emerging_positions' => 2,       // min positions from the "emerging" swing band
+
+        // Buy eligibility — only this golden signal qualifies a NEW purchase.
+        'buy_signal'             => 'strong', // swing>=58 AND fund>=58
+
+        // "Emerging strong" band: strong signal but swing still in accumulate range
+        // [low, high) — pretenders to SILNE KUPUJ, entered early before the move.
+        'emerging_swing_low'     => 58.0,    // inclusive (= accumulate threshold)
+        'emerging_swing_high'    => 72.0,    // exclusive (= strong_buy threshold)
+
+        // Sell hysteresis: enter strong at >=58, but don't exit until swing < 50.
+        'sell_swing_below'       => 50.0,
+    ],
+
     // --- LLM configuration for portfolio rebalance calls ---
     // Overrides config/ai.php for portfolio-specific behaviour.
     // Merged via array_merge($aiConfig, $portfolioConfig['llm']) in bin/portfolio-rebalance.php.
