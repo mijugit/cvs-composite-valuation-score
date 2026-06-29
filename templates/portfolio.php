@@ -62,6 +62,102 @@ $statusChip = static function (?string $status): string {
 
 </div>
 
+<!-- ─── Market clock ───────────────────────────────────────────── -->
+<div class="card" style="padding:1.25rem;margin-bottom:1.5rem;">
+    <div style="display:flex;flex-wrap:wrap;gap:1.5rem;align-items:center;">
+
+        <div style="display:flex;flex-direction:column;gap:.15rem;">
+            <span style="font-size:var(--text-xs);color:var(--c-muted);text-transform:uppercase;letter-spacing:.05em;">Warszawa</span>
+            <span id="clock-waw" style="font-size:1.1rem;font-weight:700;font-variant-numeric:tabular-nums;">—</span>
+            <span style="font-size:var(--text-xs);color:var(--c-muted);">Europe/Warsaw (CET/CEST)</span>
+        </div>
+
+        <div style="width:1px;background:var(--c-border);align-self:stretch;"></div>
+
+        <div style="display:flex;flex-direction:column;gap:.15rem;">
+            <span style="font-size:var(--text-xs);color:var(--c-muted);text-transform:uppercase;letter-spacing:.05em;">Nowy Jork</span>
+            <span id="clock-ny" style="font-size:1.1rem;font-weight:700;font-variant-numeric:tabular-nums;">—</span>
+            <span style="font-size:var(--text-xs);color:var(--c-muted);">America/New_York (ET)</span>
+        </div>
+
+        <div style="width:1px;background:var(--c-border);align-self:stretch;"></div>
+
+        <div style="display:flex;flex-direction:column;gap:.15rem;">
+            <span style="font-size:var(--text-xs);color:var(--c-muted);text-transform:uppercase;letter-spacing:.05em;">Sesja NYSE</span>
+            <span style="font-size:.95rem;font-weight:600;">09:30 – 16:00 ET</span>
+            <span style="font-size:var(--text-xs);color:var(--c-muted);">15:30 – 22:00 Warsaw</span>
+        </div>
+
+        <div style="width:1px;background:var(--c-border);align-self:stretch;"></div>
+
+        <div style="display:flex;flex-direction:column;gap:.15rem;">
+            <span style="font-size:var(--text-xs);color:var(--c-muted);text-transform:uppercase;letter-spacing:.05em;">Status rynku</span>
+            <span id="market-status" style="font-size:.95rem;font-weight:700;">—</span>
+            <span id="market-hint" style="font-size:var(--text-xs);color:var(--c-muted);"></span>
+        </div>
+
+    </div>
+</div>
+
+<script>
+(function () {
+    function pad(n) { return String(n).padStart(2, '0'); }
+
+    function fmt(date, tz) {
+        try {
+            return date.toLocaleTimeString('pl-PL', {
+                timeZone: tz,
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+                hour12: false
+            });
+        } catch (_) { return '—'; }
+    }
+
+    function isMarketOpen(now) {
+        // NYSE Mon–Fri 09:30–16:00 ET, excluding holidays
+        const holidays = <?= json_encode($portfolioConfig['holidays'] ?? []) ?>;
+        const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+        const dow = et.getDay(); // 0=Sun 6=Sat
+        if (dow === 0 || dow === 6) return false;
+
+        const ymd = et.getFullYear() + '-'
+            + pad(et.getMonth() + 1) + '-'
+            + pad(et.getDate());
+        if (holidays.includes(ymd)) return false;
+
+        const mins = et.getHours() * 60 + et.getMinutes();
+        return mins >= 570 && mins < 960; // 09:30–16:00
+    }
+
+    function tick() {
+        const now = new Date();
+        document.getElementById('clock-waw').textContent = fmt(now, 'Europe/Warsaw');
+        document.getElementById('clock-ny').textContent  = fmt(now, 'America/New_York');
+
+        const open = isMarketOpen(now);
+        const statusEl = document.getElementById('market-status');
+        const hintEl   = document.getElementById('market-hint');
+        if (open) {
+            statusEl.textContent = '🟢 Otwarta';
+            statusEl.style.color = 'var(--c-success)';
+            hintEl.textContent   = 'Trwa sesja NYSE';
+        } else {
+            statusEl.textContent = '🔴 Zamknięta';
+            statusEl.style.color = 'var(--c-muted)';
+            // hint: next open
+            const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+            const dow = et.getDay();
+            hintEl.textContent = (dow >= 1 && dow <= 4) ? 'Jutro od 09:30 ET'
+                               : (dow === 5 || dow === 6) ? 'Poniedziałek 09:30 ET'
+                               : 'Jutro od 09:30 ET';
+        }
+    }
+
+    tick();
+    setInterval(tick, 1000);
+})();
+</script>
+
 <!-- ─── Holdings ──────────────────────────────────────────────── -->
 <h2 style="font-size:1rem;font-weight:600;margin:0 0 .75rem;">Pozycje</h2>
 
