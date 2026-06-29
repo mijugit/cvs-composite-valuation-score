@@ -175,32 +175,82 @@ $statusChip = static function (?string $status): string {
                 <th style="text-align:right;">Cena zakupu</th>
                 <th style="text-align:right;">Cena rynkowa</th>
                 <th style="text-align:right;">Wartość</th>
+                <th style="text-align:right;">Wynik</th>
                 <th style="text-align:right;">% portfela</th>
             </tr>
         </thead>
         <tbody>
-            <?php foreach ($holdings as $h): ?>
+            <?php foreach ($holdings as $i => $h): ?>
             <?php
                 $pctPortfolio = $totalValue > 0 ? ($h['value_usd'] / $totalValue * 100.0) : 0.0;
-                $isApprox = !$h['price_is_snapshot'];
+                $isLive  = !empty($h['price_is_live']);
+                $pnl     = (float) ($h['pnl_pct'] ?? 0.0);
+                $reason  = $h['reason'] ?? null;
             ?>
             <tr>
-                <td><strong><?= htmlspecialchars($h['ticker']) ?></strong></td>
+                <td>
+                    <strong><?= htmlspecialchars($h['ticker']) ?></strong>
+                    <?php if (!empty($reason)): ?>
+                    <button type="button" class="pos-info" aria-label="Uzasadnienie"
+                            data-reason="<?= htmlspecialchars((string) $reason, ENT_QUOTES) ?>"
+                            data-ticker="<?= htmlspecialchars($h['ticker'], ENT_QUOTES) ?>">ⓘ</button>
+                    <?php endif; ?>
+                </td>
                 <td><?= (int) $h['quantity'] ?></td>
                 <td style="text-align:right;color:var(--c-muted);"><?= $fmt((float) $h['avg_entry_price']) ?></td>
                 <td style="text-align:right;">
                     <?= $fmt((float) $h['live_price']) ?>
-                    <?php if ($isApprox): ?>
-                    <span style="font-size:var(--text-xs);color:var(--c-muted);"> aprox</span>
-                    <?php endif; ?>
+                    <span class="px-badge px-badge--<?= $isLive ? 'live' : 'stale' ?>"
+                          title="<?= $isLive ? 'Kurs pobrany na żywo' : 'Ostatnia znana wycena (API niedostępne)' ?>">
+                        <?= $isLive ? 'live' : 'wycena' ?>
+                    </span>
                 </td>
                 <td style="text-align:right;font-weight:600;"><?= $fmt((float) $h['value_usd']) ?></td>
+                <td style="text-align:right;font-weight:600;color:<?= $pnl >= 0 ? 'var(--c-success)' : 'var(--c-danger)' ?>;">
+                    <?= ($pnl >= 0 ? '+' : '') . number_format($pnl, 1) ?>%
+                </td>
                 <td style="text-align:right;color:var(--c-muted);"><?= number_format($pctPortfolio, 1) ?>%</td>
             </tr>
             <?php endforeach; ?>
         </tbody>
     </table>
 </div>
+
+<!-- Per-position reason popover (click ⓘ) -->
+<div id="pos-info-pop" class="pos-info-pop" hidden>
+    <div class="pos-info-pop__head"><strong id="pos-info-ticker"></strong> — uzasadnienie po ostatnim rebalansie</div>
+    <p id="pos-info-text" style="margin:.4rem 0 0;font-size:var(--text-sm);line-height:1.5;"></p>
+</div>
+<script>
+(function () {
+    const pop  = document.getElementById('pos-info-pop');
+    const txt  = document.getElementById('pos-info-text');
+    const tick = document.getElementById('pos-info-ticker');
+    if (!pop) return;
+
+    function openPop(btn) {
+        txt.textContent  = btn.getAttribute('data-reason') || '';
+        tick.textContent = btn.getAttribute('data-ticker') || '';
+        const r = btn.getBoundingClientRect();
+        pop.style.top  = (window.scrollY + r.bottom + 6) + 'px';
+        pop.style.left = (window.scrollX + Math.min(r.left, document.documentElement.clientWidth - 320)) + 'px';
+        pop.hidden = false;
+    }
+    document.querySelectorAll('.pos-info').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (!pop.hidden && tick.textContent === btn.getAttribute('data-ticker')) {
+                pop.hidden = true;
+            } else {
+                openPop(btn);
+            }
+        });
+    });
+    document.addEventListener('click', function (e) {
+        if (!pop.hidden && !pop.contains(e.target)) pop.hidden = true;
+    });
+})();
+</script>
 <?php endif; ?>
 
 <!-- ─── Latest rebalance cycle ────────────────────────────────── -->
@@ -259,6 +309,63 @@ $statusChip = static function (?string $status): string {
     <?php endif; ?>
 </div>
 <?php endif; ?>
+
+<!-- ─── Strategy rules (end-user, ordered by importance) ─────────── -->
+<?php
+    $st = $portfolioConfig['strategy'] ?? [];
+    $g  = static fn(string $k, $d) => $st[$k] ?? $d;
+    $numS = static fn($v): string => rtrim(rtrim(number_format((float) $v, 1, '.', ''), '0'), '.');
+    $tgt  = $numS($g('target_weight_pct', 10));
+    $maxW = $numS($g('max_weight_pct', 15));
+    $maxSec = $numS($g('max_sector_pct', 40));
+    $emLo = $numS($g('emerging_swing_low', 58));
+    $emHi = $numS($g('emerging_swing_high', 72));
+    $sell = $numS($g('sell_swing_below', 54));
+    $tp   = $numS($g('take_profit_pct', 25));
+    $sl   = $numS($g('stop_loss_pct', 15));
+    $minE = (int) $g('min_emerging_positions', 2);
+    $tgtPos = (int) $g('target_positions', 10);
+?>
+<h2 style="font-size:1rem;font-weight:600;margin:2.5rem 0 .75rem;">Na jakich zasadach działa portfel</h2>
+<div class="card rules-card" style="padding:1.5rem;">
+    <p style="margin:0 0 1rem;color:var(--c-muted);font-size:var(--text-sm);">
+        Portfel jest zarządzany autonomicznie przez model CVS + LLM, w horyzoncie swing (1–4 miesiące),
+        według poniższych reguł (od najważniejszych do mniej istotnych). Wszystkie progi są stałe i jawne.
+    </p>
+
+    <div class="rules-grid">
+        <div>
+            <h3 class="rules-h">🟢 Reguły zakupu</h3>
+            <ol class="rules-list">
+                <li>Kupujemy <strong>wyłącznie</strong> spółki z sygnałem <strong>strong</strong> (CVS Swing ≥ <?= $emLo ?> <em>oraz</em> CVS Fund ≥ <?= $emLo ?>).</li>
+                <li>Twardy limit <strong>sektorowy</strong>: maks. <?= $maxSec ?>% wartości portfela w jednym sektorze.</li>
+                <li>Twardy limit <strong>na spółkę</strong>: maks. <?= $maxW ?>% (waga docelowa ~<?= $tgt ?>%).</li>
+                <li>Min. <strong><?= $minE ?> pozycje</strong> z pasma „emerging" (Swing <?= $emLo ?>–<?= $emHi ?>) — wczesne wejścia, pretendenci do SILNE KUPUJ.</li>
+                <li>Cel ~<?= $tgtPos ?> pozycji; nie odkupujemy w tym samym cyklu spółki właśnie sprzedanej.</li>
+            </ol>
+        </div>
+
+        <div>
+            <h3 class="rules-h">🔵 Reguły utrzymania (HOLD)</h3>
+            <ol class="rules-list">
+                <li>Trzymamy, dopóki strata nie sięgnie −<?= $sl ?>% i zysk nie sięgnie +<?= $tp ?>%.</li>
+                <li>CVS Swing pozostaje ≥ <?= $sell ?> i sygnał nadal jest strong/watchlist.</li>
+                <li>Waga pozycji mieści się w limicie (≤ <?= $maxW ?>%).</li>
+                <li>Histereza: wchodzimy przy Swing ≥ <?= $emLo ?>, ale wychodzimy dopiero < <?= $sell ?> — to ogranicza nadmierny obrót.</li>
+            </ol>
+        </div>
+
+        <div>
+            <h3 class="rules-h">🔴 Reguły sprzedaży (kolejność priorytetu)</h3>
+            <ol class="rules-list">
+                <li><strong>Stop-loss</strong>: strata ≤ −<?= $sl ?>% → sprzedaż całości. Twarda ochrona kapitału (wymuszana przez system).</li>
+                <li><strong>Take-profit</strong>: zysk ≥ +<?= $tp ?>% → realizacja (chyba że spółka nadal mocno przyspiesza, Swing ≥ <?= $emHi ?>).</li>
+                <li><strong>Załamanie sygnału</strong>: CVS Swing < <?= $sell ?>, lub rekomendacja REDUKUJ/UNIKAJ, lub utrata sygnału strong.</li>
+                <li><strong>Przekroczenie wagi</strong>: pozycja > <?= $maxW ?>% portfela → przycięcie do wagi docelowej.</li>
+            </ol>
+        </div>
+    </div>
+</div>
 
 <p class="disclaimer-inline" style="margin-top:2rem;font-size:var(--text-xs);color:var(--c-muted);">
     Wyniki CVS to hipoteza modelu analitycznego, nie rekomendacja inwestycyjna. Inwestuj świadomie.

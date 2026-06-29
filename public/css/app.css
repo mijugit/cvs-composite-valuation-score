@@ -928,6 +928,56 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
     .admin-menu__dropdown li a { padding: .65rem 1.25rem .65rem 2rem; }
 }
 
+/* --- Portfolio: live-price badge, per-position info, strategy rules ------- */
+.px-badge {
+    display: inline-block;
+    margin-left: .35rem;
+    padding: .05em .4em;
+    font-size: .62rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    border-radius: 999px;
+    vertical-align: middle;
+}
+.px-badge--live  { background: rgba(34,197,94,.15);  color: var(--c-success); }
+.px-badge--stale { background: rgba(148,163,184,.18); color: var(--c-muted); }
+
+.pos-info {
+    border: none;
+    background: none;
+    color: var(--c-primary);
+    cursor: pointer;
+    font-size: .9rem;
+    line-height: 1;
+    padding: 0 .15rem;
+    vertical-align: middle;
+    opacity: .8;
+}
+.pos-info:hover { opacity: 1; }
+
+.pos-info-pop {
+    position: absolute;
+    z-index: 50;
+    max-width: 320px;
+    padding: .85rem 1rem;
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: 8px;
+    box-shadow: 0 8px 28px rgba(0,0,0,.5);
+}
+.pos-info-pop__head { font-size: var(--text-xs); color: var(--c-muted); }
+
+.rules-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.5rem;
+}
+.rules-h { font-size: .9rem; font-weight: 700; margin: 0 0 .5rem; }
+.rules-list { margin: 0; padding-left: 1.1rem; font-size: var(--text-sm); line-height: 1.6; }
+.rules-list li { margin-bottom: .4rem; }
+.rules-list strong { color: var(--c-text); }
+
 /* --- General small-screen spacing & layout ---------------- */
 @media (max-width: 768px) {
     .site-main { padding: 1.25rem 0; }

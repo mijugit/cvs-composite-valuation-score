@@ -37,7 +37,7 @@ use DateTimeImmutable;
  * The data layer is isolated behind this class so that swapping providers
  * later requires changes only here.
  */
-class FinancialDataFetcher
+class FinancialDataFetcher implements LatestPriceSource
 {
     private const BASE_URL    = 'https://query2.finance.yahoo.com/v10/finance/quoteSummary/';
     private const CHART_URL   = 'https://query1.finance.yahoo.com/v8/finance/chart/';

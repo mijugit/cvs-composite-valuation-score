@@ -111,6 +111,37 @@ class PortfolioRepository
     }
 
     /**
+     * Returns the most recent transaction reason per ticker — the justification
+     * from the last rebalance in which each ticker was touched (BUY/HOLD/SELL).
+     * Used by the portfolio view's per-position info popover.
+     *
+     * @return array<string, string> ticker → reason
+     */
+    public function getLatestReasonsByTicker(): array
+    {
+        $sql = '
+            SELECT pt.ticker, pt.reason
+            FROM portfolio_transactions pt
+            INNER JOIN (
+                SELECT ticker, MAX(id) AS max_id
+                FROM portfolio_transactions
+                WHERE reason IS NOT NULL AND reason <> ""
+                GROUP BY ticker
+            ) latest ON latest.ticker = pt.ticker AND latest.max_id = pt.id
+        ';
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute();
+
+        $out = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $out[(string) $row['ticker']] = (string) $row['reason'];
+        }
+
+        return $out;
+    }
+
+    /**
      * Returns all transactions for a given cycle, ordered by insertion order.
      *
      * @return array<int, array<string, mixed>>
