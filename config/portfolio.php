@@ -24,9 +24,10 @@ return [
     ],
 
     // --- Rebalance window ---
-    // Number of minutes before market close when the rebalance cycle may fire.
-    // Cron fires at 20:30 and 21:30 Warsaw; the script checks this window at runtime.
-    'rebalance_window_minutes' => 30,
+    // Full NYSE session: 09:30–16:00 ET = 15:30–22:00 Warsaw = 390 minutes.
+    // Cron schedule in CF panel controls the exact fire time — this window just
+    // prevents accidental off-hours execution (weekends, before open, after close).
+    'rebalance_window_minutes' => 390,
 
     // --- LLM configuration for portfolio rebalance calls ---
     // Overrides config/ai.php for portfolio-specific behaviour.
