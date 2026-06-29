@@ -55,6 +55,68 @@ class CycleRepository
     }
 
     /**
+     * Claims the cycle for the given date for execution, returning its id, or
+     * null when the cycle must NOT run now.
+     *
+     * Rules:
+     *   - No row yet           → insert a fresh cycle (attempt 1), return its id.
+     *   - status 'completed'   → return null (already done for the day).
+     *   - status 'started'     → return null (a run is in progress / crashed; avoid
+     *                            concurrent execution — the day resets tomorrow).
+     *   - status failed/llm_failed:
+     *       - attempt_count >= $maxAttempts → return null (retries exhausted).
+     *       - otherwise → reset to 'started', increment attempt_count, clear
+     *         finished_at, and return the id for a retry on the same row.
+     *
+     * Replaces the old insertCycle() gate, which blocked every re-run once a row
+     * existed (so a transient LLM timeout locked the portfolio for the whole day).
+     */
+    public function claimForRun(string $cycleDate, int $maxAttempts): ?int
+    {
+        // Fast path: brand-new day. Portable "insert if absent" (works on MySQL and
+        // SQLite); the UNIQUE(cycle_date) constraint is the concurrency backstop.
+        $stmt = $this->db->prepare(
+            'INSERT INTO rebalance_cycle (cycle_date, status, attempt_count, started_at)
+             SELECT ?, \'started\', 1, CURRENT_TIMESTAMP
+             WHERE NOT EXISTS (SELECT 1 FROM rebalance_cycle WHERE cycle_date = ?)'
+        );
+        $stmt->execute([$cycleDate, $cycleDate]);
+
+        if ($stmt->rowCount() > 0) {
+            return (int) $this->db->lastInsertId();
+        }
+
+        // Row exists — decide whether this is a permitted retry.
+        $existing = $this->findTodayCycle($cycleDate);
+        if ($existing === null) {
+            return null; // race: vanished between INSERT IGNORE and SELECT
+        }
+
+        $id      = (int) $existing['id'];
+        $status  = (string) ($existing['status'] ?? '');
+        $attempts = (int) ($existing['attempt_count'] ?? 1);
+
+        if (!in_array($status, ['failed', 'llm_failed'], true)) {
+            return null; // completed, started, or any non-retryable state
+        }
+
+        if ($attempts >= $maxAttempts) {
+            return null; // retries exhausted for the day
+        }
+
+        $upd = $this->db->prepare(
+            'UPDATE rebalance_cycle
+             SET status = \'started\', attempt_count = attempt_count + 1,
+                 started_at = CURRENT_TIMESTAMP, finished_at = NULL
+             WHERE id = ? AND status IN (\'failed\', \'llm_failed\')'
+        );
+        $upd->execute([$id]);
+
+        // If another tick claimed it first, the UPDATE affected 0 rows.
+        return $upd->rowCount() > 0 ? $id : null;
+    }
+
+    /**
      * Updates the status and sets finished_at = CURRENT_TIMESTAMP.
      */
     public function updateStatus(int $id, string $status): void

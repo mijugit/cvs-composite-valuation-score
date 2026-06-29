@@ -53,6 +53,12 @@ return [
 
         // Sell hysteresis: enter strong at >=58, but don't exit until swing < 50.
         'sell_swing_below'       => 50.0,
+
+        // Daily retry budget: a cycle may be (re)started this many times when the
+        // previous attempt failed (llm_failed/failed). Timing of the retries is
+        // driven by the cron schedule (e.g. base time + 5/10/15 min later); the
+        // script only retries if the prior attempt failed and the budget remains.
+        'max_daily_attempts'     => 3,
     ],
 
     // --- LLM configuration for portfolio rebalance calls ---
@@ -61,8 +67,8 @@ return [
     'llm' => [
         'max_retries'         => 0,     // service-level retry owns the policy (DecisionService)
         'max_tokens'          => 2048,
-        'timeout'             => 20,    // per-attempt seconds
-        'total_timeout'       => 25,
+        'timeout'             => 45,    // per-attempt seconds (bumped: full-screener prompt is a long call)
+        'total_timeout'       => 55,
         'retry_base_delay_ms' => 0,     // irrelevant at max_retries=0
         'retry_delay_seconds' => 2,     // flat delay between service-level attempts
         'max_candidates'      => null,  // null = all screener tickers (set to N to cap)

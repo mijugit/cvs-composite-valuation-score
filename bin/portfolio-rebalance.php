@@ -89,14 +89,15 @@ $cycleRepo      = new CycleRepository($db);
 // cycle_date is always the ET date (NYSE calendar date), not Warsaw date.
 $cycleDate = $now->setTimezone(new DateTimeZone('America/New_York'))->format('Y-m-d');
 
-$id = $cycleRepo->insertCycle($cycleDate);
+$maxAttempts = (int) ($config['strategy']['max_daily_attempts'] ?? 3);
+$id = $cycleRepo->claimForRun($cycleDate, $maxAttempts);
 
 if ($id === null) {
-    $log('already_started: cycle ' . $cycleDate . ' already exists');
+    $log('skip: cycle ' . $cycleDate . ' already completed, in progress, or retries exhausted');
     exit(0);
 }
 
-$log('cycle ' . $cycleDate . ' started (id=' . $id . ')');
+$log('cycle ' . $cycleDate . ' started (id=' . $id . ', max_attempts=' . $maxAttempts . ')');
 
 // --- Rebalance engine: gather inputs + LLM call on the initial connection ---
 $aiConfig        = require ROOT_PATH . '/config/ai.php';
