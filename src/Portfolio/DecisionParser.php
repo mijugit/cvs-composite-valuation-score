@@ -46,14 +46,23 @@ final class DecisionParser
         $result = [];
 
         foreach ($decoded as $index => $item) {
+            // Per-item resilience: a single malformed decision (e.g. BUY with
+            // quantity 0 because price > target weight) must NOT discard the whole
+            // batch. Skip the bad item, keep the rest. Only a structurally broken
+            // response (not JSON / not array / zero valid items) is a parse failure.
             if (!is_array($item)) {
-                throw new \InvalidArgumentException(
-                    "Decision at index {$index} is not an object."
-                );
+                error_log("DecisionParser: item at index {$index} is not an object; skipped.");
+                continue;
             }
 
-            $validated = $this->validateItem($item, $index);
-            $key       = $validated['ticker'] ?? '__no_action__';
+            try {
+                $validated = $this->validateItem($item, $index);
+            } catch (\InvalidArgumentException $e) {
+                error_log("DecisionParser: skipping invalid decision at index {$index}: " . $e->getMessage());
+                continue;
+            }
+
+            $key = $validated['ticker'] ?? '__no_action__';
 
             if (isset($seen[$key])) {
                 // Duplicate ticker — last entry wins; overwrite in-place.
@@ -63,6 +72,12 @@ final class DecisionParser
                 $seen[$key] = count($result);
                 $result[]   = $validated;
             }
+        }
+
+        if (count($result) === 0) {
+            throw new \InvalidArgumentException(
+                'No valid decisions after validation — every item was malformed.'
+            );
         }
 
         return $result;

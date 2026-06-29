@@ -126,6 +126,27 @@ class DecisionParserTest extends TestCase
         $this->parser->parse('[{"action":"BUY","ticker":null,"quantity":10}]');
     }
 
+    public function testInvalidItemInBatchIsSkippedKeepingValidOnes(): void
+    {
+        // One BUY with quantity 0 (price > budget) must not discard the whole batch.
+        $json = '[
+            {"action":"BUY","ticker":"MU","quantity":0,"reason":"too expensive"},
+            {"action":"BUY","ticker":"AMD","quantity":2,"reason":"ok"},
+            {"action":"BUY","ticker":"ABNB","quantity":6,"reason":"ok"}
+        ]';
+        $result = $this->parser->parse($json);
+
+        $this->assertCount(2, $result);
+        $this->assertSame('AMD', $result[0]['ticker']);
+        $this->assertSame('ABNB', $result[1]['ticker']);
+    }
+
+    public function testAllItemsInvalidThrows(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->parser->parse('[{"action":"BUY","ticker":"MU","quantity":0},{"action":"SELL","ticker":"X","quantity":0}]');
+    }
+
     // --- Normalisation ---
 
     public function testDuplicateTickerLastEntryWins(): void

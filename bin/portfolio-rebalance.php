@@ -128,9 +128,42 @@ if (!$result['ok']) {
 
 $log('cycle ' . $cycleDate . ' LLM OK, ' . count($result['decisions']) . ' decisions');
 
+// --- Inject real execution prices ---
+// The LLM never returns price_usd (it must not hallucinate prices). The executor
+// needs the actual snapshot price per ticker, so we attach it here from the same
+// screener rows the model reasoned over. A BUY/SELL whose ticker has no known
+// price is dropped (cannot execute without a price); HOLD/NO_ACTION pass through.
+$priceMap = [];
+foreach ($screenerRows as $row) {
+    $t = strtoupper((string) ($row['ticker'] ?? ''));
+    if ($t !== '' && isset($row['price_at_snapshot'])) {
+        $priceMap[$t] = (float) $row['price_at_snapshot'];
+    }
+}
+
+$pricedDecisions = [];
+$droppedNoPrice  = 0;
+foreach ($result['decisions'] as $decision) {
+    $action = strtoupper((string) ($decision['action'] ?? ''));
+    $ticker = strtoupper((string) ($decision['ticker'] ?? ''));
+
+    if (in_array($action, ['BUY', 'SELL'], true)) {
+        if (!isset($priceMap[$ticker])) {
+            $droppedNoPrice++;
+            continue; // no price → cannot execute
+        }
+        $decision['price_usd'] = $priceMap[$ticker];
+    }
+    $pricedDecisions[] = $decision;
+}
+
+if ($droppedNoPrice > 0) {
+    $log('cycle ' . $cycleDate . ' dropped ' . $droppedNoPrice . ' BUY/SELL without known price');
+}
+
 // Execute portfolio — atomic transaction inside PortfolioService.
 try {
-    $portfolioService->executeCycle($id, $result['decisions']);
+    $portfolioService->executeCycle($id, $pricedDecisions);
     $log('cycle ' . $cycleDate . ' completed');
 } catch (Throwable $e) {
     $cycleRepo->updateStatus($id, 'failed');

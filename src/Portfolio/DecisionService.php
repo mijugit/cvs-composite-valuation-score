@@ -167,8 +167,15 @@ KONSTRUKCJA PORTFELA:
 KIEDY KUPUJESZ (BUY):
 • Tylko spółki z golden = {$signal}.
 • Ranking: najpierw najwyższa konwikcja, ale respektuj limit sektorowy i minimum emerging.
-• Quantity = część całkowita z ({$twFrac} × wartość_portfela / cena_USD). Gotówka to budżet —
-  rankinguj BUY od najważniejszego, system realizuje po kolei aż zabraknie gotówki.
+• Quantity = część całkowita z ({$twFrac} × wartość_portfela / cena_USD).
+• WAŻNE — droga spółka: jeśli ten wzór daje 0, ale cena 1 akcji ≤ {$mw}% wartości
+  portfela, kup DOKŁADNIE 1 akcję. Jeśli nawet 1 akcja przekracza {$mw}% — POMIŃ spółkę
+  (NIE zwracaj BUY z quantity 0; pomiń ją zupełnie lub daj NO_ACTION jeśli to jedyny ruch).
+• LIMIT SEKTOROWY jest twardy: sumuj koszt zakupów (quantity × cena) w każdym sektorze
+  i NIE przekraczaj {$msec}% wartości portfela na sektor. Jeśli kolejny zakup z sektora
+  przebiłby limit — pomiń go i wybierz spółkę z innego sektora.
+• Gotówka to budżet — rankinguj BUY od najważniejszego, system realizuje po kolei aż
+  zabraknie gotówki.
 
 KIEDY SPRZEDAJESZ (SELL) — dotyczy TYLKO spółek, które już masz w portfelu:
 • CVS Swing spadł < {$sellS}, LUB
