@@ -184,7 +184,9 @@ PROMPT;
             $recoFund    = str_pad((string) ($row['reco_fund'] ?? '-'), 9);
             $signal      = str_pad((string) ($row['golden_signal'] ?? '-'), 8);
             $sector      = str_pad(mb_substr((string) ($row['sector'] ?? '-'), 0, 22), 24);
-            $price       = isset($row['price']) ? number_format((float) $row['price'], 2, '.', '') : '-';
+            $price       = isset($row['price_at_snapshot']) && $row['price_at_snapshot'] !== null
+                ? number_format((float) $row['price_at_snapshot'], 2, '.', '')
+                : '-';
 
             $lines[] = "{$ticker} | {$swing} | {$fund} | {$recoSwing} | {$recoFund} | {$signal} | {$sector} | \${$price}";
         }
