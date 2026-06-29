@@ -95,6 +95,14 @@ Na detalu spółki oba shadow modele pokazują się jako chipy "Podgląd 3.1" /
 - 📚 **Track record modelu** — historyczna trafność rekomendacji CVS vs późniejsza cena
 - ℹ️ **Informacje o spółce** — opis biznesowy z Yahoo Finance (zero dodatkowych API callów)
 
+### Wirtualny Portfel (autonomiczny)
+- 🤖 **Autonomiczny zarządca CVS + LLM** — globalny portfel papierowy ($10 000), strategia swing 1–4M, rebalans w sesji NYSE
+- 🛡️ **Twarde guardy po stronie serwera** — limit sektorowy/spółki, stop-loss wymuszany niezależnie od LLM (`DecisionEnforcer`)
+- 🎯 **Reguły wyjścia P&L** — twardy stop-loss (−15%), miękki take-profit (+25%), histereza wejścia/wyjścia 58/54
+- 🔁 **Ograniczone retry** — do 3 prób dziennego cyklu sterowane cronem, idempotencja per data (`claimForRun`)
+- 💹 **Ceny live** — odświeżanie kursów na stronie (cache 15 min, fallback do snapshotu), P&L per pozycja, ⓘ z uzasadnieniem
+- 📖 Pełna dokumentacja: **[docs/autonomous-portfolio.md](docs/autonomous-portfolio.md)**
+
 ### Infrastruktura
 - 🔑 **Dostęp PRO** — kody per user wydawane przez admina, brama chroniąca generowanie AI, limity 10/dzień + 100/miesiąc
 - 📧 **Maile transakcyjne** — PHPMailer + SMTP, alerty + formularz prośby o kod PRO
