@@ -42,7 +42,7 @@ class PortfolioController
 
         // Find next NYSE trading day (up to 7 days ahead) for the empty-cycle message.
         $nextTradingDay = null;
-        $check = new DateTimeImmutable('tomorrow', new DateTimeZone('Europe/Warsaw'));
+        $check = new DateTimeImmutable('today', new DateTimeZone('Europe/Warsaw'));
         for ($i = 0; $i < 7; $i++) {
             if ($calendar->isMarketDay($check)) {
                 $nextTradingDay = $check;
