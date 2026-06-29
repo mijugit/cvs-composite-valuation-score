@@ -24,11 +24,14 @@ final class DecisionParser
      */
     public function parse(string $rawResponse): array
     {
-        $decoded = json_decode(trim($rawResponse), true);
+        $clean = $this->stripMarkdownFences(trim($rawResponse));
+
+        $decoded = json_decode($clean, true);
 
         if (!is_array($decoded)) {
             throw new \InvalidArgumentException(
-                'LLM response is not a valid JSON array. JSON error: ' . json_last_error_msg()
+                'LLM response is not a valid JSON array. JSON error: ' . json_last_error_msg() .
+                ' | First 200 chars: ' . substr($clean, 0, 200)
             );
         }
 
@@ -99,19 +102,16 @@ final class DecisionParser
         }
 
         // --- quantity ---
-        $quantity = isset($item['quantity']) ? (int) $item['quantity'] : null;
+        // Normalise: treat 0 and missing as null (LLMs sometimes emit 0 for HOLD/NO_ACTION).
+        $rawQty   = isset($item['quantity']) ? (int) $item['quantity'] : null;
+        $quantity = ($rawQty !== null && $rawQty > 0) ? $rawQty : null;
 
         if (in_array($action, ['BUY', 'SELL'], true)) {
-            if ($quantity === null || $quantity <= 0) {
+            if ($quantity === null) {
                 throw new \InvalidArgumentException(
                     "Decision at index {$index} with action '{$action}' requires a positive integer 'quantity'."
                 );
             }
-        } elseif ($quantity !== null) {
-            // HOLD and NO_ACTION must have null quantity
-            throw new \InvalidArgumentException(
-                "Decision at index {$index} with action '{$action}' must have null 'quantity', got {$quantity}."
-            );
         }
 
         // --- price_usd (optional, only relevant for BUY/SELL from future enhancements) ---
@@ -131,5 +131,13 @@ final class DecisionParser
             'price_usd' => $priceUsd,
             'reason'    => $reason,
         ];
+    }
+
+    private function stripMarkdownFences(string $text): string
+    {
+        // Remove optional ```json or ``` wrapper that some LLM responses include.
+        $text = preg_replace('/^```(?:json)?\s*/i', '', $text) ?? $text;
+        $text = preg_replace('/\s*```\s*$/i', '', $text) ?? $text;
+        return trim($text);
     }
 }
