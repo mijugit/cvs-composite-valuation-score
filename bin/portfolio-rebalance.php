@@ -56,6 +56,7 @@ if (file_exists($envFile)) {
 
 use CVS\Core\Database;
 use CVS\Portfolio\CycleRepository;
+use CVS\Portfolio\DecisionEnforcer;
 use CVS\Portfolio\DecisionService;
 use CVS\Portfolio\MarketCalendar;
 use CVS\Portfolio\PortfolioRepository;
@@ -125,16 +126,23 @@ if (!$result['ok']) {
 
 $log('cycle ' . $cycleDate . ' LLM OK, ' . count($result['decisions']) . ' decisions');
 
-// --- Inject real execution prices ---
+// --- Inject real execution prices + sector map ---
 // The LLM never returns price_usd (it must not hallucinate prices). The executor
 // needs the actual snapshot price per ticker, so we attach it here from the same
 // screener rows the model reasoned over. A BUY/SELL whose ticker has no known
 // price is dropped (cannot execute without a price); HOLD/NO_ACTION pass through.
-$priceMap = [];
+$priceMap  = [];
+$sectorMap = [];
 foreach ($screenerRows as $row) {
     $t = strtoupper((string) ($row['ticker'] ?? ''));
-    if ($t !== '' && isset($row['price_at_snapshot'])) {
+    if ($t === '') {
+        continue;
+    }
+    if (isset($row['price_at_snapshot'])) {
         $priceMap[$t] = (float) $row['price_at_snapshot'];
+    }
+    if (isset($row['sector'])) {
+        $sectorMap[$t] = (string) $row['sector'];
     }
 }
 
@@ -156,6 +164,23 @@ foreach ($result['decisions'] as $decision) {
 
 if ($droppedNoPrice > 0) {
     $log('cycle ' . $cycleDate . ' dropped ' . $droppedNoPrice . ' BUY/SELL without known price');
+}
+
+// --- Hard cap enforcement (server-side) ---
+// The LLM cannot reliably keep its structured quantity fields in sync with the
+// per-stock / per-sector caps. Trim every BUY to what actually fits, regardless
+// of what the model asked. This is the authoritative guard, not the prompt.
+$enforced = (new DecisionEnforcer($config['strategy'] ?? []))->apply(
+    $pricedDecisions,
+    $holdings,
+    $priceMap,
+    $sectorMap,
+    (float) ($portfolioState['cash'] ?? 0)
+);
+$pricedDecisions = $enforced['decisions'];
+
+foreach ($enforced['notes'] as $note) {
+    $log('cycle ' . $cycleDate . ' enforce: ' . $note);
 }
 
 // --- Fresh connection for the write phase ---
