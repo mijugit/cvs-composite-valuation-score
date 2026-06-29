@@ -23,18 +23,25 @@ final class DecisionEnforcer
 {
     private readonly float $maxSectorPct;
     private readonly float $maxWeightPct;
+    private readonly float $stopLossPct;
 
     /** @param array<string, mixed> $strategy config/portfolio.php['strategy'] */
     public function __construct(array $strategy)
     {
         $this->maxSectorPct = (float) ($strategy['max_sector_pct'] ?? 40.0);
         $this->maxWeightPct = (float) ($strategy['max_weight_pct'] ?? 15.0);
+        $this->stopLossPct  = (float) ($strategy['stop_loss_pct'] ?? 15.0);
     }
 
     /**
-     * Trims BUY quantities so no single stock exceeds max_weight_pct and no
-     * sector exceeds max_sector_pct of the portfolio base value. Decisions are
-     * processed in order; SELLs free up cash/sector/stock budget for later BUYs.
+     * Enforces the hard portfolio rules the LLM cannot be trusted to apply itself:
+     *   - Force-sells any holding at or below the stop-loss (capital protection),
+     *     even when the model said HOLD.
+     *   - Trims BUY quantities so no single stock exceeds max_weight_pct and no
+     *     sector exceeds max_sector_pct of the portfolio base value.
+     *   - Drops any BUY for a ticker sold this cycle (no same-cycle rebuy).
+     * Decisions are processed in order, forced stop-loss SELLs first; SELLs free
+     * up cash/sector/stock budget for later BUYs.
      *
      * @param array<int, array{ticker: string|null, action: string, quantity: int|null, price_usd: float|null, reason: string|null}> $decisions
      * @param array<int, array<string, mixed>> $holdings   current portfolio_holdings rows (ticker, quantity, avg_entry_price)
@@ -74,7 +81,53 @@ final class DecisionEnforcer
         $out   = [];
         $notes = [];
 
-        foreach ($decisions as $decision) {
+        // --- Hard stop-loss: force-sell losers the model left as HOLD ---
+        // Capital protection must not depend on the LLM obeying the prompt. Any
+        // holding at or below the stop-loss is force-sold (full quantity), unless
+        // the model already issued a SELL for it.
+        $modelSellTickers = [];
+        foreach ($decisions as $d) {
+            if (strtoupper($d['action']) === 'SELL') {
+                $modelSellTickers[strtoupper((string) ($d['ticker'] ?? ''))] = true;
+            }
+        }
+
+        $forcedSells = [];
+        if ($this->stopLossPct > 0) {
+            foreach ($holdings as $h) {
+                $t   = strtoupper((string) ($h['ticker'] ?? ''));
+                $avg = (float) ($h['avg_entry_price'] ?? 0);
+                $qty = (int) ($h['quantity'] ?? 0);
+                $px  = $priceMap[$t] ?? null;
+
+                if ($t === '' || isset($modelSellTickers[$t]) || $px === null || $avg <= 0 || $qty <= 0) {
+                    continue;
+                }
+
+                $pnlPct = ($px - $avg) / $avg * 100;
+                if ($pnlPct <= -$this->stopLossPct) {
+                    $forcedSells[] = [
+                        'ticker'    => $t,
+                        'action'    => 'SELL',
+                        'quantity'  => $qty,
+                        'price_usd' => $px,
+                        'reason'    => sprintf('STOP-LOSS auto: P&L %+.1f%%', $pnlPct),
+                    ];
+                    $notes[] = sprintf('%s: wymuszony STOP-LOSS (P&L %+.1f%%)', $t, $pnlPct);
+                }
+            }
+        }
+
+        // Tickers sold this cycle (model + forced) must not be re-bought in the same cycle.
+        $soldTickers = $modelSellTickers;
+        foreach ($forcedSells as $fs) {
+            $soldTickers[strtoupper($fs['ticker'])] = true;
+        }
+
+        // Forced stop-loss SELLs run first so they free up cash/sector/stock budget.
+        $ordered = array_merge($forcedSells, $decisions);
+
+        foreach ($ordered as $decision) {
             $action = strtoupper($decision['action']);
             $ticker = strtoupper((string) ($decision['ticker'] ?? ''));
 
@@ -96,6 +149,12 @@ final class DecisionEnforcer
             if ($action !== 'BUY') {
                 // HOLD / NO_ACTION / unknown — pass through untouched.
                 $out[] = $decision;
+                continue;
+            }
+
+            // Same-cycle rebuy guard: never buy back what we just sold this cycle.
+            if (isset($soldTickers[$ticker])) {
+                $notes[] = "{$ticker}: pominięto BUY — sprzedane w tym cyklu (brak odkupu)";
                 continue;
             }
 

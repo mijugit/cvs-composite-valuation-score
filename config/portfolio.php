@@ -51,8 +51,18 @@ return [
         'emerging_swing_low'     => 58.0,    // inclusive (= accumulate threshold)
         'emerging_swing_high'    => 72.0,    // exclusive (= strong_buy threshold)
 
-        // Sell hysteresis: enter strong at >=58, but don't exit until swing < 50.
-        'sell_swing_below'       => 50.0,
+        // Sell hysteresis: enter strong at >=58, exit when swing < this (tighter = 54
+        // exits weakening positions sooner; 50 would hold longer).
+        'sell_swing_below'       => 54.0,
+
+        // P&L exit rules (percent of entry price, on unrealized gain/loss):
+        //   stop_loss_pct  — HARD, server-enforced in DecisionEnforcer: a holding at
+        //                    or below -stop_loss_pct is force-sold even if the model
+        //                    says HOLD (capital protection must not depend on the LLM).
+        //   take_profit_pct — SOFT, prompt-driven: the model sees P&L and decides when
+        //                    to lock a gain (judgement on still-accelerating winners).
+        'take_profit_pct'        => 25.0,
+        'stop_loss_pct'          => 15.0,
 
         // Daily retry budget: a cycle may be (re)started this many times when the
         // previous attempt failed (llm_failed/failed). Timing of the retries is

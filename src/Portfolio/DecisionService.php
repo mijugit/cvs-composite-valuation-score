@@ -126,7 +126,11 @@ class DecisionService
         $emLow       = (float) ($s['emerging_swing_low'] ?? 58.0);
         $emHigh      = (float) ($s['emerging_swing_high'] ?? 72.0);
         $sellBelow   = (float) ($s['sell_swing_below'] ?? 50.0);
+        $takeProfit  = (float) ($s['take_profit_pct'] ?? 25.0);
+        $stopLoss    = (float) ($s['stop_loss_pct'] ?? 15.0);
 
+        $tpS  = rtrim(rtrim(number_format($takeProfit, 1, '.', ''), '0'), '.');
+        $slS  = rtrim(rtrim(number_format($stopLoss, 1, '.', ''), '0'), '.');
         $tw   = rtrim(rtrim(number_format($targetW, 1, '.', ''), '0'), '.');
         $mw   = rtrim(rtrim(number_format($maxW, 1, '.', ''), '0'), '.');
         $msec = rtrim(rtrim(number_format($maxSector, 1, '.', ''), '0'), '.');
@@ -177,14 +181,20 @@ KIEDY KUPUJESZ (BUY):
 • Gotówka to budżet — rankinguj BUY od najważniejszego, system realizuje po kolei aż
   zabraknie gotówki.
 
-KIEDY SPRZEDAJESZ (SELL) — dotyczy TYLKO spółek, które już masz w portfelu:
-• CVS Swing spadł < {$sellS}, LUB
-• reko_swing = REDUKUJ albo UNIKAJ, LUB
-• golden signal zdegradował do momentum lub null (brak), LUB
-• pozycja przekroczyła {$mw}% portfela (przytnij do wagi docelowej).
+KIEDY SPRZEDAJESZ (SELL) — dotyczy TYLKO spółek, które już masz w portfelu.
+Każda pozycja w danych ma podany wynik P&L (zysk/strata vs cena wejścia).
+Sprawdzaj reguły W TEJ KOLEJNOŚCI, pierwsza pasująca decyduje:
+1. STOP-LOSS: P&L ≤ −{$slS}% → SELL całość. Ochrona kapitału, najwyższy priorytet
+   (system i tak wymusi tę sprzedaż — zgłoś ją sam, by uzasadnienie było spójne).
+2. TAKE-PROFIT: P&L ≥ +{$tpS}% → SELL, realizacja zysku. Wyjątek: jeśli spółka nadal
+   ma bardzo mocny swing (≥{$emHighS}) i przyspiesza, możesz raz wstrzymać i dać HOLD.
+3. CVS Swing spadł < {$sellS}, LUB reko_swing = REDUKUJ/UNIKAJ, LUB golden = momentum/null → SELL.
+4. Pozycja przekroczyła {$mw}% portfela → przytnij do wagi docelowej (częściowy SELL).
+• NIE odkupuj w tym samym cyklu spółki, którą właśnie sprzedajesz (zwłaszcza na take-profit).
 
 KIEDY TRZYMASZ (HOLD):
-• CVS Swing ≥ {$sellS}, nadal strong/watchlist, waga w paśmie. Brak podstaw do zmiany.
+• Żadna reguła SELL nie zaszła: P&L między −{$slS}% a +{$tpS}%, CVS Swing ≥ {$sellS},
+  nadal strong/watchlist, waga w paśmie. Brak podstaw do zmiany.
 
 ═══════════════ FORMAT ODPOWIEDZI ═══════════════
 Odpowiadasz WYŁĄCZNIE poprawnym JSON array — zero tekstu przed/po, zero markdown, zero ```.
@@ -262,10 +272,15 @@ PROMPT;
             foreach ($holdings as $h) {
                 $t        = strtoupper((string) ($h['ticker'] ?? ''));
                 $qty      = (int) ($h['quantity'] ?? 0);
-                $avgPrice = number_format((float) ($h['avg_entry_price'] ?? 0), 4, '.', '');
-                $px       = $priceMap[$t] ?? (float) ($h['avg_entry_price'] ?? 0);
+                $avgVal   = (float) ($h['avg_entry_price'] ?? 0);
+                $avgPrice = number_format($avgVal, 4, '.', '');
+                $px       = $priceMap[$t] ?? $avgVal;
                 $val      = $qty * $px;
                 $pctPort  = $totalValue > 0 ? ($val / $totalValue * 100) : 0.0;
+
+                // Unrealized P&L vs entry — the input for stop-loss / take-profit rules.
+                $pnlPct  = $avgVal > 0 ? (($px - $avgVal) / $avgVal * 100) : 0.0;
+                $pnlPart = sprintf(' | P&L %+.1f%%', $pnlPct);
 
                 // Attach live CVS signal for the held name if present in the screener.
                 $row     = $this->findRow($screenerRows, $t);
@@ -280,8 +295,9 @@ PROMPT;
                     : ' | (brak aktualnego sygnału CVS w screenerze)';
 
                 $lines[] = sprintf(
-                    '  %s: %d szt. @ avg $%s | wart. $%s (%.1f%% portfela)%s',
-                    $t, $qty, $avgPrice, number_format($val, 2, '.', ''), $pctPort, $sigPart
+                    '  %s: %d szt. @ avg $%s | cena $%s | wart. $%s (%.1f%% portfela)%s%s',
+                    $t, $qty, $avgPrice, number_format($px, 2, '.', ''),
+                    number_format($val, 2, '.', ''), $pctPort, $pnlPart, $sigPart
                 );
             }
         }

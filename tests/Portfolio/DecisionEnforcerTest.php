@@ -17,6 +17,7 @@ class DecisionEnforcerTest extends TestCase
         $this->enforcer = new DecisionEnforcer([
             'max_sector_pct' => 40.0,
             'max_weight_pct' => 15.0,
+            'stop_loss_pct'  => 15.0,
         ]);
     }
 
@@ -132,6 +133,64 @@ class DecisionEnforcerTest extends TestCase
         );
 
         $this->assertSame(2, $res['decisions'][0]['quantity']);
+    }
+
+    public function testStopLossForcesSellOnLoserModelLeftAsHold(): void
+    {
+        // Hold INTC bought at $100, now $80 → -20% ≤ -15% stop-loss. Model said HOLD.
+        $holdings  = [['ticker' => 'INTC', 'quantity' => 10, 'avg_entry_price' => 100.0]];
+        $decisions = [
+            ['action' => 'HOLD', 'ticker' => 'INTC', 'quantity' => null, 'price_usd' => null, 'reason' => 'model trzyma'],
+        ];
+
+        $res = $this->enforcer->apply($decisions, $holdings, ['INTC' => 80.0], ['INTC' => 'Technology'], 1000.0);
+
+        $sells = array_values(array_filter($res['decisions'], fn($d) => $d['action'] === 'SELL' && $d['ticker'] === 'INTC'));
+        $this->assertCount(1, $sells);
+        $this->assertSame(10, $sells[0]['quantity']);  // full exit
+        $this->assertNotEmpty($res['notes']);
+    }
+
+    public function testStopLossNotTriggeredWithinThreshold(): void
+    {
+        // -10% loss is within the -15% stop → no forced sell.
+        $holdings  = [['ticker' => 'INTC', 'quantity' => 10, 'avg_entry_price' => 100.0]];
+        $decisions = [
+            ['action' => 'HOLD', 'ticker' => 'INTC', 'quantity' => null, 'price_usd' => null, 'reason' => 'trzyma'],
+        ];
+
+        $res = $this->enforcer->apply($decisions, $holdings, ['INTC' => 90.0], ['INTC' => 'Technology'], 1000.0);
+
+        $sells = array_filter($res['decisions'], fn($d) => $d['action'] === 'SELL');
+        $this->assertEmpty($sells);
+    }
+
+    public function testNoSameCycleRebuyOfSoldTicker(): void
+    {
+        // Model sells AAPL and tries to buy it back the same cycle → BUY dropped.
+        $decisions = [
+            ['action' => 'SELL', 'ticker' => 'AAPL', 'quantity' => 5, 'price_usd' => null, 'reason' => 'take-profit'],
+            $this->buy('AAPL', 5),
+        ];
+
+        $res = $this->enforcer->apply($decisions, [], ['AAPL' => 200.0], ['AAPL' => 'Technology'], 10000.0);
+
+        $buys = array_filter($res['decisions'], fn($d) => $d['action'] === 'BUY' && $d['ticker'] === 'AAPL');
+        $this->assertEmpty($buys);
+    }
+
+    public function testModelSellPreventsDuplicateForcedStopLoss(): void
+    {
+        // Model already SELLs the loser → no duplicate forced stop-loss SELL.
+        $holdings  = [['ticker' => 'INTC', 'quantity' => 10, 'avg_entry_price' => 100.0]];
+        $decisions = [
+            ['action' => 'SELL', 'ticker' => 'INTC', 'quantity' => 10, 'price_usd' => null, 'reason' => 'model sprzedaje'],
+        ];
+
+        $res = $this->enforcer->apply($decisions, $holdings, ['INTC' => 70.0], ['INTC' => 'Technology'], 1000.0);
+
+        $sells = array_filter($res['decisions'], fn($d) => $d['action'] === 'SELL' && $d['ticker'] === 'INTC');
+        $this->assertCount(1, $sells); // exactly one, not duplicated
     }
 
     public function testExistingHoldingsCountTowardSectorCap(): void
