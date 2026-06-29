@@ -97,18 +97,15 @@ if ($id === null) {
 
 $log('cycle ' . $cycleDate . ' started (id=' . $id . ')');
 
-// --- Rebalance engine ---
-// Reconnect before heavy queries: CF drops idle connections after the ~20s LLM call.
-Database::reconnect();
-$db = Database::connection();
-
-$aiConfig       = require ROOT_PATH . '/config/ai.php';
+// --- Rebalance engine: gather inputs + LLM call on the initial connection ---
+$aiConfig        = require ROOT_PATH . '/config/ai.php';
 $mergedLlmConfig = array_merge($aiConfig, $config['llm']);
 
 $portfolioRepo   = new PortfolioRepository($db);
-$portfolioService = new PortfolioService($db, $cycleRepo);
-$decisionService  = new DecisionService($cycleRepo, $mergedLlmConfig, $config);
+$decisionService = new DecisionService($cycleRepo, $mergedLlmConfig, $config);
 $screenerRepo    = new ScreenerRepository($db);
+// PortfolioService is built AFTER the LLM call on a fresh connection (see below),
+// so the write transaction and the cycle summary/status share one connection.
 
 // Gather inputs.
 $portfolioState = $portfolioRepo->getCurrentState();
@@ -160,6 +157,16 @@ foreach ($result['decisions'] as $decision) {
 if ($droppedNoPrice > 0) {
     $log('cycle ' . $cycleDate . ' dropped ' . $droppedNoPrice . ' BUY/SELL without known price');
 }
+
+// --- Fresh connection for the write phase ---
+// The connection used during the ~30s LLM call may be dropped by CF. More importantly,
+// executeCycle's transaction and its cycle summary/status writes MUST share one
+// connection — otherwise the cross-connection writes deadlock on the rebalance_cycle
+// row (SQLSTATE 1205 lock wait timeout). Rebuild cycleRepo on the fresh connection.
+Database::reconnect();
+$writeDb          = Database::connection();
+$cycleRepo        = new CycleRepository($writeDb);
+$portfolioService = new PortfolioService($writeDb, $cycleRepo);
 
 // Execute portfolio — atomic transaction inside PortfolioService.
 try {
