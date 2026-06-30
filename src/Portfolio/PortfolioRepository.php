@@ -257,6 +257,58 @@ class PortfolioRepository
     }
 
     /**
+     * Returns the latest cvs_snapshots rows for tickers that:
+     *   - have a positive screener recommendation (SILNE KUPUJ or AKUMULUJ)
+     *   - pass quality_gate
+     *   - are NOT in the supplied held-ticker list
+     *   - belong to the live model version / RESCORE origin
+     *
+     * Uses the same self-join pattern as ScreenerRepository::findAllLatest()
+     * and applies model_version + origin='RESCORE' filters to exclude shadow rows
+     * (lesson: commit 442689d — unfiltered join returns duplicate rows).
+     *
+     * When $heldTickers is empty, no NOT IN clause is added (returns all
+     * qualifying rows rather than an empty result).
+     *
+     * @param  list<string>              $heldTickers ticker symbols currently held
+     * @return array<int, array<string, mixed>> sorted by cvs_swing DESC
+     */
+    public function getScreenerRecommendationsNotHeld(array $heldTickers, string $liveModelVersion): array
+    {
+        $notInClause = '';
+        $params = [$liveModelVersion, $liveModelVersion];
+
+        if ($heldTickers !== []) {
+            $in = implode(',', array_fill(0, count($heldTickers), '?'));
+            $notInClause = "AND s.ticker NOT IN ($in)";
+            $params = array_merge($params, $heldTickers);
+        }
+
+        $stmt = $this->db->prepare("
+            SELECT s.ticker, s.cvs_swing, s.cvs_fund, s.reco_swing,
+                   s.golden_signal, s.price_at_snapshot, s.score_date
+            FROM cvs_snapshots s
+            INNER JOIN (
+                SELECT ticker, MAX(score_date) AS max_date
+                FROM cvs_snapshots
+                WHERE model_version = ?
+                  AND origin = 'RESCORE'
+                GROUP BY ticker
+            ) latest ON s.ticker = latest.ticker AND s.score_date = latest.max_date
+            WHERE s.model_version = ?
+              AND s.origin = 'RESCORE'
+              AND s.quality_gate = 1
+              AND (s.reco_swing LIKE '%SILNE KUPUJ%' OR s.reco_swing LIKE '%AKUMULUJ%')
+              $notInClause
+            ORDER BY s.cvs_swing DESC
+        ");
+
+        $stmt->execute($params);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
      * Fetches all transactions for the given cycle IDs in one query (anti-N+1).
      * Returns a map: cycle_id => list of transaction rows (ordered by id ASC).
      *
