@@ -8,6 +8,7 @@
 /** @var string|null $filter_sector */
 /** @var string|null $filter_atr */
 /** @var string $sort */
+/** @var array<string, true> $heldTickersMap */
 
 $recoOptions = [
     '⬆⬆ SILNE KUPUJ',
@@ -74,7 +75,18 @@ $atrChip = static function (?string $state): string {
 
 // Helper: column-header info hint (ⓘ tooltip), reusing the .chart-hint pattern.
 $hint = static fn (string $text): string =>
-    ' <span class="chart-hint" tabindex="0">ⓘ<span class="chart-hint__tooltip">' . $text . '</span></span>';
+    ' <span class="chart-hint" tabindex="0">&#9432;<span class="chart-hint__tooltip">' . $text . '</span></span>';
+
+// S-04: badge "w portfelu" next to the ticker link.
+// Conflict variant (amber/red) when held but reco is REDUKUJ or UNIKAJ.
+$heldBadge = static function (string $ticker, string $reco) use ($heldTickersMap): string {
+    if (!isset($heldTickersMap[$ticker])) {
+        return '';
+    }
+    $conflict = str_contains($reco, 'REDUKUJ') || str_contains($reco, 'UNIKAJ');
+    $cls = $conflict ? 'portfolio-badge portfolio-badge--conflict' : 'portfolio-badge';
+    return ' <span class="' . $cls . '">w portfelu</span>';
+};
 ?>
 
 <div style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:.5rem;">
@@ -205,12 +217,12 @@ $hint = static fn (string $text): string =>
                 default                               => 'color:var(--c-muted);',
             };
         ?>
-        <tr>
+        <tr class="<?= isset($heldTickersMap[(string) $row['ticker']]) ? 'tr--held' : '' ?>">
             <td>
                 <a href="/analysis/<?= urlencode((string) $row['ticker']) ?>"
                    style="font-weight:700;color:var(--c-fund);">
                     <?= htmlspecialchars((string) $row['ticker']) ?>
-                </a>
+                </a><?= $heldBadge((string) $row['ticker'], $recoStr) ?>
             </td>
             <td><strong style="color:var(--c-primary);"><?= $swing ?></strong></td>
             <td><strong style="color:var(--c-fund);"><?= $fund ?></strong></td>

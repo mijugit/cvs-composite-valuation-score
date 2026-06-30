@@ -323,26 +323,26 @@ None — no schema changes.
 
 #### Automated
 
-- [x] 1.1 Lint passes: `php -l src/Portfolio/PortfolioRepository.php`
-- [x] 1.2 New tests pass: `vendor/bin/phpunit tests/Portfolio/PortfolioScreenerLinkTest.php`
-- [x] 1.3 Full suite green: `vendor/bin/phpunit`
-- [x] 1.4 Static analysis clean: `vendor/bin/phpstan analyse`
+- [x] 1.1 Lint passes: `php -l src/Portfolio/PortfolioRepository.php` — a003f25
+- [x] 1.2 New tests pass: `vendor/bin/phpunit tests/Portfolio/PortfolioScreenerLinkTest.php` — a003f25
+- [x] 1.3 Full suite green: `vendor/bin/phpunit` — a003f25
+- [x] 1.4 Static analysis clean: `vendor/bin/phpstan analyse` — a003f25
 
 ### Phase 2: Screener markers
 
 #### Automated
 
-- [ ] 2.1 Lint passes: `php -l src/Screener/ScreenerController.php templates/screener.php`
-- [ ] 2.2 Static analysis clean: `vendor/bin/phpstan analyse`
-- [ ] 2.3 Full suite green: `vendor/bin/phpunit`
+- [x] 2.1 Lint passes: `php -l src/Screener/ScreenerController.php templates/screener.php`
+- [x] 2.2 Static analysis clean: `vendor/bin/phpstan analyse`
+- [x] 2.3 Full suite green: `vendor/bin/phpunit`
 
 #### Manual
 
-- [ ] 2.4 Held tickers show "w portfelu" badge in screener
-- [ ] 2.5 Row background highlighted for held tickers
-- [ ] 2.6 Conflict badge amber/red for held tickers with negative reco
-- [ ] 2.7 No badge for non-held tickers; no layout regressions
-- [ ] 2.8 Screener renders correctly when portfolio is empty
+- [x] 2.4 Held tickers show "w portfelu" badge in screener
+- [x] 2.5 Row background highlighted for held tickers
+- [x] 2.6 Conflict badge amber/red for held tickers with negative reco
+- [x] 2.7 No badge for non-held tickers; no layout regressions
+- [x] 2.8 Screener renders correctly when portfolio is empty
 
 ### Phase 3: Portfolio section
 

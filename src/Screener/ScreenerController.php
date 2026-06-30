@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace CVS\Screener;
 
 use CVS\Auth\AuthController;
+use CVS\Core\Database;
 use CVS\Core\Request;
 use CVS\Core\Response;
+use CVS\Portfolio\PortfolioRepository;
 
 /**
  * Handles GET /screener — CVS ranking with filters.
@@ -53,6 +55,11 @@ class ScreenerController
         $lastScored = $this->repo->getLastScoredAt();
         $sectors   = $this->repo->getDistinctSectors();
 
+        // Build held-ticker map for screener badge enrichment (S-04).
+        $portfolioRepo  = new PortfolioRepository(Database::connection());
+        $holdings       = $portfolioRepo->getCurrentHoldings();
+        $heldTickersMap = array_fill_keys(array_column($holdings, 'ticker'), true);
+
         Response::view('screener', [
             'rows'        => $rows,
             'lastScored'  => $lastScored,
@@ -62,7 +69,8 @@ class ScreenerController
             'filter_min_swing' => $minSwing,
             'filter_sector'    => $sector,
             'filter_atr'       => $atr,
-            'sort'        => $sort,
+            'sort'             => $sort,
+            'heldTickersMap'   => $heldTickersMap,
         ]);
     }
 }
