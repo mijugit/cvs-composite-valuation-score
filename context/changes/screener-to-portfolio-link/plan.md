@@ -332,30 +332,30 @@ None — no schema changes.
 
 #### Automated
 
-- [x] 2.1 Lint passes: `php -l src/Screener/ScreenerController.php templates/screener.php`
-- [x] 2.2 Static analysis clean: `vendor/bin/phpstan analyse`
-- [x] 2.3 Full suite green: `vendor/bin/phpunit`
+- [x] 2.1 Lint passes: `php -l src/Screener/ScreenerController.php templates/screener.php` — 5bf5bea
+- [x] 2.2 Static analysis clean: `vendor/bin/phpstan analyse` — 5bf5bea
+- [x] 2.3 Full suite green: `vendor/bin/phpunit` — 5bf5bea
 
 #### Manual
 
-- [x] 2.4 Held tickers show "w portfelu" badge in screener
-- [x] 2.5 Row background highlighted for held tickers
-- [x] 2.6 Conflict badge amber/red for held tickers with negative reco
-- [x] 2.7 No badge for non-held tickers; no layout regressions
-- [x] 2.8 Screener renders correctly when portfolio is empty
+- [x] 2.4 Held tickers show "w portfelu" badge in screener — 5bf5bea
+- [x] 2.5 Row background highlighted for held tickers — 5bf5bea
+- [x] 2.6 Conflict badge amber/red for held tickers with negative reco — 5bf5bea
+- [x] 2.7 No badge for non-held tickers; no layout regressions — 5bf5bea
+- [x] 2.8 Screener renders correctly when portfolio is empty — 5bf5bea
 
 ### Phase 3: Portfolio section
 
 #### Automated
 
-- [ ] 3.1 Lint passes: `php -l src/Portfolio/PortfolioController.php templates/portfolio.php`
-- [ ] 3.2 Static analysis clean: `vendor/bin/phpstan analyse`
-- [ ] 3.3 Full suite green: `vendor/bin/phpunit`
+- [x] 3.1 Lint passes: `php -l src/Portfolio/PortfolioController.php templates/portfolio.php`
+- [x] 3.2 Static analysis clean: `vendor/bin/phpstan analyse`
+- [x] 3.3 Full suite green: `vendor/bin/phpunit`
 
 #### Manual
 
-- [ ] 3.4 "Polecane przez screener" section appears below holdings
-- [ ] 3.5 Section lists only SILNE KUPUJ/AKUMULUJ tickers not in portfolio
-- [ ] 3.6 Held tickers absent from section; NEUTRALNIE/REDUKUJ/UNIKAJ absent
-- [ ] 3.7 Section hidden when no qualifying screener rows
-- [ ] 3.8 Ticker links navigate to /analysis/{ticker}; no portfolio regressions
+- [x] 3.4 "Polecane przez screener" section appears below holdings
+- [x] 3.5 Section lists only SILNE KUPUJ/AKUMULUJ tickers not in portfolio
+- [x] 3.6 Held tickers absent from section; NEUTRALNIE/REDUKUJ/UNIKAJ absent
+- [x] 3.7 Section hidden when no qualifying screener rows
+- [x] 3.8 Ticker links navigate to /analysis/{ticker}; no portfolio regressions

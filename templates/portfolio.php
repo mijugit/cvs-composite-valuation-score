@@ -8,6 +8,7 @@
  * @var float                             $totalValue     cash + sum(holdings value_usd)
  * @var \DateTimeImmutable|null           $nextTradingDay next NYSE trading day from today
  * @var array<string, mixed>              $portfolioConfig config/portfolio.php
+ * @var array<int, array<string, mixed>>  $recommended    S-04: screener SILNE KUPUJ/AKUMULUJ not held
  */
 
 $cash          = (float) $state['cash'];
@@ -251,6 +252,57 @@ $statusChip = static function (?string $status): string {
     });
 })();
 </script>
+<?php endif; ?>
+
+<!-- ─── S-04: Screener recommendations not held ────────────────── -->
+<?php if (!empty($recommended)): ?>
+<?php
+    $recoColorRec = static function (string $reco): string {
+        return match (true) {
+            str_contains($reco, 'SILNE KUPUJ') => 'color:var(--c-success);font-weight:700;',
+            str_contains($reco, 'AKUMULUJ')    => 'color:var(--c-primary);font-weight:700;',
+            default                            => 'color:var(--c-muted);',
+        };
+    };
+?>
+<h2 style="font-size:1rem;font-weight:600;margin:0 0 .75rem;">Polecane przez screener, ale nie w portfelu</h2>
+<div class="card" style="overflow-x:auto;margin-bottom:1.5rem;">
+    <p style="color:var(--c-muted);font-size:var(--text-xs);margin-bottom:.75rem;">
+        Sp&#243;&#322;ki z reko <strong>SILNE KUPUJ</strong> lub <strong>AKUMULUJ</strong> (quality gate &#10003;), kt&#243;rych nie ma w portfelu &mdash; posortowane wg CVS Swing.
+    </p>
+    <table class="pillar-table" style="width:100%;">
+        <thead>
+            <tr>
+                <th>Ticker</th>
+                <th>Rekomendacja</th>
+                <th style="text-align:right;">CVS Swing</th>
+                <th style="text-align:right;">Cena</th>
+                <th>Data</th>
+            </tr>
+        </thead>
+        <tbody>
+        <?php foreach ($recommended as $rec):
+            $recTicker = htmlspecialchars((string) $rec['ticker']);
+            $recReco   = htmlspecialchars((string) ($rec['reco_swing'] ?? '&#8212;'));
+            $recSwing  = $rec['cvs_swing'] !== null ? number_format((float) $rec['cvs_swing'], 1) : '&#8212;';
+            $recPrice  = $rec['price_at_snapshot'] !== null ? '$' . number_format((float) $rec['price_at_snapshot'], 2) : '&#8212;';
+            $recDate   = htmlspecialchars(substr((string) ($rec['score_date'] ?? ''), 0, 10));
+            $recColor  = $recoColorRec((string) ($rec['reco_swing'] ?? ''));
+        ?>
+        <tr>
+            <td>
+                <a href="/analysis/<?= urlencode((string) $rec['ticker']) ?>"
+                   style="font-weight:700;color:var(--c-fund);"><?= $recTicker ?></a>
+            </td>
+            <td style="font-size:var(--text-sm);<?= $recColor ?>"><?= $recReco ?></td>
+            <td style="text-align:right;"><strong style="color:var(--c-primary);"><?= $recSwing ?></strong></td>
+            <td style="text-align:right;font-size:var(--text-sm);"><?= $recPrice ?></td>
+            <td style="font-size:var(--text-xs);color:var(--c-muted);"><?= $recDate ?></td>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+</div>
 <?php endif; ?>
 
 <!-- ─── Latest rebalance cycle ────────────────────────────────── -->

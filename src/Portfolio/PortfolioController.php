@@ -79,6 +79,10 @@ class PortfolioController
             $check = $check->modify('+1 day');
         }
 
+        // S-04: screener-recommended tickers not yet held (SILNE KUPUJ / AKUMULUJ).
+        $heldTickers = array_keys(array_fill_keys(array_column($holdings, 'ticker'), true));
+        $recommended = $portfolioRepo->getScreenerRecommendationsNotHeld($heldTickers, $liveModelVersion);
+
         Response::view('portfolio', compact(
             'state',
             'holdings',
@@ -86,6 +90,7 @@ class PortfolioController
             'totalValue',
             'nextTradingDay',
             'portfolioConfig',
+            'recommended',
         ));
     }
 
