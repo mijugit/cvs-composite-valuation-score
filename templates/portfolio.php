@@ -254,7 +254,10 @@ $statusChip = static function (?string $status): string {
 <?php endif; ?>
 
 <!-- ─── Latest rebalance cycle ────────────────────────────────── -->
-<h2 style="font-size:1rem;font-weight:600;margin:0 0 .75rem;">Ostatni rebalans</h2>
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;">
+    <h2 style="font-size:1rem;font-weight:600;margin:0;">Ostatni rebalans</h2>
+    <a href="/portfolio/history" style="font-size:var(--text-sm);">Zobacz pe&#322;n&#261; histori&#281; &rarr;</a>
+</div>
 
 <?php if ($latestCycle === null): ?>
 <div class="card" style="padding:1.5rem;">

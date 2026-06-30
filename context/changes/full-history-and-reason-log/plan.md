@@ -262,25 +262,25 @@ None — no schema changes.
 ### Phase 2: Controller + route
 
 #### Automated
-- [x] 2.1 Syntax passes: `php -l src/Portfolio/PortfolioController.php src/Core/routes.php`
-- [x] 2.2 Static analysis clean: `vendor/bin/phpstan analyse`
-- [x] 2.3 Full suite green: `vendor/bin/phpunit`
+- [x] 2.1 Syntax passes: `php -l src/Portfolio/PortfolioController.php src/Core/routes.php` — e545702
+- [x] 2.2 Static analysis clean: `vendor/bin/phpstan analyse` — e545702
+- [x] 2.3 Full suite green: `vendor/bin/phpunit` — e545702
 
 #### Manual
-- [ ] 2.4 `/portfolio/history` returns 302 logged out, 200 authenticated
-- [ ] 2.5 View model correct: completed excludes failed; Δ matches; hasMore/nextShow correct at the 30-cycle boundary
+- [x] 2.4 `/portfolio/history` returns 302 logged out, 200 authenticated
+- [x] 2.5 View model correct: completed excludes failed; Δ matches; hasMore/nextShow correct at the 30-cycle boundary
 
 ### Phase 3: View, link, and styling
 
 #### Automated
-- [ ] 3.1 Templates parse: `php -l templates/portfolio-history.php templates/portfolio.php`
-- [ ] 3.2 Static analysis clean: `vendor/bin/phpstan analyse`
-- [ ] 3.3 Full suite green: `vendor/bin/phpunit`
+- [x] 3.1 Templates parse: `php -l templates/portfolio-history.php templates/portfolio.php`
+- [x] 3.2 Static analysis clean: `vendor/bin/phpstan analyse`
+- [x] 3.3 Full suite green: `vendor/bin/phpunit`
 
 #### Manual
-- [ ] 3.4 Link from `/portfolio` navigates to history page
-- [ ] 3.5 Cards collapsed by default; expand shows transactions + reasons
-- [ ] 3.6 Δ colored correctly; first cycle shows no Δ
-- [ ] 3.7 "Pokaż starsze" reveals older cycles; hides when all shown
-- [ ] 3.8 Failed cycles appear only under "zdarzenia operacyjne"
-- [ ] 3.9 Empty state renders with no cycles
+- [x] 3.4 Link from `/portfolio` navigates to history page
+- [x] 3.5 Cards collapsed by default; expand shows transactions + reasons
+- [x] 3.6 Δ colored correctly; first cycle shows no Δ
+- [x] 3.7 "Pokaż starsze" reveals older cycles; hides when all shown
+- [x] 3.8 Failed cycles appear only under "zdarzenia operacyjne"
+- [x] 3.9 Empty state renders with no cycles

@@ -978,6 +978,47 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
 .rules-list li { margin-bottom: .4rem; }
 .rules-list strong { color: var(--c-text); }
 
+/* --- Portfolio history (S-03) ----------------------------- */
+.cycle-card { padding: 0; overflow: hidden; }
+.cycle-card summary { list-style: none; cursor: pointer; padding: 1rem 1.25rem; }
+.cycle-card summary::-webkit-details-marker { display: none; }
+.cycle-card summary:hover { background: rgba(255,255,255,.03); }
+
+.cycle-card__summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+.cycle-card__meta  { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.cycle-card__value { display: flex; align-items: center; gap: .5rem; white-space: nowrap; }
+
+.cycle-delta { font-size: var(--text-sm); font-weight: 600; }
+.cycle-delta--pos { color: var(--c-success); }
+.cycle-delta--neg { color: var(--c-danger); }
+
+.cycle-card__body {
+    padding: .75rem 1.25rem 1.25rem;
+    border-top: 1px solid var(--c-border);
+}
+.cycle-card__notes {
+    font-size: var(--text-sm);
+    color: var(--c-text);
+    margin: 0 0 .75rem;
+    padding: .6rem .75rem;
+    background: var(--c-surface-alt, #f8fafc);
+    border-radius: var(--radius);
+}
+.cycle-tx-table { width: 100%; }
+.cycle-tx__reason {
+    font-size: var(--text-xs);
+    color: var(--c-muted);
+    max-width: 340px;
+    white-space: normal;
+    line-height: 1.45;
+}
+
 /* --- General small-screen spacing & layout ---------------- */
 @media (max-width: 768px) {
     .site-main { padding: 1.25rem 0; }
