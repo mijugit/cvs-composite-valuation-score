@@ -1,7 +1,7 @@
 ---
 change_id: screener-to-portfolio-link
 title: Screener to portfolio linkage (S-04)
-status: implementing
+status: implemented
 created: 2026-06-30
 updated: 2026-06-30
 

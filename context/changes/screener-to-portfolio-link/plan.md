@@ -348,14 +348,14 @@ None — no schema changes.
 
 #### Automated
 
-- [x] 3.1 Lint passes: `php -l src/Portfolio/PortfolioController.php templates/portfolio.php`
-- [x] 3.2 Static analysis clean: `vendor/bin/phpstan analyse`
-- [x] 3.3 Full suite green: `vendor/bin/phpunit`
+- [x] 3.1 Lint passes: `php -l src/Portfolio/PortfolioController.php templates/portfolio.php` — 20b5b2b
+- [x] 3.2 Static analysis clean: `vendor/bin/phpstan analyse` — 20b5b2b
+- [x] 3.3 Full suite green: `vendor/bin/phpunit` — 20b5b2b
 
 #### Manual
 
-- [x] 3.4 "Polecane przez screener" section appears below holdings
-- [x] 3.5 Section lists only SILNE KUPUJ/AKUMULUJ tickers not in portfolio
-- [x] 3.6 Held tickers absent from section; NEUTRALNIE/REDUKUJ/UNIKAJ absent
-- [x] 3.7 Section hidden when no qualifying screener rows
-- [x] 3.8 Ticker links navigate to /analysis/{ticker}; no portfolio regressions
+- [x] 3.4 "Polecane przez screener" section appears below holdings — 20b5b2b
+- [x] 3.5 Section lists only SILNE KUPUJ/AKUMULUJ tickers not in portfolio — 20b5b2b
+- [x] 3.6 Held tickers absent from section; NEUTRALNIE/REDUKUJ/UNIKAJ absent — 20b5b2b
+- [x] 3.7 Section hidden when no qualifying screener rows — 20b5b2b
+- [x] 3.8 Ticker links navigate to /analysis/{ticker}; no portfolio regressions — 20b5b2b
