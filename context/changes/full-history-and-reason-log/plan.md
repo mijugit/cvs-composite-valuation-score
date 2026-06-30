@@ -273,14 +273,14 @@ None — no schema changes.
 ### Phase 3: View, link, and styling
 
 #### Automated
-- [x] 3.1 Templates parse: `php -l templates/portfolio-history.php templates/portfolio.php`
-- [x] 3.2 Static analysis clean: `vendor/bin/phpstan analyse`
-- [x] 3.3 Full suite green: `vendor/bin/phpunit`
+- [x] 3.1 Templates parse: `php -l templates/portfolio-history.php templates/portfolio.php` — 7b1e9c3
+- [x] 3.2 Static analysis clean: `vendor/bin/phpstan analyse` — 7b1e9c3
+- [x] 3.3 Full suite green: `vendor/bin/phpunit` — 7b1e9c3
 
 #### Manual
-- [x] 3.4 Link from `/portfolio` navigates to history page
-- [x] 3.5 Cards collapsed by default; expand shows transactions + reasons
-- [x] 3.6 Δ colored correctly; first cycle shows no Δ
-- [x] 3.7 "Pokaż starsze" reveals older cycles; hides when all shown
-- [x] 3.8 Failed cycles appear only under "zdarzenia operacyjne"
-- [x] 3.9 Empty state renders with no cycles
+- [x] 3.4 Link from `/portfolio` navigates to history page — 7b1e9c3
+- [x] 3.5 Cards collapsed by default; expand shows transactions + reasons — 7b1e9c3
+- [x] 3.6 Δ colored correctly; first cycle shows no Δ — 7b1e9c3
+- [x] 3.7 "Pokaż starsze" reveals older cycles; hides when all shown — 7b1e9c3
+- [x] 3.8 Failed cycles appear only under "zdarzenia operacyjne" — 7b1e9c3
+- [x] 3.9 Empty state renders with no cycles — 7b1e9c3

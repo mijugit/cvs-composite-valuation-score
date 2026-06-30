@@ -1,7 +1,7 @@
 ---
 change_id: full-history-and-reason-log
 title: Full rebalance history and reason timeline (S-03)
-status: implementing
+status: implemented
 created: 2026-06-30
 updated: 2026-06-30
 archived_at: null
