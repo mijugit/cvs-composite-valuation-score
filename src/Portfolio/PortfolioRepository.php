@@ -205,4 +205,84 @@ class PortfolioRepository
 
         return $row !== false ? $row : null;
     }
+
+    /**
+     * Returns completed cycles newest-first, paginated.
+     * Fetch limit+1 rows to detect overflow and compute the last card's Δ.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getCompletedCyclesPage(int $limit, int $offset = 0): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT * FROM rebalance_cycle
+             WHERE status = 'completed'
+             ORDER BY cycle_date DESC, id DESC
+             LIMIT ? OFFSET ?"
+        );
+        $stmt->execute([$limit, $offset]);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Returns the total number of completed rebalance cycles.
+     */
+    public function countCompletedCycles(): int
+    {
+        $stmt = $this->db->prepare(
+            "SELECT COUNT(*) FROM rebalance_cycle WHERE status = 'completed'"
+        );
+        $stmt->execute();
+
+        return (int) $stmt->fetchColumn();
+    }
+
+    /**
+     * Returns all non-completed cycles (failed, llm_failed, started) newest-first.
+     * These form the "zdarzenia operacyjne" section — small set, no pagination.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getOperationalCycles(): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT * FROM rebalance_cycle
+             WHERE status <> 'completed'
+             ORDER BY cycle_date DESC, id DESC"
+        );
+        $stmt->execute();
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Fetches all transactions for the given cycle IDs in one query (anti-N+1).
+     * Returns a map: cycle_id => list of transaction rows (ordered by id ASC).
+     *
+     * @param  list<int>                     $cycleIds
+     * @return array<int, list<array<string, mixed>>>
+     */
+    public function getTransactionsForCycles(array $cycleIds): array
+    {
+        if ($cycleIds === []) {
+            return [];
+        }
+
+        $in   = implode(',', array_fill(0, count($cycleIds), '?'));
+        $stmt = $this->db->prepare(
+            "SELECT * FROM portfolio_transactions
+             WHERE cycle_id IN ($in)
+             ORDER BY cycle_id ASC, id ASC"
+        );
+        $stmt->execute($cycleIds);
+
+        $grouped = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $cid = (int) $row['cycle_id'];
+            $grouped[$cid][] = $row;
+        }
+
+        return $grouped;
+    }
 }
