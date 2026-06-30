@@ -90,6 +90,61 @@ class PortfolioController
     }
 
     /**
+     * Full rebalance history page at GET /portfolio/history.
+     *
+     * Completed cycles form the main timeline; non-completed are operational events.
+     * Pagination: cumulative window via ?show=N (default 30, max 3000).
+     * Fetches show+1 completed rows to detect overflow and compute the last card's Δ.
+     */
+    public function history(Request $req): void
+    {
+        AuthController::requireAuth();
+
+        $db            = Database::connection();
+        $portfolioRepo = new PortfolioRepository($db);
+
+        $show = max(30, min(3000, (int) $req->query('show', 30)));
+
+        // Fetch one extra row: used both for hasMore detection and for computing
+        // pnl_delta on the last visible card (Δ[last] = value[last] - value[last+1]).
+        $rawCompleted = $portfolioRepo->getCompletedCyclesPage($show + 1);
+
+        $hasMore  = count($rawCompleted) > $show;
+        $nextShow = $show + 30;
+
+        // Visible slice: trim to $show items.
+        $visible = array_slice($rawCompleted, 0, $show);
+
+        // Compute per-card pnl_delta (newest-first: delta[i] = value[i] - value[i+1]).
+        $completed = [];
+        foreach ($visible as $i => $cycle) {
+            $currVal = isset($cycle['portfolio_value_usd']) ? (float) $cycle['portfolio_value_usd'] : null;
+            // next in newest-first order = rawCompleted[$i+1] (may be the extra row)
+            $nextRow  = $rawCompleted[$i + 1] ?? null;
+            $prevVal  = $nextRow !== null && isset($nextRow['portfolio_value_usd'])
+                ? (float) $nextRow['portfolio_value_usd']
+                : null;
+
+            $delta = ($currVal !== null && $prevVal !== null) ? round($currVal - $prevVal, 2) : null;
+            $completed[] = array_merge($cycle, ['pnl_delta' => $delta]);
+        }
+
+        // Batch-fetch transactions for visible completed cycles.
+        $visibleIds = array_map(static fn(array $c): int => (int) $c['id'], $completed);
+        $transactionsByCycle = $portfolioRepo->getTransactionsForCycles($visibleIds);
+
+        $operational = $portfolioRepo->getOperationalCycles();
+
+        Response::view('portfolio-history', compact(
+            'completed',
+            'transactionsByCycle',
+            'operational',
+            'hasMore',
+            'nextShow',
+        ));
+    }
+
+    /**
      * Live price map per ticker, session-cached so we never hit Yahoo more than
      * once per 15 minutes. On a cache miss (or when a newly-held ticker is not yet
      * cached) we refetch all current tickers. Per-ticker failures fall back to the

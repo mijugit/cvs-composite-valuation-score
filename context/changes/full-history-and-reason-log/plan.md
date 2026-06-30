@@ -254,17 +254,17 @@ None — no schema changes.
 ### Phase 1: Data layer — split, paginate, batch
 
 #### Automated
-- [x] 1.1 Linting/syntax passes: `php -l src/Portfolio/PortfolioRepository.php`
-- [x] 1.2 New tests pass: `vendor/bin/phpunit tests/Portfolio/PortfolioHistoryRepositoryTest.php`
-- [x] 1.3 Full suite green: `vendor/bin/phpunit`
-- [x] 1.4 Static analysis clean: `vendor/bin/phpstan analyse`
+- [x] 1.1 Linting/syntax passes: `php -l src/Portfolio/PortfolioRepository.php` — cd9e542
+- [x] 1.2 New tests pass: `vendor/bin/phpunit tests/Portfolio/PortfolioHistoryRepositoryTest.php` — cd9e542
+- [x] 1.3 Full suite green: `vendor/bin/phpunit` — cd9e542
+- [x] 1.4 Static analysis clean: `vendor/bin/phpstan analyse` — cd9e542
 
 ### Phase 2: Controller + route
 
 #### Automated
-- [ ] 2.1 Syntax passes: `php -l src/Portfolio/PortfolioController.php src/Core/routes.php`
-- [ ] 2.2 Static analysis clean: `vendor/bin/phpstan analyse`
-- [ ] 2.3 Full suite green: `vendor/bin/phpunit`
+- [x] 2.1 Syntax passes: `php -l src/Portfolio/PortfolioController.php src/Core/routes.php`
+- [x] 2.2 Static analysis clean: `vendor/bin/phpstan analyse`
+- [x] 2.3 Full suite green: `vendor/bin/phpunit`
 
 #### Manual
 - [ ] 2.4 `/portfolio/history` returns 302 logged out, 200 authenticated

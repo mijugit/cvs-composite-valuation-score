@@ -141,7 +141,8 @@ $router->get('/screener', fn($req) => $screener->index($req));
 // ------------------------------------------------------------------
 
 $portfolio = new PortfolioController();
-$router->get('/portfolio', fn($req) => $portfolio->index($req));
+$router->get('/portfolio',         fn($req) => $portfolio->index($req));
+$router->get('/portfolio/history', fn($req) => $portfolio->history($req));
 
 // ------------------------------------------------------------------
 // Watchlist Alerts (S-04)
