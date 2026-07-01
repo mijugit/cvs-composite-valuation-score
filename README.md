@@ -11,6 +11,7 @@
 ![Claude API](https://img.shields.io/badge/Claude-Sonnet_4.6-D97706?logo=anthropic&logoColor=white)
 ![PHPUnit](https://img.shields.io/badge/PHPUnit-11-3C8DB7?logo=php&logoColor=white)
 ![PHPStan](https://img.shields.io/badge/PHPStan-Level_6-9B5DE5)
+![AI Code Review](https://img.shields.io/badge/AI_Code_Review-Claude-D97706?logo=anthropic&logoColor=white)
 
 > ⚠️ **Disclaimer:** Wyniki CVS to hipoteza modelu analitycznego, nie rekomendacja
 > inwestycyjna. Inwestuj świadomie. CVS results are an analytical-model hypothesis,
