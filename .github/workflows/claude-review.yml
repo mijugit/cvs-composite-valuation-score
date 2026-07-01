@@ -8,6 +8,7 @@ on:
 jobs:
   review:
     name: AI Code Review
+    if: "!contains(github.event.pull_request.labels.*.name, 'skip-review')"
     runs-on: ubuntu-latest
     permissions:
       contents: read
