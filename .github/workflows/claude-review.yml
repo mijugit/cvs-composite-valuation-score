@@ -13,6 +13,7 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
+      id-token: write
 
     steps:
       - name: Checkout
@@ -24,7 +25,7 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.GHA_API_KEY }}
-          direct_prompt: |
+          prompt: |
             Review this pull request against the CVS (Composite Valuation Score) project
             conventions documented in CLAUDE.md. Focus on:
 
