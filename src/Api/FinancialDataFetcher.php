@@ -46,6 +46,7 @@ class FinancialDataFetcher implements LatestPriceSource
 
     private const MODULES = [
         'assetProfile',
+        'quoteType',
         'financialData',
         'defaultKeyStatistics',
         'summaryDetail',
@@ -549,6 +550,7 @@ class FinancialDataFetcher implements LatestPriceSource
     private function normalise(array $raw, array $closes, array $spyCloses, DateTimeImmutable $referenceDate, ?float $fxRateToUsd = null, array $dailyOhlc = ['high' => [], 'low' => [], 'close' => []]): ?array
     {
         $ap   = $raw['assetProfile']            ?? [];
+        $qt   = $raw['quoteType']                ?? [];
         $fin  = $raw['financialData']           ?? [];
         $ks   = $raw['defaultKeyStatistics']    ?? [];
         $sd   = $raw['summaryDetail']           ?? [];
@@ -705,8 +707,12 @@ class FinancialDataFetcher implements LatestPriceSource
             'native_price'       => $nativePrice,
             'fx_rate_to_usd'     => $fxF,
 
-            // Company profile (assetProfile — already fetched, zero extra cost)
-            'long_name'        => is_string($ap['longName']             ?? null) ? $ap['longName']             : null,
+            // Company profile (assetProfile/quoteType — already fetched, zero extra cost)
+            // longName lives on quoteType, not assetProfile — Yahoo's assetProfile module
+            // never carries it, so this was silently null for every ticker until the
+            // quoteType module was added (2026-07-02 bug fix).
+            'long_name'        => is_string($qt['longName'] ?? null) ? $qt['longName']
+                                 : (is_string($qt['shortName'] ?? null) ? $qt['shortName'] : null),
             'industry'         => is_string($ap['industry']             ?? null) ? $ap['industry']             : null,
             'country'          => is_string($ap['country']              ?? null) ? $ap['country']              : null,
             'website'          => is_string($ap['website']              ?? null) ? $ap['website']              : null,

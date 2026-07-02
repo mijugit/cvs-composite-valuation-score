@@ -329,4 +329,51 @@ class FinancialDataFetcherFxTest extends TestCase
 
         $this->assertSame('TWD', $result['native_currency']);
     }
+
+    // ------------------------------------------------------------------
+    // long_name — regression for the 2026-07-02 bug (cvs_snapshots.company_name
+    // was NULL for every ticker in production: longName was being read from the
+    // assetProfile module, which Yahoo never populates it under — it lives on
+    // quoteType instead).
+    // ------------------------------------------------------------------
+
+    public function testLongNameComesFromQuoteType(): void
+    {
+        $raw = $this->baseRaw('USD', 'USD');
+        $raw['quoteType'] = ['longName' => 'Apple Inc.', 'shortName' => 'Apple'];
+
+        $result = $this->callNormalise($this->fetcher(), $raw, 1.0);
+
+        $this->assertSame('Apple Inc.', $result['long_name']);
+    }
+
+    public function testLongNameFallsBackToShortNameWhenLongNameMissing(): void
+    {
+        $raw = $this->baseRaw('USD', 'USD');
+        $raw['quoteType'] = ['shortName' => 'Apple'];
+
+        $result = $this->callNormalise($this->fetcher(), $raw, 1.0);
+
+        $this->assertSame('Apple', $result['long_name']);
+    }
+
+    public function testLongNameNullWhenQuoteTypeMissing(): void
+    {
+        $result = $this->callNormalise($this->fetcher(), $this->baseRaw('USD', 'USD'), 1.0);
+
+        $this->assertNull($result['long_name']);
+    }
+
+    public function testLongNameIgnoresAssetProfileLongName(): void
+    {
+        // assetProfile.longName never actually exists in real Yahoo responses —
+        // this guards against re-introducing the old (buggy) extraction source.
+        $raw = $this->baseRaw('USD', 'USD');
+        $raw['assetProfile']['longName'] = 'Should Not Be Used';
+        $raw['quoteType'] = ['longName' => 'Correct Name'];
+
+        $result = $this->callNormalise($this->fetcher(), $raw, 1.0);
+
+        $this->assertSame('Correct Name', $result['long_name']);
+    }
 }
