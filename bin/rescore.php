@@ -83,11 +83,14 @@ $writer      = new SnapshotWriter();
 $priceAlertRepo = new PriceAlertRepository();
 $atrZonesCfg    = is_array($config['atr_zones'] ?? null) ? $config['atr_zones'] : [];
 
-$mailConfig  = require ROOT_PATH . '/config/mail.php';
-$alertSvc    = new AlertService(
+$mailConfig    = require ROOT_PATH . '/config/mail.php';
+$trajectoryCfg = is_array($config['trajectory'] ?? null) ? $config['trajectory'] : [];
+$alertSvc      = new AlertService(
     new AlertRepository(),
     new MailService(null, $mailConfig),
-    new UserRepository()
+    new UserRepository(),
+    new CvsSnapshotRepository(),
+    $trajectoryCfg
 );
 
 try {
@@ -129,6 +132,7 @@ foreach ($tickers as $ticker) {
 
     // Phase 8 (slice 3): cache the ATR entry zone per ticker (from already-fetched
     // daily OHLC — zero extra Yahoo calls) so the light price-alert cron can read it.
+    $zone = null;
     if ($price !== null && !empty($financials['daily_ohlc'])) {
         $zone = AtrZoneCalculator::compute($financials['daily_ohlc'], $price, $atrZonesCfg);
         if ($zone['has_zone']) {
@@ -137,7 +141,9 @@ foreach ($tickers as $ticker) {
     }
 
     // S-04: check for state change and notify watching users.
-    $alerted = $alertSvc->checkAndNotify($ticker, $result->toArray());
+    // companyName/price/zone are already computed above (zero extra fetches) —
+    // enrich the alert mail beyond the bare reco/signal change.
+    $alerted = $alertSvc->checkAndNotify($ticker, $result->toArray(), $companyName, $price, $zone);
     if ($alerted > 0) {
         $log(sprintf('rescore: alert sent for %s to %d user(s)', $ticker, $alerted));
     }

@@ -62,6 +62,7 @@ use CVS\Alerts\PriceAlertService;
 use CVS\Api\FinancialDataFetcher;
 use CVS\Auth\UserRepository;
 use CVS\Mail\MailService;
+use CVS\TrackRecord\CvsSnapshotRepository;
 
 try {
     $service = new PriceAlertService(
@@ -69,7 +70,10 @@ try {
         new FinancialDataFetcher($config['data_source']),
         new MailService(null, $mailConfig),
         new UserRepository(),
-        is_array($config['price_alert'] ?? null) ? $config['price_alert'] : []
+        new CvsSnapshotRepository(),
+        is_array($config['price_alert'] ?? null) ? $config['price_alert'] : [],
+        (string) ($config['model_version'] ?? ''),
+        is_array($config['trajectory'] ?? null) ? $config['trajectory'] : []
     );
 
     $sent = $service->checkAndNotify();

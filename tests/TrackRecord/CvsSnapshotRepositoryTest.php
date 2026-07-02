@@ -554,6 +554,29 @@ class CvsSnapshotRepositoryTest extends TestCase
         $this->assertEquals(74.0, $rows[0]['cvs_swing'], 'must be the live-model row, not the shadow row');
     }
 
+    public function test_find_latest_by_ticker_with_live_version_excludes_shadow_row(): void
+    {
+        // Mirrors the findAllLatest hotfix — a price-alert or watchlist-alert read
+        // for a single ticker must not randomly land on the shadow (3.1) row when
+        // both share the same score_date.
+        [$repo, ] = $this->makeVersionedRepo();
+
+        $base   = $this->passResult('AAPL');
+        $base['swing']['cvs'] = 74.0;
+
+        $shadow = $this->passResult('AAPL');
+        $shadow['swing']['cvs'] = 62.0;
+
+        $repo->save('AAPL', $base,   185.50, 'Technology', null, '3.0');
+        $repo->save('AAPL', $shadow, 185.50, 'Technology', null, '3.1');
+
+        $row = $repo->findLatestByTicker('AAPL', '3.0');
+
+        $this->assertNotNull($row);
+        $this->assertSame('3.0', $row['model_version']);
+        $this->assertEquals(74.0, $row['cvs_swing'], 'must be the live-model row, not the shadow row');
+    }
+
     public function test_find_all_latest_without_live_version_returns_both_rows_legacy_behaviour(): void
     {
         // Documents the pre-fix behaviour for backward-compat callers that

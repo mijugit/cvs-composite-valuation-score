@@ -209,14 +209,27 @@ class CvsSnapshotRepository
      * are a calibration-only measurement layer and never feed user-facing reads.
      * The calibration pipeline (later slice) reads corpus rows via its own queries.
      *
+     * $liveModelVersion pins the row to the production-facing model (mirrors
+     * findAllLatest) — since a single (ticker, score_date) can carry several
+     * shadow rows (3.1/3.2 alongside the live version), an unfiltered query is
+     * ambiguous about which one comes back. Nullable for backward compatibility.
+     *
      * @return array<string, mixed>|null
      */
-    public function findLatestByTicker(string $ticker): ?array
+    public function findLatestByTicker(string $ticker, ?string $liveModelVersion = null): ?array
     {
-        $stmt = $this->db->prepare(
-            'SELECT * FROM cvs_snapshots WHERE ticker = ? AND origin = ? ORDER BY score_date DESC LIMIT 1'
-        );
-        $stmt->execute([$ticker, self::ORIGIN_RESCORE]);
+        if ($liveModelVersion !== null) {
+            $stmt = $this->db->prepare(
+                'SELECT * FROM cvs_snapshots WHERE ticker = ? AND origin = ? AND model_version = ?
+                 ORDER BY score_date DESC LIMIT 1'
+            );
+            $stmt->execute([$ticker, self::ORIGIN_RESCORE, $liveModelVersion]);
+        } else {
+            $stmt = $this->db->prepare(
+                'SELECT * FROM cvs_snapshots WHERE ticker = ? AND origin = ? ORDER BY score_date DESC LIMIT 1'
+            );
+            $stmt->execute([$ticker, self::ORIGIN_RESCORE]);
+        }
         $row = $stmt->fetch();
         return $row !== false ? $row : null;
     }

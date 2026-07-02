@@ -8,6 +8,7 @@ use CVS\Alerts\AlertRepository;
 use CVS\Alerts\AlertService;
 use CVS\Auth\UserRepository;
 use CVS\Mail\MailService;
+use CVS\TrackRecord\CvsSnapshotRepository;
 use PDO;
 use PHPUnit\Framework\TestCase;
 
@@ -48,24 +49,38 @@ class AlertServiceTest extends TestCase
                 is_admin INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL DEFAULT (datetime(\'now\')))
         ');
+        // Minimal shape — only what findTrajectory() reads (score_date, cvs_swing,
+        // ticker, origin, model_version). Absence is also tolerated gracefully
+        // (AlertService::fetchTrajectory catches DB errors), but most tests here
+        // want a real, empty trajectory rather than a swallowed exception.
+        $this->pdo->exec('
+            CREATE TABLE cvs_snapshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, ticker TEXT NOT NULL,
+                score_date TEXT NOT NULL, cvs_swing REAL NULL,
+                model_version TEXT NULL, origin TEXT NOT NULL DEFAULT \'rescore\')
+        ');
     }
 
-    private function makeService(bool &$mailSent = null, int &$sendCount = null): AlertService
+    private function makeService(bool &$mailSent = null, int &$sendCount = null, ?string &$lastHtml = null): AlertService
     {
         $mailSent  = false;
         $sendCount = 0;
+        $lastHtml  = null;
 
         $mailMock = $this->createMock(MailService::class);
-        $mailMock->method('send')->willReturnCallback(function () use (&$mailSent, &$sendCount) {
-            $mailSent = true;
+        $mailMock->method('send')->willReturnCallback(function ($to, $subject, $html) use (&$mailSent, &$sendCount, &$lastHtml) {
+            $mailSent  = true;
             $sendCount++;
+            $lastHtml  = $html;
             return true;
         });
 
         return new AlertService(
             new AlertRepository($this->pdo),
             $mailMock,
-            new UserRepository($this->pdo)
+            new UserRepository($this->pdo),
+            new CvsSnapshotRepository($this->pdo),
+            ['window_days' => 90, 'min_points' => 2]
         );
     }
 
@@ -160,5 +175,107 @@ class AlertServiceTest extends TestCase
         $this->assertNotNull($last);
         $this->assertSame('⬆⬆ SILNE KUPUJ', $last['last_reco']);
         $this->assertSame('strong', $last['last_signal']);
+    }
+
+    // ------------------------------------------------------------------
+    // Content enrichment (company name, Fund score, price/zone, trajectory,
+    // earnings timing, model version, mute-ticker link, old→new signal)
+    // ------------------------------------------------------------------
+
+    /** @return array<string, mixed> */
+    private function fullResult(string $reco = '⬆ AKUMULUJ', float $swing = 65.0): array
+    {
+        return [
+            'swing'           => ['recommendation' => $reco, 'cvs' => $swing],
+            'fundamental'     => ['recommendation' => '⬆ AKUMULUJ', 'cvs' => 61.5],
+            'golden_signal'   => 'watchlist',
+            'model_version'   => '4.0',
+            'earnings_timing' => ['days_since' => null, 'days_to' => 3, 'state' => 'before', 'guard_active' => true],
+        ];
+    }
+
+    public function test_mail_includes_company_name_in_header(): void
+    {
+        $this->setupUser(1, 'user@test.com', true, 'AVGO');
+        $svc = $this->makeService($mailSent, $sendCount, $html);
+        $svc->checkAndNotify('AVGO', $this->fullResult(), 'Broadcom Inc.');
+        $this->assertStringContainsString('AVGO — Broadcom Inc.', $html);
+    }
+
+    public function test_mail_includes_fundamental_score(): void
+    {
+        $this->setupUser(1, 'user@test.com', true, 'AAPL');
+        $svc = $this->makeService($mailSent, $sendCount, $html);
+        $svc->checkAndNotify('AAPL', $this->fullResult());
+        $this->assertStringContainsString('CVS Fundamentalny', $html);
+        $this->assertStringContainsString('61.5', $html);
+    }
+
+    public function test_mail_includes_model_version_and_date_footer(): void
+    {
+        $this->setupUser(1, 'user@test.com', true, 'AAPL');
+        $svc = $this->makeService($mailSent, $sendCount, $html);
+        $svc->checkAndNotify('AAPL', $this->fullResult());
+        $this->assertStringContainsString('Wersja modelu: 4.0', $html);
+    }
+
+    public function test_mail_includes_earnings_proximity(): void
+    {
+        $this->setupUser(1, 'user@test.com', true, 'AAPL');
+        $svc = $this->makeService($mailSent, $sendCount, $html);
+        $svc->checkAndNotify('AAPL', $this->fullResult());
+        $this->assertStringContainsString('Wyniki za 3 dni', $html);
+    }
+
+    public function test_mail_includes_price_and_zone_badge(): void
+    {
+        $this->setupUser(1, 'user@test.com', true, 'AAPL');
+        $svc  = $this->makeService($mailSent, $sendCount, $html);
+        $zone = ['has_zone' => true, 'zone_low' => 150.0, 'zone_high' => 160.0];
+        $svc->checkAndNotify('AAPL', $this->fullResult(), null, 155.0, $zone);
+        $this->assertStringContainsString('$155.00', $html);
+        $this->assertStringContainsString('Cena w strefie kupna', $html);
+    }
+
+    public function test_mail_includes_mute_ticker_link(): void
+    {
+        $this->setupUser(1, 'user@test.com', true, 'AAPL');
+        $svc = $this->makeService($mailSent, $sendCount, $html);
+        $svc->checkAndNotify('AAPL', $this->fullResult());
+        $this->assertStringContainsString('/analysis/AAPL', $html);
+        $this->assertStringContainsString('Zarządzaj na stronie analizy', $html);
+    }
+
+    public function test_mail_shows_signal_old_to_new_not_just_new(): void
+    {
+        // Regression: the pre-enrichment mail only rendered the NEW signal, so a
+        // mail triggered purely by a signal change (reco unchanged) never told the
+        // user what the signal actually transitioned from.
+        $this->setupUser(1, 'user@test.com', true, 'AAPL');
+        $alertRepo = new AlertRepository($this->pdo);
+        $alertRepo->upsertSent(1, 'AAPL', '⬆ AKUMULUJ', null);
+
+        $svc = $this->makeService($mailSent, $sendCount, $html);
+        $svc->checkAndNotify('AAPL', $this->fullResult('⬆ AKUMULUJ'));
+
+        $this->assertStringContainsString('brak → ⭐ Obserwuj', $html);
+    }
+
+    public function test_mail_includes_trajectory_when_history_present(): void
+    {
+        $this->setupUser(1, 'user@test.com', true, 'AAPL');
+
+        // Two prior snapshots under the live model version — enough for a trajectory.
+        $this->pdo->prepare(
+            'INSERT INTO cvs_snapshots (ticker, score_date, cvs_swing, model_version, origin) VALUES (?, ?, ?, ?, ?)'
+        )->execute(['AAPL', date('Y-m-d', strtotime('-1 day')), 60.0, '4.0', 'rescore']);
+        $this->pdo->prepare(
+            'INSERT INTO cvs_snapshots (ticker, score_date, cvs_swing, model_version, origin) VALUES (?, ?, ?, ?, ?)'
+        )->execute(['AAPL', date('Y-m-d'), 65.0, '4.0', 'rescore']);
+
+        $svc = $this->makeService($mailSent, $sendCount, $html);
+        $svc->checkAndNotify('AAPL', $this->fullResult());
+
+        $this->assertStringContainsString('Trajektoria', $html);
     }
 }

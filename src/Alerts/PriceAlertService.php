@@ -6,7 +6,12 @@ namespace CVS\Alerts;
 
 use CVS\Api\FinancialDataFetcher;
 use CVS\Auth\UserRepository;
+use CVS\Mail\AlertEmailHelpers;
 use CVS\Mail\MailService;
+use CVS\TrackRecord\CvsSnapshotRepository;
+use CVS\TrackRecord\TrajectoryCalculator;
+use DateTimeImmutable;
+use Throwable;
 
 /**
  * Detects "price entered the accumulation zone" and dispatches alert emails
@@ -22,17 +27,29 @@ use CVS\Mail\MailService;
  */
 class PriceAlertService
 {
-    private float $marginFrac;
+    private float  $marginFrac;
+    /** @var array<string, mixed> */
+    private array  $trajectoryConfig;
 
-    /** @param array<string, mixed> $cfg `price_alert` config section */
+    /**
+     * @param array<string, mixed> $cfg              `price_alert` config section
+     * @param string                $liveModelVersion `model_version` from cvs-weights config —
+     *                                                pins CVS-score reads to the production model
+     *                                                (shadow rows share the same score_date).
+     * @param array<string, mixed> $trajectoryConfig `trajectory` config section (window_days/min_points)
+     */
     public function __construct(
-        private readonly PriceAlertRepository $repo,
-        private readonly FinancialDataFetcher $fetcher,
-        private readonly MailService          $mail,
-        private readonly UserRepository       $users,
-        array $cfg = []
+        private readonly PriceAlertRepository  $repo,
+        private readonly FinancialDataFetcher  $fetcher,
+        private readonly MailService           $mail,
+        private readonly UserRepository        $users,
+        private readonly CvsSnapshotRepository $snapshots,
+        array $cfg = [],
+        private readonly string $liveModelVersion = '',
+        array $trajectoryConfig = []
     ) {
-        $this->marginFrac = (float) ($cfg['hysteresis_margin_frac'] ?? 0.0);
+        $this->marginFrac      = (float) ($cfg['hysteresis_margin_frac'] ?? 0.0);
+        $this->trajectoryConfig = $trajectoryConfig;
     }
 
     /**
@@ -111,7 +128,8 @@ class PriceAlertService
                 $user = $this->users->findById($a['user_id']);
                 if ($user !== null && !empty($user['email'])) {
                     $stopSwing = $zone['stop_swing'] !== null ? (float) $zone['stop_swing'] : null;
-                    $html = $this->buildHtml($ticker, (float) $zone['zone_low'], (float) $zone['zone_high'], $price, $stopSwing);
+                    $stopFund  = $zone['stop_fund']  !== null ? (float) $zone['stop_fund']  : null;
+                    $html = $this->buildHtml($ticker, (float) $zone['zone_low'], (float) $zone['zone_high'], $price, $stopSwing, $stopFund);
                     $this->mail->send((string) $user['email'], sprintf('CVS Alert: %s — cena w strefie kupna', $ticker), $html);
                 }
                 $this->repo->updateState($a['user_id'], $ticker, 'in', true);
@@ -124,24 +142,45 @@ class PriceAlertService
         return $sent;
     }
 
-    private function buildHtml(string $ticker, float $zoneLow, float $zoneHigh, float $price, ?float $stopSwing): string
+    // ------------------------------------------------------------------
+    // Private helpers
+    // ------------------------------------------------------------------
+
+    private function buildHtml(string $ticker, float $zoneLow, float $zoneHigh, float $price, ?float $stopSwing, ?float $stopFund): string
     {
         $usd     = static fn(float $v): string => '$' . number_format($v, 2);
-        $stopRow = $stopSwing !== null
-            ? '<tr><td style="padding:8px;background:#f0f4f8;font-weight:bold;">Stop (swing):</td><td style="padding:8px;">' . $usd($stopSwing) . '</td></tr>'
-            : '';
+        $stopRow = '';
+        if ($stopSwing !== null) {
+            $stopRow .= '<tr><td style="padding:8px;background:#f0f4f8;font-weight:bold;">Stop (swing):</td><td style="padding:8px;">' . $usd($stopSwing) . '</td></tr>';
+        }
+        if ($stopFund !== null) {
+            $stopRow .= '<tr><td style="padding:8px;background:#f0f4f8;font-weight:bold;">Stop (fundamentalny):</td><td style="padding:8px;">' . $usd($stopFund) . '</td></tr>';
+        }
+
+        $snapshot   = $this->findLatestSnapshot($ticker);
+        $headerName = AlertEmailHelpers::headerTitle($ticker, $snapshot['company_name'] ?? null);
+        $scoreRows  = $this->buildScoreRows($snapshot);
+        $trajectory = $this->fetchTrajectory($ticker);
+        $trajectoryRow = AlertEmailHelpers::trajectoryRow($trajectory);
+        $earningsRow   = $snapshot !== null ? AlertEmailHelpers::earningsRow([
+            'days_since' => $snapshot['days_since_earnings'] ?? null,
+            'days_to'    => $snapshot['days_to_earnings']    ?? null,
+            'state'      => $snapshot['earnings_state']      ?? null,
+        ]) : '';
+        $footerMeta = AlertEmailHelpers::footerMeta($this->liveModelVersion);
 
         return '
-            <h2 style="color:#1e3a5f;">CVS Alert — cena weszła w strefę kupna: ' . htmlspecialchars($ticker) . '</h2>
+            <h2 style="color:#1e3a5f;">CVS Alert — cena weszła w strefę kupna: ' . $headerName . '</h2>
             <table style="border-collapse:collapse;width:100%;font-family:sans-serif;font-size:14px;">
                 <tr><td style="padding:8px;background:#f0f4f8;font-weight:bold;width:160px;">Ticker:</td>
                     <td style="padding:8px;font-weight:bold;font-size:16px;">' . htmlspecialchars($ticker) . '</td></tr>
                 <tr><td style="padding:8px;background:#f0f4f8;font-weight:bold;">Strefa kupna:</td>
                     <td style="padding:8px;">' . $usd($zoneLow) . ' – ' . $usd($zoneHigh) . '</td></tr>
                 <tr><td style="padding:8px;background:#f0f4f8;font-weight:bold;">Bieżąca cena:</td>
-                    <td style="padding:8px;font-weight:bold;">' . $usd($price) . '</td></tr>
-                ' . $stopRow . '
+                    <td style="padding:8px;font-weight:bold;color:#22c55e;">' . $usd($price) . '</td></tr>
+                ' . $stopRow . $scoreRows . $trajectoryRow . $earningsRow . '
             </table>
+            <p style="color:#888;font-size:11px;margin-top:8px;">' . $footerMeta . '</p>
             <p style="margin-top:16px;">
                 <a href="https://cvs.timeflow.fun/analysis/' . urlencode($ticker) . '"
                    style="background:#1e3a5f;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;">
@@ -152,6 +191,60 @@ class PriceAlertService
                 Poziomy orientacyjne z danych cenowych — nie są rekomendacją inwestycyjną. Inwestuj świadomie.<br>
                 Wygenerowano automatycznie przez CVS Composite Valuation Score.
             </p>
+            ' . AlertEmailHelpers::muteFooter($ticker, null) . '
         ';
+    }
+
+    /**
+     * Latest CVS snapshot for context (company name, scores, earnings timing) —
+     * this alert type has no CVSResult of its own (price-only cron), so it reads
+     * the most recent rescore row instead. Graceful null on any failure/absence.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function findLatestSnapshot(string $ticker): ?array
+    {
+        try {
+            return $this->snapshots->findLatestByTicker($ticker, $this->liveModelVersion ?: null);
+        } catch (Throwable $e) {
+            return null;
+        }
+    }
+
+    /** @return array<string, mixed>|null */
+    private function fetchTrajectory(string $ticker): ?array
+    {
+        if ($this->liveModelVersion === '') {
+            return null;
+        }
+        try {
+            $windowDays = (int) ($this->trajectoryConfig['window_days'] ?? 90);
+            $minPoints  = (int) ($this->trajectoryConfig['min_points']  ?? 2);
+            $since      = (new DateTimeImmutable())->modify('-' . $windowDays . ' days');
+            $rows       = $this->snapshots->findTrajectory($ticker, $since, $this->liveModelVersion);
+            return TrajectoryCalculator::summarise($rows, $minPoints);
+        } catch (Throwable $e) {
+            return null;
+        }
+    }
+
+    /** @param array<string, mixed>|null $snapshot */
+    private function buildScoreRows(?array $snapshot): string
+    {
+        if ($snapshot === null) {
+            return '';
+        }
+        $rows = '';
+        if (isset($snapshot['cvs_swing'])) {
+            $recoStr = !empty($snapshot['reco_swing']) ? ' · ' . htmlspecialchars((string) $snapshot['reco_swing']) : '';
+            $rows .= '<tr><td style="padding:8px;background:#f0f4f8;font-weight:bold;">CVS Swing:</td>'
+                . '<td style="padding:8px;font-weight:bold;">' . number_format((float) $snapshot['cvs_swing'], 1) . ' / 100' . $recoStr . '</td></tr>';
+        }
+        if (isset($snapshot['cvs_fund'])) {
+            $recoStr = !empty($snapshot['reco_fund']) ? ' · ' . htmlspecialchars((string) $snapshot['reco_fund']) : '';
+            $rows .= '<tr><td style="padding:8px;background:#f0f4f8;font-weight:bold;">CVS Fundamentalny:</td>'
+                . '<td style="padding:8px;font-weight:bold;color:#a16207;">' . number_format((float) $snapshot['cvs_fund'], 1) . ' / 100' . $recoStr . '</td></tr>';
+        }
+        return $rows;
     }
 }
