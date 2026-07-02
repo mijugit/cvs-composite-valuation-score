@@ -24,6 +24,42 @@ $deltaChip = static function (?float $delta): string {
         ? '<span class="tr-delta--up">▲ +' . number_format($delta, 1) . 'pp</span>'
         : '<span class="tr-delta--down">▼ ' . number_format($delta, 1) . 'pp</span>';
 };
+
+// Hover hint: friendly company name + CVS Swing/Fund — same content shape as
+// the dashboard watchlist chip tooltip.
+$recoColor = static function (?string $reco): string {
+    return match (true) {
+        $reco === null                        => 'color:var(--c-muted);',
+        str_contains($reco, 'SILNE KUPUJ')     => 'color:var(--c-success);',
+        str_contains($reco, 'AKUMULUJ')        => 'color:var(--c-primary);',
+        str_contains($reco, 'REDUKUJ')         => 'color:var(--c-warn);',
+        str_contains($reco, 'UNIKAJ')          => 'color:var(--c-danger);',
+        default                                => 'color:var(--c-muted);',
+    };
+};
+
+$tickerHint = static function (string $ticker, ?array $info) use ($recoColor): string {
+    $name  = $info['companyName'] ?? null;
+    $swing = $info['cvsSwing']    ?? null;
+    $fund  = $info['cvsFund']     ?? null;
+    if ($name === null && $swing === null && $fund === null) {
+        return '';
+    }
+
+    $html = '<span class="ticker-hint__tooltip"><strong>' . htmlspecialchars($name ?? $ticker) . '</strong>';
+    if ($swing !== null || $fund !== null) {
+        $html .= '<span class="ticker-hint__tooltip-scores">';
+        if ($swing !== null) {
+            $html .= '<span style="' . $recoColor($info['recoSwing'] ?? null) . '">CVS Swing ' . number_format($swing, 1) . '</span>';
+        }
+        if ($fund !== null) {
+            $html .= '<span style="' . $recoColor($info['recoFund'] ?? null) . '">CVS Fund ' . number_format($fund, 1) . '</span>';
+        }
+        $html .= '</span>';
+    }
+    $html .= '</span>';
+    return $html;
+};
 ?>
 
 <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;">
@@ -107,9 +143,12 @@ $deltaChip = static function (?float $delta): string {
         <tr class="tr-summary-row" data-ticker="<?= htmlspecialchars($ticker) ?>">
             <td>
                 <span class="tr-summary-row__arrow">▶</span>
-                <a href="/track-record/<?= urlencode($ticker) ?>" style="font-weight:700;color:var(--c-fund);">
-                    <?= htmlspecialchars($ticker) ?>
-                </a>
+                <span class="ticker-hint">
+                    <a href="/track-record/<?= urlencode($ticker) ?>" style="font-weight:700;color:var(--c-fund);">
+                        <?= htmlspecialchars($ticker) ?>
+                    </a>
+                    <?= $tickerHint($ticker, $summary['info'] ?? null) ?>
+                </span>
             </td>
             <td><?= (int) $summary['total'] ?></td>
             <td style="color:var(--c-success);"><?= (int) $summary['hits'] ?></td>

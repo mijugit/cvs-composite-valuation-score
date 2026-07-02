@@ -14,6 +14,7 @@ use CVS\Core\Response;
 class TrackRecordController
 {
     private TrackRecordRepository $repo;
+    private CvsSnapshotRepository $snapshots;
     private string $liveModelVersion;
 
     private const VALID_HORIZONS = [7, 15, 30, 60, 90];
@@ -21,7 +22,8 @@ class TrackRecordController
 
     public function __construct()
     {
-        $this->repo = new TrackRecordRepository();
+        $this->repo      = new TrackRecordRepository();
+        $this->snapshots = new CvsSnapshotRepository();
         $config = require dirname(__DIR__, 2) . '/config/cvs-weights.php';
         $this->liveModelVersion = (string) ($config['model_version'] ?? '');
     }
@@ -51,6 +53,11 @@ class TrackRecordController
         $byTicker      = $this->groupByTicker($enriched);
         $olderByTicker = $this->groupByTicker($olderEnriched);
 
+        // Company name + current scores for the hover hint — sourced from the true
+        // latest snapshot (not the horizon-bounded evaluation rows above), same
+        // method/shape as the dashboard watchlist tooltip (AnalysisController).
+        $latestInfo = $this->buildLatestInfoMap($liveVersion);
+
         // One row per ticker for the accordion: summary stats + delta + the full
         // evaluation list (rendered collapsed, expanded on click).
         $tickerSummaries = [];
@@ -58,6 +65,7 @@ class TrackRecordController
             $summary            = TrackRecordCalculator::summarise($rows);
             $summary['delta']   = TrackRecordCalculator::deltaHitRatePct($rows, $olderByTicker[$ticker] ?? []);
             $summary['rows']    = $rows;
+            $summary['info']    = $latestInfo[$ticker] ?? null;
             $tickerSummaries[$ticker] = $summary;
         }
 
@@ -91,6 +99,31 @@ class TrackRecordController
             $byTicker[$ticker][] = $row;
         }
         return $byTicker;
+    }
+
+    /**
+     * Ticker → {companyName, cvsSwing, cvsFund, recoSwing, recoFund} for the
+     * hover hint, mirroring AnalysisController::dashboard()'s $watchlistInfo.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private function buildLatestInfoMap(?string $liveVersion): array
+    {
+        $info = [];
+        foreach ($this->snapshots->findAllLatest($liveVersion) as $row) {
+            $ticker = (string) ($row['ticker'] ?? '');
+            if ($ticker === '') {
+                continue;
+            }
+            $info[$ticker] = [
+                'companyName' => $row['company_name'] ?? null,
+                'cvsSwing'    => isset($row['cvs_swing']) ? (float) $row['cvs_swing'] : null,
+                'cvsFund'     => isset($row['cvs_fund'])  ? (float) $row['cvs_fund']  : null,
+                'recoSwing'   => $row['reco_swing'] ?? null,
+                'recoFund'    => $row['reco_fund']  ?? null,
+            ];
+        }
+        return $info;
     }
 
     // ------------------------------------------------------------------

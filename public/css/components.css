@@ -145,6 +145,39 @@
 
 .tr-delta--up   { color: var(--c-success); }
 .tr-delta--down { color: var(--c-danger); }
+
+/* --- Generic ticker hover hint ------------------------------
+   Same hover-tooltip behaviour as .watchlist-chip__tooltip (dashboard), but
+   for tickers rendered as plain inline text/links rather than chips — used
+   on /track-record and /screener. */
+.ticker-hint { position: relative; display: inline-block; }
+
+.ticker-hint__tooltip {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 50;
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-md, 6px);
+    box-shadow: var(--shadow-lg);
+    padding: .5rem .75rem;
+    font-size: .8rem;
+    white-space: nowrap;
+    text-align: left;
+    cursor: default;
+}
+.ticker-hint:hover .ticker-hint__tooltip { display: block; }
+
+.ticker-hint__tooltip-scores {
+    display: flex;
+    flex-direction: column;
+    gap: .15rem;
+    margin-top: .25rem;
+    color: var(--c-muted, var(--c-text-muted));
+}
 .tr-delta--flat { color: var(--c-text-muted, #888); }
 
 /* Toast */

@@ -87,6 +87,42 @@ $heldBadge = static function (string $ticker, string $reco) use ($heldTickersMap
     $cls = $conflict ? 'portfolio-badge portfolio-badge--conflict' : 'portfolio-badge';
     return ' <span class="' . $cls . '">w portfelu</span>';
 };
+
+// Hover hint: friendly company name + CVS Swing/Fund — same content shape as
+// the dashboard watchlist chip tooltip.
+$hintRecoColor = static function (?string $reco): string {
+    return match (true) {
+        $reco === null                        => 'color:var(--c-muted);',
+        str_contains($reco, 'SILNE KUPUJ')     => 'color:var(--c-success);',
+        str_contains($reco, 'AKUMULUJ')        => 'color:var(--c-primary);',
+        str_contains($reco, 'REDUKUJ')         => 'color:var(--c-warn);',
+        str_contains($reco, 'UNIKAJ')          => 'color:var(--c-danger);',
+        default                                => 'color:var(--c-muted);',
+    };
+};
+
+$tickerHint = static function (string $ticker, array $row) use ($hintRecoColor): string {
+    $name  = $row['company_name'] ?? null;
+    $swing = isset($row['cvs_swing']) ? (float) $row['cvs_swing'] : null;
+    $fund  = isset($row['cvs_fund'])  ? (float) $row['cvs_fund']  : null;
+    if ($name === null && $swing === null && $fund === null) {
+        return '';
+    }
+
+    $html = '<span class="ticker-hint__tooltip"><strong>' . htmlspecialchars($name ?? $ticker) . '</strong>';
+    if ($swing !== null || $fund !== null) {
+        $html .= '<span class="ticker-hint__tooltip-scores">';
+        if ($swing !== null) {
+            $html .= '<span style="' . $hintRecoColor($row['reco_swing'] ?? null) . '">CVS Swing ' . number_format($swing, 1) . '</span>';
+        }
+        if ($fund !== null) {
+            $html .= '<span style="' . $hintRecoColor($row['reco_fund'] ?? null) . '">CVS Fund ' . number_format($fund, 1) . '</span>';
+        }
+        $html .= '</span>';
+    }
+    $html .= '</span>';
+    return $html;
+};
 ?>
 
 <div style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:.5rem;">
@@ -219,10 +255,13 @@ $heldBadge = static function (string $ticker, string $reco) use ($heldTickersMap
         ?>
         <tr class="<?= isset($heldTickersMap[(string) $row['ticker']]) ? 'tr--held' : '' ?>">
             <td>
-                <a href="/analysis/<?= urlencode((string) $row['ticker']) ?>"
-                   style="font-weight:700;color:var(--c-fund);">
-                    <?= htmlspecialchars((string) $row['ticker']) ?>
-                </a><?= $heldBadge((string) $row['ticker'], $recoStr) ?>
+                <span class="ticker-hint">
+                    <a href="/analysis/<?= urlencode((string) $row['ticker']) ?>"
+                       style="font-weight:700;color:var(--c-fund);">
+                        <?= htmlspecialchars((string) $row['ticker']) ?>
+                    </a>
+                    <?= $tickerHint((string) $row['ticker'], $row) ?>
+                </span><?= $heldBadge((string) $row['ticker'], $recoStr) ?>
             </td>
             <td><strong style="color:var(--c-primary);"><?= $swing ?></strong></td>
             <td><strong style="color:var(--c-fund);"><?= $fund ?></strong></td>
