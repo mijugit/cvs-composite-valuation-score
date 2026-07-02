@@ -108,4 +108,73 @@ class TrackRecordCalculatorTest extends TestCase
         $this->assertNull($stats['hit_rate_pct']);
         $this->assertSame(1, $stats['neutral']);
     }
+
+    // ------------------------------------------------------------------
+    // deltaHitRatePct()
+    // ------------------------------------------------------------------
+
+    public function test_delta_positive_when_recent_band_outperforms(): void
+    {
+        // Older band (horizon 2N): 1/2 hit = 50%.
+        $older = [
+            ['score_date' => '2026-01-01', 'result' => 'hit',  'price_change_pct' => 5.0],
+            ['score_date' => '2026-01-02', 'result' => 'miss', 'price_change_pct' => -1.0],
+        ];
+        // Current (horizon N) = older + two new rows that are both hits → recent
+        // band (current minus older, by score_date) = 2/2 hit = 100%.
+        $current = array_merge($older, [
+            ['score_date' => '2026-02-01', 'result' => 'hit', 'price_change_pct' => 3.0],
+            ['score_date' => '2026-02-02', 'result' => 'hit', 'price_change_pct' => 2.0],
+        ]);
+
+        $delta = TrackRecordCalculator::deltaHitRatePct($current, $older);
+
+        $this->assertEquals(50.0, $delta); // 100% - 50%
+    }
+
+    public function test_delta_negative_when_recent_band_underperforms(): void
+    {
+        $older = [
+            ['score_date' => '2026-01-01', 'result' => 'hit', 'price_change_pct' => 5.0],
+            ['score_date' => '2026-01-02', 'result' => 'hit', 'price_change_pct' => 4.0],
+        ];
+        $current = array_merge($older, [
+            ['score_date' => '2026-02-01', 'result' => 'miss', 'price_change_pct' => -3.0],
+        ]);
+
+        $delta = TrackRecordCalculator::deltaHitRatePct($current, $older);
+
+        $this->assertEquals(-100.0, $delta); // 0% - 100%
+    }
+
+    public function test_delta_null_when_recent_band_empty(): void
+    {
+        // $current === $older → the "recent" band (set difference) is empty.
+        $older = [
+            ['score_date' => '2026-01-01', 'result' => 'hit', 'price_change_pct' => 5.0],
+        ];
+
+        $this->assertNull(TrackRecordCalculator::deltaHitRatePct($older, $older));
+    }
+
+    public function test_delta_null_when_older_band_empty(): void
+    {
+        $current = [
+            ['score_date' => '2026-02-01', 'result' => 'hit', 'price_change_pct' => 5.0],
+        ];
+
+        $this->assertNull(TrackRecordCalculator::deltaHitRatePct($current, []));
+    }
+
+    public function test_delta_null_when_recent_band_all_neutral(): void
+    {
+        $older = [
+            ['score_date' => '2026-01-01', 'result' => 'hit', 'price_change_pct' => 5.0],
+        ];
+        $current = array_merge($older, [
+            ['score_date' => '2026-02-01', 'result' => 'neutral', 'price_change_pct' => 0.5],
+        ]);
+
+        $this->assertNull(TrackRecordCalculator::deltaHitRatePct($current, $older));
+    }
 }

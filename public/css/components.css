@@ -128,6 +128,25 @@
 
 .industry-row td { background: rgba(0,0,0,.15); }
 
+/* --- Track Record accordion (per-ticker summary rows) ------ */
+.tr-summary-row { cursor: pointer; transition: background .12s; }
+.tr-summary-row:hover { background: rgba(255,255,255,.04); }
+
+.tr-summary-row__arrow {
+    display: inline-block;
+    font-size: .6rem;
+    margin-right: .35rem;
+    transition: transform .18s;
+    color: var(--c-text-muted, #888);
+}
+.tr-summary-row--expanded .tr-summary-row__arrow { transform: rotate(90deg); }
+
+.tr-detail-row td { background: rgba(0,0,0,.15); font-size: var(--text-sm); }
+
+.tr-delta--up   { color: var(--c-success); }
+.tr-delta--down { color: var(--c-danger); }
+.tr-delta--flat { color: var(--c-text-muted, #888); }
+
 /* Toast */
 .sectors-toast {
     position: fixed;

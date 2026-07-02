@@ -967,4 +967,29 @@
     });
 }());
 
+// ------------------------------------------------------------------
+// Track Record — per-ticker accordion
+// ------------------------------------------------------------------
+
+(function () {
+    'use strict';
+
+    const summaryRows = document.querySelectorAll('.tr-summary-row');
+    if (!summaryRows.length) return;
+
+    summaryRows.forEach(row => {
+        row.addEventListener('click', e => {
+            if (e.target.closest('a')) return; // let the ticker link navigate normally
+            const ticker = row.dataset.ticker;
+            if (!ticker) return;
+            // Attribute match, not a class-name suffix — tickers can contain a dot
+            // (e.g. "XTB.WA"), which would otherwise split a compound class selector.
+            const detailRows = document.querySelectorAll('.tr-detail-row[data-ticker="' + ticker + '"]');
+            if (!detailRows.length) return;
+            detailRows.forEach(r => { r.hidden = !r.hidden; });
+            row.classList.toggle('tr-summary-row--expanded');
+        });
+    });
+}());
+
 })();

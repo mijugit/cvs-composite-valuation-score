@@ -139,4 +139,45 @@ class TrackRecordCalculator
             'avg_change_pct'=> $avgChange,
         ];
     }
+
+    // ------------------------------------------------------------------
+    // Per-ticker trend (track-record accordion)
+    // ------------------------------------------------------------------
+
+    /**
+     * Change in hit-rate between a "recent" and an "older" band, for one ticker.
+     *
+     * $currentRows (horizon N) is a superset of $olderRows (horizon 2N) because
+     * getEvaluations()'s cutoff is a lower bound, not a window (old.score_date is
+     * always "at least N days old", unbounded further back — see
+     * TrackRecordRepository::getEvaluations()). Subtracting $olderRows out of
+     * $currentRows by score_date isolates exactly the rows that only just matured
+     * into the N-day horizon: aged [N, 2N) days. Comparing that band's hit-rate
+     * against $olderRows' own hit-rate (the established, ≥2N-day track record)
+     * answers "are freshly-matured calls for this ticker doing better or worse
+     * than its longer history" — without any new SQL (both inputs come from the
+     * same getEvaluations() call, just at horizon N and horizon 2N).
+     *
+     * @param array<int, array<string, mixed>> $currentRows enriched rows at horizon N, one ticker
+     * @param array<int, array<string, mixed>> $olderRows   enriched rows at horizon 2N, same ticker
+     * @return float|null percentage-point delta (recent - older); null when either
+     *                     band has no evaluated (hit/miss) pairs to compare
+     */
+    public static function deltaHitRatePct(array $currentRows, array $olderRows): ?float
+    {
+        $olderDates = array_column($olderRows, 'score_date');
+        $recentBand = array_values(array_filter(
+            $currentRows,
+            static fn(array $row): bool => !in_array($row['score_date'] ?? null, $olderDates, true)
+        ));
+
+        $recentRate = self::summarise($recentBand)['hit_rate_pct'];
+        $olderRate  = self::summarise($olderRows)['hit_rate_pct'];
+
+        if ($recentRate === null || $olderRate === null) {
+            return null;
+        }
+
+        return round($recentRate - $olderRate, 1);
+    }
 }

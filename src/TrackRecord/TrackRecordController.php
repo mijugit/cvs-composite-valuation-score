@@ -34,13 +34,54 @@ class TrackRecordController
     {
         AuthController::requireAuth();
 
-        $horizon = $this->parseHorizon($req);
+        $horizon      = $this->parseHorizon($req);
+        $liveVersion  = $this->liveModelVersion !== '' ? $this->liveModelVersion : null;
 
-        $evaluations = $this->repo->getEvaluations($horizon, $this->liveModelVersion !== '' ? $this->liveModelVersion : null);
+        $evaluations = $this->repo->getEvaluations($horizon, $liveVersion);
         $enriched    = TrackRecordCalculator::enrichWithResult($evaluations);
         $stats       = TrackRecordCalculator::summarise($enriched);
 
-        // Group by ticker for the per-ticker summary table.
+        // Comparison band for the per-ticker delta (accordion) — reuses the same
+        // query at double the horizon, no new SQL. See
+        // TrackRecordCalculator::deltaHitRatePct() for why this isolates a clean
+        // "recently matured vs established" comparison.
+        $olderEvaluations = $this->repo->getEvaluations($horizon * 2, $liveVersion);
+        $olderEnriched    = TrackRecordCalculator::enrichWithResult($olderEvaluations);
+
+        $byTicker      = $this->groupByTicker($enriched);
+        $olderByTicker = $this->groupByTicker($olderEnriched);
+
+        // One row per ticker for the accordion: summary stats + delta + the full
+        // evaluation list (rendered collapsed, expanded on click).
+        $tickerSummaries = [];
+        foreach ($byTicker as $ticker => $rows) {
+            $summary            = TrackRecordCalculator::summarise($rows);
+            $summary['delta']   = TrackRecordCalculator::deltaHitRatePct($rows, $olderByTicker[$ticker] ?? []);
+            $summary['rows']    = $rows;
+            $tickerSummaries[$ticker] = $summary;
+        }
+
+        // Honest empty-state: tracking effectively starts when the live model_version
+        // began being written (not at the first-ever snapshot — older versions/currency
+        // basis differ and are excluded from evaluation).
+        $trackingStart = $this->repo->getEarliestLiveSnapshotDate($liveVersion);
+
+        Response::view('track-record', [
+            'evaluations'      => $enriched,
+            'tickerSummaries'  => $tickerSummaries,
+            'stats'            => $stats,
+            'horizon'          => $horizon,
+            'horizons'         => self::VALID_HORIZONS,
+            'trackingStart'    => $trackingStart,
+        ]);
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $enriched
+     * @return array<string, array<int, array<string, mixed>>>
+     */
+    private function groupByTicker(array $enriched): array
+    {
         $byTicker = [];
         foreach ($enriched as $row) {
             $ticker = (string) $row['ticker'];
@@ -49,22 +90,7 @@ class TrackRecordController
             }
             $byTicker[$ticker][] = $row;
         }
-
-        // Honest empty-state: tracking effectively starts when the live model_version
-        // began being written (not at the first-ever snapshot — older versions/currency
-        // basis differ and are excluded from evaluation).
-        $trackingStart = $this->repo->getEarliestLiveSnapshotDate(
-            $this->liveModelVersion !== '' ? $this->liveModelVersion : null
-        );
-
-        Response::view('track-record', [
-            'evaluations'   => $enriched,
-            'byTicker'      => $byTicker,
-            'stats'         => $stats,
-            'horizon'       => $horizon,
-            'horizons'      => self::VALID_HORIZONS,
-            'trackingStart' => $trackingStart,
-        ]);
+        return $byTicker;
     }
 
     // ------------------------------------------------------------------

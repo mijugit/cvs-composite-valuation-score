@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 /** @var array<int, array<string, mixed>> $evaluations */
-/** @var array<string, array<int, array<string, mixed>>> $byTicker */
+/** @var array<string, array<string, mixed>> $tickerSummaries Per-ticker: total/hits/misses/neutral/hit_rate_pct/avg_change_pct/delta/rows */
 /** @var array{total: int, hits: int, misses: int, neutral: int, pending: int,
  *            hit_rate_pct: float|null, avg_change_pct: float|null} $stats */
 /** @var int $horizon */
@@ -14,6 +14,15 @@ $resultChip = static function (string $result): string {
         'neutral' => '<span class="signal-pill" style="background:rgba(90,117,149,.15);color:var(--c-muted);">Neutralna</span>',
         default   => '—',
     };
+};
+
+$deltaChip = static function (?float $delta): string {
+    if ($delta === null || $delta === 0.0) {
+        return '<span class="tr-delta--flat">→ b/d</span>';
+    }
+    return $delta > 0
+        ? '<span class="tr-delta--up">▲ +' . number_format($delta, 1) . 'pp</span>'
+        : '<span class="tr-delta--down">▼ ' . number_format($delta, 1) . 'pp</span>';
 };
 ?>
 
@@ -70,42 +79,63 @@ $resultChip = static function (string $result): string {
 </div>
 <?php else: ?>
 
-<!-- Evaluations table -->
-<div class="card" style="overflow-x:auto;">
+<!-- Per-ticker accordion -->
+<div class="card" style="overflow-x:auto;padding:0;">
     <table class="pillar-table" style="width:100%;">
         <thead>
             <tr>
                 <th>Ticker</th>
-                <th>Data snapshotu</th>
-                <th>CVS Swing</th>
-                <th>Rekomendacja</th>
-                <th>Cena wtedy</th>
-                <th>Cena teraz</th>
-                <th>Zmiana %</th>
-                <th>Wynik</th>
+                <th>Ocen</th>
+                <th>Trafnych</th>
+                <th>Błędów</th>
+                <th>% Trafności</th>
+                <th>
+                    Δ Trafność
+                    <span class="chart-hint" tabindex="0">ⓘ
+                        <span class="chart-hint__tooltip">
+                            Porównanie trafności dwóch pasm: ocen, które dopiero co „dojrzały" w tym
+                            horyzoncie ([<?= $horizon ?>, <?= $horizon * 2 ?>) dni), względem starszej,
+                            ustalonej historii (≥<?= $horizon * 2 ?> dni). Dodatnia = model ostatnio
+                            trafia częściej niż wcześniej.
+                        </span>
+                    </span>
+                </th>
             </tr>
         </thead>
         <tbody>
-        <?php foreach ($evaluations as $row):
+        <?php foreach ($tickerSummaries as $ticker => $summary): ?>
+        <tr class="tr-summary-row" data-ticker="<?= htmlspecialchars($ticker) ?>">
+            <td>
+                <span class="tr-summary-row__arrow">▶</span>
+                <a href="/track-record/<?= urlencode($ticker) ?>" style="font-weight:700;color:var(--c-fund);">
+                    <?= htmlspecialchars($ticker) ?>
+                </a>
+            </td>
+            <td><?= (int) $summary['total'] ?></td>
+            <td style="color:var(--c-success);"><?= (int) $summary['hits'] ?></td>
+            <td style="color:var(--c-danger);"><?= (int) $summary['misses'] ?></td>
+            <td><strong><?= $summary['hit_rate_pct'] !== null ? number_format((float) $summary['hit_rate_pct'], 1) . '%' : '—' ?></strong></td>
+            <td><?= $deltaChip($summary['delta']) ?></td>
+        </tr>
+        <?php foreach ($summary['rows'] as $row):
             $change = $row['price_change_pct'] !== null ? (float) $row['price_change_pct'] : null;
             $changeStr = $change !== null ? ($change >= 0 ? '+' : '') . number_format($change, 1) . '%' : '—';
             $changeColor = $change !== null ? ($change >= 0 ? 'color:var(--c-success)' : 'color:var(--c-danger)') : '';
         ?>
-        <tr>
-            <td>
-                <a href="/track-record/<?= urlencode((string) $row['ticker']) ?>"
-                   style="font-weight:700;color:var(--c-fund);">
-                    <?= htmlspecialchars((string) $row['ticker']) ?>
-                </a>
+        <tr class="tr-detail-row" data-ticker="<?= htmlspecialchars($ticker) ?>" hidden>
+            <td colspan="2" style="color:var(--c-muted);"><?= htmlspecialchars((string) $row['score_date']) ?></td>
+            <td colspan="2">
+                <?= $row['cvs_swing'] !== null ? number_format((float) $row['cvs_swing'], 1) : '—' ?>
+                &nbsp;·&nbsp; <?= htmlspecialchars((string) ($row['reco_swing'] ?? '—')) ?>
             </td>
-            <td style="color:var(--c-muted);font-size:var(--text-sm);"><?= htmlspecialchars((string) $row['score_date']) ?></td>
-            <td><strong><?= $row['cvs_swing'] !== null ? number_format((float) $row['cvs_swing'], 1) : '—' ?></strong></td>
-            <td style="font-size:var(--text-sm);"><?= htmlspecialchars((string) ($row['reco_swing'] ?? '—')) ?></td>
-            <td>$<?= $row['price_then'] !== null ? number_format((float) $row['price_then'], 2) : '—' ?></td>
-            <td>$<?= $row['price_now']  !== null ? number_format((float) $row['price_now'],  2) : '—' ?></td>
-            <td style="<?= $changeColor ?>;font-weight:600;"><?= $changeStr ?></td>
+            <td>
+                $<?= $row['price_then'] !== null ? number_format((float) $row['price_then'], 2) : '—' ?>
+                → $<?= $row['price_now'] !== null ? number_format((float) $row['price_now'], 2) : '—' ?>
+                &nbsp; <span style="<?= $changeColor ?>;font-weight:600;"><?= $changeStr ?></span>
+            </td>
             <td><?= $resultChip($row['result'] ?? 'neutral') ?></td>
         </tr>
+        <?php endforeach; ?>
         <?php endforeach; ?>
         </tbody>
     </table>
