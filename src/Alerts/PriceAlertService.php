@@ -142,6 +142,34 @@ class PriceAlertService
         return $sent;
     }
 
+    /**
+     * Manual production test: renders and sends the price-zone alert HTML for a
+     * ticker's real current zone/price to an arbitrary address. Reads only —
+     * never touches price_alert state — safe to call outside the cron.
+     */
+    public function sendPreviewMail(string $ticker, string $toEmail): bool
+    {
+        $zone = $this->repo->findZone($ticker);
+        if ($zone === null || $zone['zone_low'] === null || $zone['zone_high'] === null) {
+            return false;
+        }
+
+        $native = $this->fetcher->fetchLatestPrice($ticker);
+        if ($native === null) {
+            return false;
+        }
+        $fx    = $zone['fx_rate_to_usd'] !== null ? (float) $zone['fx_rate_to_usd'] : 1.0;
+        $price = $native * $fx;
+
+        $stopSwing = $zone['stop_swing'] !== null ? (float) $zone['stop_swing'] : null;
+        $stopFund  = $zone['stop_fund']  !== null ? (float) $zone['stop_fund']  : null;
+
+        $html = $this->buildHtml($ticker, (float) $zone['zone_low'], (float) $zone['zone_high'], $price, $stopSwing, $stopFund);
+        $subject = sprintf('[TEST] CVS Alert: %s — podgląd strefy kupna', $ticker);
+
+        return $this->mail->send($toEmail, $subject, $html);
+    }
+
     // ------------------------------------------------------------------
     // Private helpers
     // ------------------------------------------------------------------

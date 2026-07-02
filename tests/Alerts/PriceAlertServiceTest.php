@@ -184,4 +184,42 @@ class PriceAlertServiceTest extends TestCase
         $this->assertStringContainsString('MU', $html);
         $this->assertStringNotContainsString('CVS Swing', $html);
     }
+
+    // ------------------------------------------------------------------
+    // sendPreviewMail() — manual production test tool (bin/send_test_mail.php)
+    // ------------------------------------------------------------------
+
+    public function test_send_preview_mail_renders_from_real_zone_and_price(): void
+    {
+        $this->pdo->prepare(
+            'INSERT INTO ticker_zone (ticker, zone_low, zone_high, stop_swing, stop_fund, computed_at) VALUES (?, ?, ?, ?, ?, ?)'
+        )->execute(['AVGO', 195.0, 215.0, 180.0, 165.0, date('Y-m-d H:i:s')]);
+
+        [$svc] = $this->makeService(208.50, $html);
+        $sent = $svc->sendPreviewMail('AVGO', 'demo@test.com');
+
+        $this->assertTrue($sent);
+        $this->assertStringContainsString('$208.50', $html);
+        $this->assertStringContainsString('$195.00', $html);
+    }
+
+    public function test_send_preview_mail_returns_false_without_zone(): void
+    {
+        [$svc] = $this->makeService(100.0, $html);
+        $sent = $svc->sendPreviewMail('ZZZZ', 'demo@test.com');
+
+        $this->assertFalse($sent);
+    }
+
+    public function test_send_preview_mail_does_not_write_price_alert_state(): void
+    {
+        $this->pdo->prepare(
+            'INSERT INTO ticker_zone (ticker, zone_low, zone_high, computed_at) VALUES (?, ?, ?, ?)'
+        )->execute(['AVGO', 195.0, 215.0, date('Y-m-d H:i:s')]);
+
+        [$svc, $repo] = $this->makeService(208.50, $html);
+        $svc->sendPreviewMail('AVGO', 'demo@test.com');
+
+        $this->assertSame([], $repo->findActiveAlerts(), 'preview must not create/touch price_alert rows');
+    }
 }

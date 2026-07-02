@@ -49,14 +49,17 @@ class AlertServiceTest extends TestCase
                 is_admin INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL DEFAULT (datetime(\'now\')))
         ');
-        // Minimal shape — only what findTrajectory() reads (score_date, cvs_swing,
-        // ticker, origin, model_version). Absence is also tolerated gracefully
-        // (AlertService::fetchTrajectory catches DB errors), but most tests here
-        // want a real, empty trajectory rather than a swallowed exception.
+        // Covers both findTrajectory() (score_date, cvs_swing, ticker, origin,
+        // model_version) and findLatestByTicker() (used by sendPreviewMail()).
+        // Absence is also tolerated gracefully (AlertService catches DB errors),
+        // but most tests here want real data rather than a swallowed exception.
         $this->pdo->exec('
             CREATE TABLE cvs_snapshots (
-                id INTEGER PRIMARY KEY AUTOINCREMENT, ticker TEXT NOT NULL,
-                score_date TEXT NOT NULL, cvs_swing REAL NULL,
+                id INTEGER PRIMARY KEY AUTOINCREMENT, ticker TEXT NOT NULL, company_name TEXT NULL,
+                score_date TEXT NOT NULL, cvs_swing REAL NULL, cvs_fund REAL NULL,
+                reco_swing TEXT NULL, reco_fund TEXT NULL, golden_signal TEXT NULL,
+                price_at_snapshot REAL NULL,
+                days_since_earnings INTEGER NULL, days_to_earnings INTEGER NULL, earnings_state TEXT NULL,
                 model_version TEXT NULL, origin TEXT NOT NULL DEFAULT \'rescore\')
         ');
     }
@@ -277,5 +280,74 @@ class AlertServiceTest extends TestCase
         $svc->checkAndNotify('AAPL', $this->fullResult());
 
         $this->assertStringContainsString('Trajektoria', $html);
+    }
+
+    // ------------------------------------------------------------------
+    // sendPreviewMail() — manual production test tool (bin/send_test_mail.php)
+    // ------------------------------------------------------------------
+
+    public function test_send_preview_mail_renders_from_latest_snapshot(): void
+    {
+        $this->pdo->prepare(
+            'INSERT INTO cvs_snapshots (ticker, company_name, score_date, cvs_swing, cvs_fund, reco_swing, reco_fund, golden_signal, model_version)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        )->execute(['AVGO', 'Broadcom Inc.', date('Y-m-d'), 57.9, 54.3, '⬆ AKUMULUJ', '⬆ AKUMULUJ', 'watchlist', '4.0']);
+
+        $svc = $this->makeService($mailSent, $sendCount, $html);
+        $sent = $svc->sendPreviewMail('AVGO', 'demo@test.com', '4.0');
+
+        $this->assertTrue($sent);
+        $this->assertTrue($mailSent);
+        $this->assertStringContainsString('AVGO — Broadcom Inc.', $html);
+        $this->assertStringContainsString('57.9', $html);
+        $this->assertStringContainsString('54.3', $html);
+    }
+
+    public function test_send_preview_mail_uses_test_subject(): void
+    {
+        $this->pdo->prepare(
+            'INSERT INTO cvs_snapshots (ticker, score_date, cvs_swing, reco_swing, model_version) VALUES (?, ?, ?, ?, ?)'
+        )->execute(['AAPL', date('Y-m-d'), 70.0, '⬆ AKUMULUJ', '4.0']);
+
+        $sentSubject = null;
+        $mailMock = $this->createMock(MailService::class);
+        $mailMock->method('send')->willReturnCallback(function ($to, $subject) use (&$sentSubject) {
+            $sentSubject = $subject;
+            return true;
+        });
+
+        $svc = new AlertService(
+            new AlertRepository($this->pdo),
+            $mailMock,
+            new UserRepository($this->pdo),
+            new CvsSnapshotRepository($this->pdo)
+        );
+        $svc->sendPreviewMail('AAPL', 'demo@test.com', '4.0');
+
+        $this->assertSame('[TEST] CVS Alert: AAPL — podgląd', $sentSubject);
+    }
+
+    public function test_send_preview_mail_returns_false_when_no_snapshot(): void
+    {
+        $svc = $this->makeService($mailSent, $sendCount, $html);
+        $sent = $svc->sendPreviewMail('ZZZZ', 'demo@test.com', '4.0');
+
+        $this->assertFalse($sent);
+        $this->assertFalse($mailSent);
+    }
+
+    public function test_send_preview_mail_does_not_write_alert_state(): void
+    {
+        // Safety property: a preview send must never touch alert_sent — it
+        // would otherwise suppress a legitimate future real alert.
+        $this->pdo->prepare(
+            'INSERT INTO cvs_snapshots (ticker, score_date, cvs_swing, reco_swing, model_version) VALUES (?, ?, ?, ?, ?)'
+        )->execute(['AAPL', date('Y-m-d'), 70.0, '⬆ AKUMULUJ', '4.0']);
+
+        $svc = $this->makeService($mailSent, $sendCount, $html);
+        $svc->sendPreviewMail('AAPL', 'demo@test.com', '4.0');
+
+        $alertRepo = new AlertRepository($this->pdo);
+        $this->assertNull($alertRepo->getLastSent(1, 'AAPL'));
     }
 }

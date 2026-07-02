@@ -135,6 +135,66 @@ class AlertService
         return $sent;
     }
 
+    /**
+     * Manual production test: renders and sends the state-change alert HTML for
+     * a ticker's most recent real snapshot to an arbitrary address. Bypasses
+     * per-user dedup entirely — never call this from the rescore pipeline, only
+     * from bin/send_test_mail.php for verifying rendering/deliverability.
+     *
+     * @param string|null               $companyName Override; falls back to the snapshot's company_name.
+     * @param float|null                $price       Override; falls back to the snapshot's price_at_snapshot.
+     * @param array<string, mixed>|null $atrZone     AtrZoneCalculator-shaped zone (e.g. from PriceAlertRepository::findZone).
+     */
+    public function sendPreviewMail(
+        string  $ticker,
+        string  $toEmail,
+        string  $liveModelVersion,
+        ?string $companyName = null,
+        ?float  $price = null,
+        ?array  $atrZone = null
+    ): bool {
+        $snapshot = null;
+        try {
+            $snapshot = $this->snapshots->findLatestByTicker($ticker, $liveModelVersion ?: null);
+        } catch (Throwable $e) {
+            // fall through — $snapshot stays null, handled below
+        }
+
+        if ($snapshot === null) {
+            return false;
+        }
+
+        $swingCvs = isset($snapshot['cvs_swing']) ? (float) $snapshot['cvs_swing'] : null;
+        $fundCvs  = isset($snapshot['cvs_fund'])  ? (float) $snapshot['cvs_fund']  : null;
+
+        $trajectory = $this->fetchTrajectory($ticker, $liveModelVersion);
+
+        $html = $this->buildHtml($ticker, [
+            'company_name'    => $companyName ?? ($snapshot['company_name'] ?? null),
+            'price'           => $price ?? (isset($snapshot['price_at_snapshot']) ? (float) $snapshot['price_at_snapshot'] : null),
+            'atr_zone'        => $atrZone,
+            'reco_old'        => null,
+            'reco_new'        => $snapshot['reco_swing'] ?? null,
+            'signal_old'      => null,
+            'signal_new'      => $snapshot['golden_signal'] ?? null,
+            'cvs_swing'       => $swingCvs,
+            'cvs_fund'        => $fundCvs,
+            'fund_reco'       => $snapshot['reco_fund'] ?? null,
+            'model_version'   => $liveModelVersion,
+            'earnings_timing' => [
+                'days_since' => $snapshot['days_since_earnings'] ?? null,
+                'days_to'    => $snapshot['days_to_earnings']    ?? null,
+                'state'      => $snapshot['earnings_state']      ?? null,
+            ],
+            'trajectory'      => $trajectory,
+            'unsub_url'       => '',
+        ]);
+
+        $subject = sprintf('[TEST] CVS Alert: %s — podgląd', $ticker);
+
+        return $this->mail->send($toEmail, $subject, $html);
+    }
+
     // ------------------------------------------------------------------
     // Private helpers
     // ------------------------------------------------------------------
