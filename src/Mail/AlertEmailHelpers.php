@@ -63,6 +63,23 @@ class AlertEmailHelpers
             . '<td style="padding:8px;">' . htmlspecialchars($label) . '</td></tr>';
     }
 
+    /**
+     * Price position relative to the ATR accumulation zone — same three-state
+     * classification as the analysis-page exec-plan badge (in/above/below).
+     * Used by both alert templates so a price shown in a mail always reflects
+     * where it actually sits, not just an assumed "just entered the zone".
+     *
+     * @return array{0: string, 1: string} [color hex, label]
+     */
+    public static function zoneBadge(float $price, float $zoneLow, float $zoneHigh): array
+    {
+        return match (true) {
+            $price >= $zoneLow && $price <= $zoneHigh => ['#22c55e', '✓ Cena w strefie kupna'],
+            $price > $zoneHigh                        => ['#f59e0b', '↑ Powyżej strefy — czekaj na cofnięcie'],
+            default                                    => ['#ef4444', '↓ Poniżej strefy (poniżej wsparcia)'],
+        };
+    }
+
     public static function footerMeta(string $modelVersion): string
     {
         return 'Wersja modelu: ' . htmlspecialchars($modelVersion)

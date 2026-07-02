@@ -197,15 +197,23 @@ class PriceAlertService
         ]) : '';
         $footerMeta = AlertEmailHelpers::footerMeta($this->liveModelVersion);
 
+        // Real cron sends only fire on an out→in transition, so price is always
+        // actually inside the zone there — but sendPreviewMail() renders this same
+        // template against whatever the live price happens to be right now, which
+        // may be outside the zone. Badge-driven color/label (not a hardcoded
+        // "entered the zone" assumption) keeps the mail accurate in both cases.
+        [$badgeColor, $badgeLabel] = AlertEmailHelpers::zoneBadge($price, $zoneLow, $zoneHigh);
+
         return '
-            <h2 style="color:#1e3a5f;">CVS Alert — cena weszła w strefę kupna: ' . $headerName . '</h2>
+            <h2 style="color:#1e3a5f;">CVS Alert — pozycja względem strefy kupna: ' . $headerName . '</h2>
             <table style="border-collapse:collapse;width:100%;font-family:sans-serif;font-size:14px;">
                 <tr><td style="padding:8px;background:#f0f4f8;font-weight:bold;width:160px;">Ticker:</td>
                     <td style="padding:8px;font-weight:bold;font-size:16px;">' . htmlspecialchars($ticker) . '</td></tr>
                 <tr><td style="padding:8px;background:#f0f4f8;font-weight:bold;">Strefa kupna:</td>
                     <td style="padding:8px;">' . $usd($zoneLow) . ' – ' . $usd($zoneHigh) . '</td></tr>
                 <tr><td style="padding:8px;background:#f0f4f8;font-weight:bold;">Bieżąca cena:</td>
-                    <td style="padding:8px;font-weight:bold;color:#22c55e;">' . $usd($price) . '</td></tr>
+                    <td style="padding:8px;font-weight:bold;color:' . $badgeColor . ';">' . $usd($price) . '<br>'
+                    . '<span style="color:' . $badgeColor . ';font-weight:bold;">' . $badgeLabel . '</span></td></tr>
                 ' . $stopRow . $scoreRows . $trajectoryRow . $earningsRow . '
             </table>
             <p style="color:#888;font-size:11px;margin-top:8px;">' . $footerMeta . '</p>

@@ -311,11 +311,7 @@ class AlertService
 
         $low  = (float) $atrZone['zone_low'];
         $high = (float) $atrZone['zone_high'];
-        [$badgeColor, $badgeLabel] = match (true) {
-            $price >= $low && $price <= $high => ['#22c55e', '✓ Cena w strefie kupna'],
-            $price > $high                    => ['#f59e0b', '↑ Powyżej strefy — czekaj na cofnięcie'],
-            default                            => ['#ef4444', '↓ Poniżej strefy (poniżej wsparcia)'],
-        };
+        [$badgeColor, $badgeLabel] = AlertEmailHelpers::zoneBadge($price, $low, $high);
 
         return '<tr><td style="padding:8px;background:#f0f4f8;font-weight:bold;">Cena / strefa kupna:</td>'
             . '<td style="padding:8px;">' . $usdText . ' &nbsp; (' . $usdFmt($low) . ' – ' . $usdFmt($high) . ')<br>'

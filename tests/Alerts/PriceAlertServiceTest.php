@@ -203,6 +203,24 @@ class PriceAlertServiceTest extends TestCase
         $this->assertStringContainsString('$195.00', $html);
     }
 
+    public function test_send_preview_mail_does_not_mislabel_price_above_zone(): void
+    {
+        // Regression: the preview reuses the "price entered the zone" template,
+        // but the live price it renders against may sit outside the zone (real
+        // cron sends only fire on an actual in-zone transition — the preview has
+        // no such guarantee). Must show an accurate "above zone" badge, not the
+        // in-zone green/checkmark.
+        $this->pdo->prepare(
+            'INSERT INTO ticker_zone (ticker, zone_low, zone_high, computed_at) VALUES (?, ?, ?, ?)'
+        )->execute(['TSLA', 368.60, 386.43, date('Y-m-d H:i:s')]);
+
+        [$svc] = $this->makeService(425.30, $html);
+        $svc->sendPreviewMail('TSLA', 'demo@test.com');
+
+        $this->assertStringContainsString('Powyżej strefy', $html);
+        $this->assertStringNotContainsString('Cena w strefie kupna', $html);
+    }
+
     public function test_send_preview_mail_returns_false_without_zone(): void
     {
         [$svc] = $this->makeService(100.0, $html);
