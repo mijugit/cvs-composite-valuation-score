@@ -110,9 +110,20 @@
         <form id="analysis-form" class="form">
             <input type="hidden" id="csrf-token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
 
+            <?php
+            // Cache-busting for the autocomplete data fetch (app.js) — same
+            // filemtime pattern as $asset() in layout.php, but tickers.json is
+            // fetched dynamically by JS rather than linked in <head>, so it needs
+            // its own version stamp passed through a data attribute. Without this,
+            // a ticker added via /admin/tickers can sit in a stale browser cache
+            // of the JSON response and never appear in the dropdown.
+            $tickersJsonPath    = dirname(__DIR__) . '/public/data/tickers.json';
+            $tickersJsonVersion = is_file($tickersJsonPath) ? filemtime($tickersJsonPath) : time();
+            ?>
             <div class="form-group">
                 <label for="tickers">Tickery</label>
-                <textarea id="tickers" name="tickers" rows="3" placeholder="AAPL, MSFT, NVDA"></textarea>
+                <textarea id="tickers" name="tickers" rows="3" placeholder="AAPL, MSFT, NVDA"
+                          data-tickers-version="<?= $tickersJsonVersion ?>"></textarea>
             </div>
 
             <button type="submit" class="btn btn--primary" id="analyse-btn">

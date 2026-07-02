@@ -578,7 +578,13 @@
         dropdown.hidden = true;
         wrapper.appendChild(dropdown);
 
-        fetch(TICKERS_URL)
+        // Cache-bust with the server-stamped file version (set by dashboard.php)
+        // so a ticker added via /admin/tickers shows up without a hard refresh —
+        // same problem class as the CSS/JS cache-busting in layout.php's $asset().
+        const version = textarea.dataset.tickersVersion;
+        const url = version ? TICKERS_URL + '?v=' + version : TICKERS_URL;
+
+        fetch(url)
             .then(r => r.json())
             .then(data => {
                 tickerList = data;
