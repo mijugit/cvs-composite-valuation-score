@@ -25,10 +25,12 @@ class PortfolioScreenerLinkTest extends TestCase
             CREATE TABLE cvs_snapshots (
                 id                  INTEGER PRIMARY KEY AUTOINCREMENT,
                 ticker              TEXT    NOT NULL,
+                company_name        TEXT,
                 model_version       TEXT    NOT NULL,
                 origin              TEXT    NOT NULL DEFAULT "RESCORE",
                 quality_gate        INTEGER NOT NULL DEFAULT 1,
                 reco_swing          TEXT,
+                reco_fund           TEXT,
                 cvs_swing           REAL,
                 cvs_fund            REAL,
                 golden_signal       TEXT,
@@ -48,10 +50,12 @@ class PortfolioScreenerLinkTest extends TestCase
     {
         $row = array_merge([
             'ticker'            => $ticker,
+            'company_name'      => null,
             'model_version'     => self::MODEL,
             'origin'            => 'RESCORE',
             'quality_gate'      => 1,
             'reco_swing'        => $reco,
+            'reco_fund'         => $reco,
             'cvs_swing'         => 60.0,
             'cvs_fund'          => 55.0,
             'golden_signal'     => null,
@@ -61,12 +65,12 @@ class PortfolioScreenerLinkTest extends TestCase
 
         $this->db->prepare('
             INSERT INTO cvs_snapshots
-                (ticker, model_version, origin, quality_gate, reco_swing,
+                (ticker, company_name, model_version, origin, quality_gate, reco_swing, reco_fund,
                  cvs_swing, cvs_fund, golden_signal, price_at_snapshot, score_date)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ')->execute([
-            $row['ticker'], $row['model_version'], $row['origin'],
-            $row['quality_gate'], $row['reco_swing'], $row['cvs_swing'],
+            $row['ticker'], $row['company_name'], $row['model_version'], $row['origin'],
+            $row['quality_gate'], $row['reco_swing'], $row['reco_fund'], $row['cvs_swing'],
             $row['cvs_fund'], $row['golden_signal'], $row['price_at_snapshot'],
             $row['score_date'],
         ]);
@@ -143,5 +147,21 @@ class PortfolioScreenerLinkTest extends TestCase
         $rows = $this->repo->getScreenerRecommendationsNotHeld([], self::MODEL);
 
         $this->assertCount(2, $rows);
+    }
+
+    // ── company name / fund reco (hover hint) ────────────────────────────────
+
+    public function testIncludesCompanyNameAndRecoFund(): void
+    {
+        $this->insertSnapshot('AVGO', '⬆⬆ SILNE KUPUJ', [
+            'company_name' => 'Broadcom Inc.',
+            'reco_fund'    => '⬆ AKUMULUJ',
+        ]);
+
+        $rows = $this->repo->getScreenerRecommendationsNotHeld([], self::MODEL);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame('Broadcom Inc.', $rows[0]['company_name']);
+        $this->assertSame('⬆ AKUMULUJ', $rows[0]['reco_fund']);
     }
 }

@@ -45,7 +45,7 @@ class PortfolioRepository
      * (lesson: commit 442689d — unfiltered JOIN returns duplicate rows when shadow
      * scoring writes multiple rows per ticker/date).
      *
-     * @return array<int, array{ticker: string, quantity: int, avg_entry_price: float, live_price: float, price_is_snapshot: bool, value_usd: float, updated_at: string}>
+     * @return array<int, array{ticker: string, quantity: int, avg_entry_price: float, live_price: float, price_is_snapshot: bool, value_usd: float, updated_at: string, company_name: ?string, cvs_swing: ?float, cvs_fund: ?float, reco_swing: ?string, reco_fund: ?string}>
      */
     public function getCurrentHoldingsWithPrice(string $liveModelVersion): array
     {
@@ -56,7 +56,12 @@ class PortfolioRepository
                 h.avg_entry_price,
                 h.updated_at,
                 COALESCE(s.price_at_snapshot, h.avg_entry_price) AS live_price,
-                (s.price_at_snapshot IS NOT NULL)                 AS price_is_snapshot
+                (s.price_at_snapshot IS NOT NULL)                 AS price_is_snapshot,
+                s.company_name,
+                s.cvs_swing,
+                s.cvs_fund,
+                s.reco_swing,
+                s.reco_fund
             FROM portfolio_holdings h
             LEFT JOIN cvs_snapshots s
                 ON  s.ticker        = h.ticker
@@ -88,6 +93,11 @@ class PortfolioRepository
                 'price_is_snapshot'=> (bool) $row['price_is_snapshot'],
                 'value_usd'        => round($quantity * $livePrice, 2),
                 'updated_at'       => (string) $row['updated_at'],
+                'company_name'     => $row['company_name'] ?? null,
+                'cvs_swing'        => isset($row['cvs_swing']) ? (float) $row['cvs_swing'] : null,
+                'cvs_fund'         => isset($row['cvs_fund'])  ? (float) $row['cvs_fund']  : null,
+                'reco_swing'       => $row['reco_swing'] ?? null,
+                'reco_fund'        => $row['reco_fund']  ?? null,
             ];
         }, $rows);
     }
@@ -285,7 +295,7 @@ class PortfolioRepository
         }
 
         $stmt = $this->db->prepare("
-            SELECT s.ticker, s.cvs_swing, s.cvs_fund, s.reco_swing,
+            SELECT s.ticker, s.company_name, s.cvs_swing, s.cvs_fund, s.reco_swing, s.reco_fund,
                    s.golden_signal, s.price_at_snapshot, s.score_date
             FROM cvs_snapshots s
             INNER JOIN (

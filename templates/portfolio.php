@@ -19,6 +19,48 @@ $pnlPct        = $initialCapital > 0 ? ($pnl / $initialCapital) * 100.0 : 0.0;
 $fmt = static fn(float $v): string => '$' . number_format($v, 2, '.', ' ');
 $fmtPct = static fn(float $v): string => ($v >= 0 ? '+' : '') . number_format($v, 2, '.', '') . '%';
 
+// Hover hint: friendly company name + CVS Swing/Fund — same content shape as
+// the dashboard watchlist chip tooltip (rendered via the shared .ticker-hint
+// portal mechanism in app.js, so it isn't clipped by this table's
+// overflow-x:auto wrapper).
+$hintRecoColor = static function (?string $reco): string {
+    return match (true) {
+        $reco === null                        => 'color:var(--c-muted);',
+        str_contains($reco, 'SILNE KUPUJ')     => 'color:var(--c-success);',
+        str_contains($reco, 'AKUMULUJ')        => 'color:var(--c-primary);',
+        str_contains($reco, 'REDUKUJ')         => 'color:var(--c-warn);',
+        str_contains($reco, 'UNIKAJ')          => 'color:var(--c-danger);',
+        default                                => 'color:var(--c-muted);',
+    };
+};
+
+$tickerHint = static function (
+    string  $ticker,
+    ?string $name,
+    ?float  $swing,
+    ?float  $fund,
+    ?string $recoSwing,
+    ?string $recoFund
+) use ($hintRecoColor): string {
+    if ($name === null && $swing === null && $fund === null) {
+        return '';
+    }
+
+    $html = '<span class="ticker-hint__tooltip"><strong>' . htmlspecialchars($name ?? $ticker) . '</strong>';
+    if ($swing !== null || $fund !== null) {
+        $html .= '<span class="ticker-hint__tooltip-scores">';
+        if ($swing !== null) {
+            $html .= '<span style="' . $hintRecoColor($recoSwing) . '">CVS Swing ' . number_format($swing, 1) . '</span>';
+        }
+        if ($fund !== null) {
+            $html .= '<span style="' . $hintRecoColor($recoFund) . '">CVS Fund ' . number_format($fund, 1) . '</span>';
+        }
+        $html .= '</span>';
+    }
+    $html .= '</span>';
+    return $html;
+};
+
 $statusChip = static function (?string $status): string {
     return match ($status) {
         'completed'         => '<span class="signal-pill signal-pill--strong">✓ Zakończony</span>',
@@ -190,7 +232,17 @@ $statusChip = static function (?string $status): string {
             ?>
             <tr>
                 <td>
-                    <strong><?= htmlspecialchars($h['ticker']) ?></strong>
+                    <span class="ticker-hint">
+                        <strong><?= htmlspecialchars($h['ticker']) ?></strong>
+                        <?= $tickerHint(
+                            $h['ticker'],
+                            $h['company_name'] ?? null,
+                            $h['cvs_swing'] ?? null,
+                            $h['cvs_fund']  ?? null,
+                            $h['reco_swing'] ?? null,
+                            $h['reco_fund']  ?? null
+                        ) ?>
+                    </span>
                     <?php if (!empty($reason)): ?>
                     <button type="button" class="pos-info" aria-label="Uzasadnienie"
                             data-reason="<?= htmlspecialchars((string) $reason, ENT_QUOTES) ?>"
@@ -291,8 +343,18 @@ $statusChip = static function (?string $status): string {
         ?>
         <tr>
             <td>
-                <a href="/analysis/<?= urlencode((string) $rec['ticker']) ?>"
-                   style="font-weight:700;color:var(--c-fund);"><?= $recTicker ?></a>
+                <span class="ticker-hint">
+                    <a href="/analysis/<?= urlencode((string) $rec['ticker']) ?>"
+                       style="font-weight:700;color:var(--c-fund);"><?= $recTicker ?></a>
+                    <?= $tickerHint(
+                        (string) $rec['ticker'],
+                        $rec['company_name'] ?? null,
+                        $rec['cvs_swing'] !== null ? (float) $rec['cvs_swing'] : null,
+                        $rec['cvs_fund']  !== null ? (float) $rec['cvs_fund']  : null,
+                        $rec['reco_swing'] ?? null,
+                        $rec['reco_fund']  ?? null
+                    ) ?>
+                </span>
             </td>
             <td style="font-size:var(--text-sm);<?= $recColor ?>"><?= $recReco ?></td>
             <td style="text-align:right;"><strong style="color:var(--c-primary);"><?= $recSwing ?></strong></td>

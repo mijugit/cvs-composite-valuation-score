@@ -74,6 +74,23 @@ class PortfolioRepositoryTest extends TestCase
             )
         ');
 
+        $this->db->exec('
+            CREATE TABLE cvs_snapshots (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticker              TEXT    NOT NULL,
+                company_name        TEXT,
+                model_version       TEXT    NOT NULL,
+                origin              TEXT    NOT NULL DEFAULT "RESCORE",
+                reco_swing          TEXT,
+                reco_fund           TEXT,
+                cvs_swing           REAL,
+                cvs_fund            REAL,
+                price_at_snapshot   REAL,
+                score_date          TEXT    NOT NULL,
+                scored_at           TEXT    NOT NULL
+            )
+        ');
+
         $this->repo = new PortfolioRepository($this->db);
     }
 
@@ -223,5 +240,42 @@ class PortfolioRepositoryTest extends TestCase
         $this->assertNotNull($row);
         $this->assertSame('2026-06-26', $row['cycle_date']);
         $this->assertSame('completed', $row['status']);
+    }
+
+    // --- getCurrentHoldingsWithPrice ---
+
+    public function testGetCurrentHoldingsWithPriceIncludesCompanyNameAndScores(): void
+    {
+        $this->db->exec("INSERT INTO portfolio_holdings (ticker, quantity, avg_entry_price, updated_at)
+                         VALUES ('AVGO', 10, 180.00, '2026-07-01 12:00:00')");
+        $this->db->exec("INSERT INTO cvs_snapshots
+                         (ticker, company_name, model_version, origin, reco_swing, reco_fund,
+                          cvs_swing, cvs_fund, price_at_snapshot, score_date, scored_at)
+                         VALUES ('AVGO', 'Broadcom Inc.', '4.0', 'RESCORE', '⬆ AKUMULUJ', '⬆ AKUMULUJ',
+                          57.9, 54.3, 208.50, '2026-07-02', '2026-07-02 16:00:00')");
+
+        $holdings = $this->repo->getCurrentHoldingsWithPrice('4.0');
+
+        $this->assertCount(1, $holdings);
+        $this->assertSame('Broadcom Inc.', $holdings[0]['company_name']);
+        $this->assertEqualsWithDelta(57.9, $holdings[0]['cvs_swing'], 0.001);
+        $this->assertEqualsWithDelta(54.3, $holdings[0]['cvs_fund'], 0.001);
+        $this->assertSame('⬆ AKUMULUJ', $holdings[0]['reco_swing']);
+        $this->assertSame('⬆ AKUMULUJ', $holdings[0]['reco_fund']);
+    }
+
+    public function testGetCurrentHoldingsWithPriceHandlesMissingSnapshotGracefully(): void
+    {
+        // No matching cvs_snapshots row — holding still appears (LEFT JOIN),
+        // company_name/scores just come back null.
+        $this->db->exec("INSERT INTO portfolio_holdings (ticker, quantity, avg_entry_price, updated_at)
+                         VALUES ('NEWCO', 5, 50.00, '2026-07-01 12:00:00')");
+
+        $holdings = $this->repo->getCurrentHoldingsWithPrice('4.0');
+
+        $this->assertCount(1, $holdings);
+        $this->assertNull($holdings[0]['company_name']);
+        $this->assertNull($holdings[0]['cvs_swing']);
+        $this->assertNull($holdings[0]['cvs_fund']);
     }
 }
