@@ -998,4 +998,54 @@
     });
 }());
 
+// ------------------------------------------------------------------
+// Ticker hover hint — portal
+// ------------------------------------------------------------------
+// .ticker-hint__tooltip (screener, track-record) lives inside a card with
+// overflow-x:auto, which per the CSS overflow spec computes overflow-y to
+// auto too — any position:absolute (or position:fixed, since the card's
+// backdrop-filter makes it the containing block for fixed descendants as
+// well) tooltip nested inside gets clipped by that card's edge. Fix: a
+// single tooltip element living directly under <body> (never a descendant
+// of the clipping card), repositioned via getBoundingClientRect() on each
+// hover instead of pure CSS :hover.
+
+(function () {
+    'use strict';
+
+    const hints = document.querySelectorAll('.ticker-hint');
+    if (!hints.length) return;
+
+    const portal = document.createElement('div');
+    portal.className = 'ticker-hint-portal';
+    document.body.appendChild(portal);
+
+    function show(hint, tooltip) {
+        portal.innerHTML = tooltip.innerHTML;
+        const r = hint.getBoundingClientRect();
+        portal.style.left = (r.left + r.width / 2) + 'px';
+        portal.style.top = (r.top - 6) + 'px';
+        portal.classList.add('ticker-hint-portal--visible');
+    }
+
+    function hide() {
+        portal.classList.remove('ticker-hint-portal--visible');
+    }
+
+    hints.forEach(hint => {
+        const tooltip = hint.querySelector('.ticker-hint__tooltip');
+        if (!tooltip || tooltip.innerHTML.trim() === '') return;
+
+        hint.addEventListener('mouseenter', () => show(hint, tooltip));
+        hint.addEventListener('mouseleave', hide);
+        // Keyboard/touch users: focus on the ticker link also reveals it.
+        hint.addEventListener('focusin', () => show(hint, tooltip));
+        hint.addEventListener('focusout', hide);
+    });
+
+    // A hidden portal card would otherwise trail the page during horizontal
+    // table scroll; hide on scroll of the nearest scrolling ancestor too.
+    window.addEventListener('scroll', hide, true);
+}());
+
 })();

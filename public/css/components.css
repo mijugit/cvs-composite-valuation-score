@@ -147,29 +147,15 @@
 .tr-delta--down { color: var(--c-danger); }
 
 /* --- Generic ticker hover hint ------------------------------
-   Same hover-tooltip behaviour as .watchlist-chip__tooltip (dashboard), but
-   for tickers rendered as plain inline text/links rather than chips — used
-   on /track-record and /screener. */
-.ticker-hint { position: relative; display: inline-block; }
-
-.ticker-hint__tooltip {
-    display: none;
-    position: absolute;
-    bottom: calc(100% + 6px);
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 50;
-    background: var(--c-surface);
-    border: 1px solid var(--c-border);
-    border-radius: var(--radius-md, 6px);
-    box-shadow: var(--shadow-lg);
-    padding: .5rem .75rem;
-    font-size: .8rem;
-    white-space: nowrap;
-    text-align: left;
-    cursor: default;
-}
-.ticker-hint:hover .ticker-hint__tooltip { display: block; }
+   Content source for the hover hint on plain inline ticker text/links (used
+   on /track-record and /screener). Always display:none here — both pages
+   wrap their tables in a `overflow-x:auto` card, which (per the CSS overflow
+   spec) computes overflow-y to auto too and clips any absolutely/fixed
+   positioned descendant regardless of z-index. Rendered instead via a single
+   body-level portal element (public/js/app.js) that isn't a descendant of
+   any clipping container — see .ticker-hint-portal below. */
+.ticker-hint { display: inline-block; }
+.ticker-hint__tooltip { display: none; }
 
 .ticker-hint__tooltip-scores {
     display: flex;
@@ -178,6 +164,28 @@
     margin-top: .25rem;
     color: var(--c-muted, var(--c-text-muted));
 }
+
+/* Single shared tooltip, appended to <body> by app.js and repositioned on
+   each hover — a direct child of <body> is never clipped by an ancestor
+   card's overflow:auto, unlike the old position:absolute-inside-the-card
+   approach. */
+.ticker-hint-portal {
+    display: none;
+    position: fixed;
+    transform: translate(-50%, -100%);
+    z-index: 9999;
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-md, 6px);
+    box-shadow: var(--shadow-lg);
+    padding: .5rem .75rem;
+    font-size: .8rem;
+    white-space: nowrap;
+    text-align: left;
+    pointer-events: none;
+}
+.ticker-hint-portal--visible { display: block; }
+
 .tr-delta--flat { color: var(--c-text-muted, #888); }
 
 /* Toast */
