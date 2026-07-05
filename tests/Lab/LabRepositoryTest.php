@@ -88,6 +88,15 @@ class LabRepositoryTest extends TestCase
             )
         ');
 
+        $this->db->exec('
+            CREATE TABLE rebalance_cycle (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                cycle_date          TEXT    NOT NULL,
+                status              TEXT    NOT NULL,
+                portfolio_value_usd REAL
+            )
+        ');
+
         $this->repo = new LabRepository($this->db);
     }
 
@@ -345,5 +354,50 @@ class LabRepositoryTest extends TestCase
 
         $this->assertSame(['2026-07-01', '2026-07-02', '2026-07-03'], array_column($series['P1'], 'date'));
         $this->assertArrayHasKey('P0', $series);
+    }
+
+    // ------------------------------------------------------------------
+    // getAllPortfolios / getTradeStats / getLlmValueSeries (Phase 3 — /lab view)
+    // ------------------------------------------------------------------
+
+    public function testGetAllPortfoliosReturnsEveryRegisteredPortfolioKeyedByCode(): void
+    {
+        $this->repo->initPortfolio('P1', 'Bazowy CVS', '1', 100000.0);
+        $this->repo->initPortfolio('P0', 'Benchmark SPY', '1', 100000.0);
+
+        $all = $this->repo->getAllPortfolios();
+
+        $this->assertSame(['P0', 'P1'], array_keys($all));
+        $this->assertSame('Bazowy CVS', $all['P1']['name']);
+    }
+
+    public function testGetTradeStatsSumsFeesAndCountsOnlyFilledTrades(): void
+    {
+        $this->repo->initPortfolio('P1', 'Bazowy CVS', '1', 100000.0);
+        $this->repo->applyTrade('P1', '2026-07-02', [
+            'ticker' => 'MU', 'action' => 'BUY', 'quantity' => 10.0, 'price' => 100.0, 'fee' => 5.0, 'reason' => 'seed',
+        ], 'filled');
+        $this->repo->applyTrade('P1', '2026-07-02', [
+            'ticker' => 'AMD', 'action' => 'BUY', 'quantity' => 5.0, 'price' => 50.0, 'fee' => 2.5, 'reason' => 'seed',
+        ], 'filled');
+        $this->repo->applyTrade('P1', '2026-07-02', [
+            'ticker' => 'ABNB', 'action' => 'BUY', 'quantity' => 20.0, 'price' => null, 'fee' => null, 'reason' => 'seed',
+        ], 'pending');
+
+        $stats = $this->repo->getTradeStats();
+
+        $this->assertSame(7.5, $stats['P1']['fee_total']);
+        $this->assertSame(2, $stats['P1']['tx_count']);
+    }
+
+    public function testGetLlmValueSeriesFiltersCompletedAndSinceDate(): void
+    {
+        $this->db->exec("INSERT INTO rebalance_cycle (cycle_date, status, portfolio_value_usd) VALUES ('2026-06-20', 'completed', 90000.0)");
+        $this->db->exec("INSERT INTO rebalance_cycle (cycle_date, status, portfolio_value_usd) VALUES ('2026-07-02', 'completed', 95000.0)");
+        $this->db->exec("INSERT INTO rebalance_cycle (cycle_date, status, portfolio_value_usd) VALUES ('2026-07-03', 'failed', NULL)");
+
+        $series = $this->repo->getLlmValueSeries('2026-07-02');
+
+        $this->assertSame([['date' => '2026-07-02', 'value' => 95000.0]], $series);
     }
 }

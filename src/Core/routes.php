@@ -21,6 +21,7 @@ use CVS\Admin\TickersController;
 use CVS\Pro\ProController;
 use CVS\Translation\TranslationController;
 use CVS\Portfolio\PortfolioController;
+use CVS\Lab\LabController;
 
 $auth        = new AuthController();
 $analysis    = new AnalysisController();
@@ -143,6 +144,13 @@ $router->get('/screener', fn($req) => $screener->index($req));
 $portfolio = new PortfolioController();
 $router->get('/portfolio',         fn($req) => $portfolio->index($req));
 $router->get('/portfolio/history', fn($req) => $portfolio->history($req));
+
+// ------------------------------------------------------------------
+// Lab — experimental paper portfolios (change: cvs-experimental-portfolios)
+// ------------------------------------------------------------------
+
+$lab = new LabController();
+$router->get('/lab', fn($req) => $lab->index($req));
 
 // ------------------------------------------------------------------
 // Watchlist Alerts (S-04)

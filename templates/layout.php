@@ -43,6 +43,7 @@ $asset = static function (string $path): string {
             <a href="/dashboard">Panel</a>
             <a href="/screener">Screener</a>
             <a href="/portfolio"<?= str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/portfolio') ? ' aria-current="page"' : '' ?>>Portfel</a>
+            <a href="/lab"<?= str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/lab') ? ' aria-current="page"' : '' ?>>Lab</a>
             <a href="/track-record">Track Record</a>
             <a href="/model">Model</a>
             <?php if (empty($_SESSION['is_admin'])): ?>

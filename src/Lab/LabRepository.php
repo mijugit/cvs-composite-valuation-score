@@ -360,4 +360,73 @@ class LabRepository
         }
         return $out;
     }
+
+    // ------------------------------------------------------------------
+    // /lab view support
+    // ------------------------------------------------------------------
+
+    /**
+     * All registered Lab portfolios, keyed by code — feeds the /lab cards.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public function getAllPortfolios(): array
+    {
+        $stmt = $this->db->query('SELECT * FROM lab_portfolio ORDER BY code ASC');
+        $rows = $stmt !== false ? ($stmt->fetchAll() ?: []) : [];
+
+        $out = [];
+        foreach ($rows as $r) {
+            $out[(string) $r['code']] = $r;
+        }
+        return $out;
+    }
+
+    /**
+     * Fee total and filled-trade count per portfolio — feeds the /lab metrics table.
+     *
+     * @return array<string, array{fee_total: float, tx_count: int}>
+     */
+    public function getTradeStats(): array
+    {
+        $stmt = $this->db->query(
+            "SELECT portfolio_code, COALESCE(SUM(fee), 0) AS fee_total, COUNT(*) AS tx_count
+             FROM lab_trade WHERE status = 'filled' GROUP BY portfolio_code"
+        );
+        $rows = $stmt !== false ? ($stmt->fetchAll() ?: []) : [];
+
+        $out = [];
+        foreach ($rows as $r) {
+            $out[(string) $r['portfolio_code']] = [
+                'fee_total' => (float) $r['fee_total'],
+                'tx_count'  => (int) $r['tx_count'],
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Read-only view into the (separate, Portfolio-module) rebalance_cycle table —
+     * the existing LLM-driven portfolio's value series, shown on /lab purely as a
+     * "for reference" line. The Lab module never writes to this table and never
+     * touches CVS\Portfolio\* classes; this is the one sanctioned read.
+     *
+     * @return list<array{date: string, value: float}>
+     */
+    public function getLlmValueSeries(string $sinceDate): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT cycle_date, portfolio_value_usd FROM rebalance_cycle
+             WHERE status = 'completed' AND portfolio_value_usd IS NOT NULL AND cycle_date >= ?
+             ORDER BY cycle_date ASC"
+        );
+        $stmt->execute([$sinceDate]);
+        $rows = $stmt->fetchAll() ?: [];
+
+        $out = [];
+        foreach ($rows as $r) {
+            $out[] = ['date' => (string) $r['cycle_date'], 'value' => (float) $r['portfolio_value_usd']];
+        }
+        return $out;
+    }
 }
