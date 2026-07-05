@@ -13,9 +13,20 @@ $chipMeta = [
     'refuted'      => ['label' => 'obalana',            'bg' => 'rgba(239,68,68,.18)',   'fg' => 'var(--c-danger)'],
 ];
 
-$ciTooltip = 'Przedział ufności 95% ze statystyki bootstrap na dziennych różnicach zwrotu '
-    . 'względem portfela odniesienia. Jeśli cały przedział leży po jednej stronie zera, '
-    . 'różnica prawdopodobnie nie jest przypadkiem; jeśli obejmuje zero — dane jeszcze nic nie rozstrzygają.';
+// Same portal-hint pattern as the ticker hover hints (public/js/app.js +
+// .ticker-hint/.ticker-hint__tooltip in components.css) — reused as-is so the
+// CI explainer matches the app's existing tooltip look instead of a bare
+// browser-native `title` attribute.
+$ciTooltipHtml = '<strong>Przedział ufności 95% (bootstrap)</strong>'
+    . '<span class="ticker-hint__tooltip-scores">'
+    . '<span>Różnica dziennych zwrotów</span>'
+    . '<span>vs portfel odniesienia.</span>'
+    . '</span>'
+    . '<span class="ticker-hint__tooltip-scores">'
+    . '<span>Cały przedział po jednej stronie zera</span>'
+    . '<span>→ różnica raczej nie jest przypadkiem.</span>'
+    . '<span>Obejmuje zero → za wcześnie wnioskować.</span>'
+    . '</span>';
 
 $executionLabel = static function (string $execution): string {
     return $execution === 'open'
@@ -205,7 +216,10 @@ window.addEventListener('load', function () {
                         ? htmlspecialchars(sprintf('%s (%d sesji / min %d)', $meta['label'], $hs['n'], $hs['min_sessions']))
                         : htmlspecialchars($meta['label']) ?>
                 </span>
-                <span title="<?= htmlspecialchars($ciTooltip) ?>" style="cursor:help;color:var(--c-muted);font-size:var(--text-xs);border:1px solid var(--c-border);border-radius:999px;width:1.1rem;height:1.1rem;display:inline-flex;align-items:center;justify-content:center;">ⓘ</span>
+                <span class="ticker-hint">
+                    <span style="cursor:help;color:var(--c-muted);font-size:var(--text-xs);border:1px solid var(--c-border);border-radius:999px;width:1.1rem;height:1.1rem;display:inline-flex;align-items:center;justify-content:center;">ⓘ</span>
+                    <span class="ticker-hint__tooltip"><?= $ciTooltipHtml ?></span>
+                </span>
                 <?php if ($hs['n'] > 0): ?>
                 <span style="font-size:var(--text-xs);color:var(--c-muted);">
                     CI 95%: [<?= number_format($hs['ci'][0] * 100, 3) ?>%, <?= number_format($hs['ci'][1] * 100, 3) ?>%]
