@@ -55,6 +55,28 @@ class LabController
         $p0Return = LabMetrics::totalReturnPct($navSeries['P0'] ?? []);
         $p1Return = LabMetrics::totalReturnPct($navSeries['P1'] ?? []);
 
+        $statsCfg = $labConfig['stats'];
+        $hypothesisStatuses = [];
+        foreach ($codes as $code) {
+            $hypothesis = $labConfig['portfolios'][$code]['hypothesis'] ?? null;
+            if ($hypothesis === null) {
+                continue;
+            }
+
+            $variantReturns   = LabStats::dailyReturns($navSeries[$code] ?? []);
+            $referenceReturns = LabStats::dailyReturns($navSeries[$hypothesis['versus']] ?? []);
+            $diffs            = LabStats::pairedDiffs($variantReturns, $referenceReturns);
+            $n                = count($diffs);
+            $ci               = LabStats::bootstrapCiOfMeanDiff($diffs, (int) $statsCfg['bootstrap_iterations'], (int) $statsCfg['bootstrap_seed']);
+
+            $hypothesisStatuses[$code] = [
+                'status'       => LabStats::hypothesisStatus($ci, $n, $hypothesis, $statsCfg),
+                'ci'           => $ci,
+                'n'            => $n,
+                'min_sessions' => (int) $statsCfg['min_sessions'],
+            ];
+        }
+
         $metrics = [];
         foreach ($codes as $code) {
             $series      = $navSeries[$code] ?? [];
@@ -72,11 +94,12 @@ class LabController
         }
 
         Response::view('lab', [
-            'portfolioDefs' => $labConfig['portfolios'],
-            'portfolios'    => $portfolios,
-            'chartSeries'   => $chartSeries,
-            'metrics'       => $metrics,
-            'd0'            => $d0,
+            'portfolioDefs'       => $labConfig['portfolios'],
+            'portfolios'          => $portfolios,
+            'chartSeries'         => $chartSeries,
+            'metrics'             => $metrics,
+            'd0'                  => $d0,
+            'hypothesisStatuses'  => $hypothesisStatuses,
         ]);
     }
 }

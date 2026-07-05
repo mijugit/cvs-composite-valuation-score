@@ -4,6 +4,18 @@
 /** @var array<string, list<array{date: string, value: float}>> $chartSeries code (+ 'LLM') => normalised series */
 /** @var array<string, array<string, mixed>> $metrics code => computed metrics */
 /** @var string|null $d0 */
+/** @var array<string, array{status: string, ci: array{0: float, 1: float}, n: int, min_sessions: int}> $hypothesisStatuses */
+
+$chipMeta = [
+    'too_early'    => ['label' => 'za wcześnie',       'bg' => 'rgba(148,163,184,.18)', 'fg' => '#94a3b8'],
+    'inconclusive' => ['label' => 'nierozstrzygnięte',  'bg' => 'rgba(96,165,250,.18)',  'fg' => '#60a5fa'],
+    'supported'    => ['label' => 'potwierdzana',       'bg' => 'rgba(34,197,94,.18)',   'fg' => 'var(--c-success)'],
+    'refuted'      => ['label' => 'obalana',            'bg' => 'rgba(239,68,68,.18)',   'fg' => 'var(--c-danger)'],
+];
+
+$ciTooltip = 'Przedział ufności 95% ze statystyki bootstrap na dziennych różnicach zwrotu '
+    . 'względem portfela odniesienia. Jeśli cały przedział leży po jednej stronie zera, '
+    . 'różnica prawdopodobnie nie jest przypadkiem; jeśli obejmuje zero — dane jeszcze nic nie rozstrzygają.';
 
 $executionLabel = static function (string $execution): string {
     return $execution === 'open'
@@ -182,10 +194,25 @@ window.addEventListener('load', function () {
             <li><?= htmlspecialchars($sectorCapLabel($rules['sector_cap_pct'] !== null ? (float) $rules['sector_cap_pct'] : null)) ?></li>
             <?php endif; ?>
         </ul>
-        <?php if ($hyp !== null): ?>
+        <?php if ($hyp !== null): $hs = $hypothesisStatuses[$code] ?? null; $meta = $chipMeta[$hs['status'] ?? 'too_early']; ?>
         <div style="border-top:1px solid var(--c-border);padding-top:.5rem;margin-top:.5rem;">
             <p style="font-size:var(--text-sm);margin:0 0 .35rem;"><?= htmlspecialchars((string) $hyp['claim']) ?></p>
-            <p style="font-size:var(--text-xs);color:var(--c-muted);margin:0;">Źródło: <?= htmlspecialchars((string) $hyp['source']) ?></p>
+            <p style="font-size:var(--text-xs);color:var(--c-muted);margin:0 0 .5rem;">Źródło: <?= htmlspecialchars((string) $hyp['source']) ?></p>
+            <?php if ($hs !== null): ?>
+            <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;">
+                <span style="background:<?= $meta['bg'] ?>;color:<?= $meta['fg'] ?>;padding:.15rem .55rem;border-radius:999px;font-size:var(--text-xs);font-weight:600;">
+                    <?= $hs['status'] === 'too_early'
+                        ? htmlspecialchars(sprintf('%s (%d sesji / min %d)', $meta['label'], $hs['n'], $hs['min_sessions']))
+                        : htmlspecialchars($meta['label']) ?>
+                </span>
+                <span title="<?= htmlspecialchars($ciTooltip) ?>" style="cursor:help;color:var(--c-muted);font-size:var(--text-xs);border:1px solid var(--c-border);border-radius:999px;width:1.1rem;height:1.1rem;display:inline-flex;align-items:center;justify-content:center;">ⓘ</span>
+                <?php if ($hs['n'] > 0): ?>
+                <span style="font-size:var(--text-xs);color:var(--c-muted);">
+                    CI 95%: [<?= number_format($hs['ci'][0] * 100, 3) ?>%, <?= number_format($hs['ci'][1] * 100, 3) ?>%]
+                </span>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
         </div>
         <?php else: ?>
         <p style="font-size:var(--text-sm);color:var(--c-muted);border-top:1px solid var(--c-border);padding-top:.5rem;margin-top:.5rem;">
