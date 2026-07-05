@@ -303,17 +303,23 @@ class FinancialDataFetcher implements LatestPriceSource
     }
 
     /**
-     * Fetch daily OHLC (high/low/close) via the chart endpoint for ATR / entry-zone math.
+     * Fetch daily OHLC (open/high/low/close + date) via the chart endpoint for
+     * ATR / entry-zone math (AtrZoneCalculator) and the Lab execution engine
+     * (change: cvs-experimental-portfolios — open-price execution for P2,
+     * gap-detection for stop fills).
      *
-     * Returns parallel float arrays (oldest first) with nulls dropped consistently across
-     * all three series (a row is kept only when high, low AND close are present), or an
-     * empty structure on any failure. Same v8 chart endpoint as fetchChartData, daily interval.
+     * Returns parallel arrays (oldest first) with nulls dropped consistently across
+     * all five series (a row is kept only when open, high, low, close AND the
+     * timestamp are present), or an empty structure on any failure. Same v8 chart
+     * endpoint as fetchChartData, daily interval. The heavy lifting (network +
+     * JSON decode) stays here; the pure array-building is delegated to
+     * parseOhlcChartResult() so it can be unit-tested offline on a fixture.
      *
-     * @return array{high: float[], low: float[], close: float[]}
+     * @return array{open: float[], high: float[], low: float[], close: float[], date: string[]}
      */
     private function fetchDailyOhlc(string $ticker, string $range): array
     {
-        $empty = ['high' => [], 'low' => [], 'close' => []];
+        $empty = ['open' => [], 'high' => [], 'low' => [], 'close' => [], 'date' => []];
 
         $auth = $this->getCrumbAndCookie();
         $url  = self::CHART_URL . urlencode($ticker)
@@ -332,30 +338,60 @@ class FinancialDataFetcher implements LatestPriceSource
             return $empty;
         }
 
-        $quote = $decoded['chart']['result'][0]['indicators']['quote'][0] ?? null;
-        if (!is_array($quote)) {
+        $chartResult = $decoded['chart']['result'][0] ?? null;
+        if (!is_array($chartResult)) {
             return $empty;
         }
 
+        return self::parseOhlcChartResult($chartResult);
+    }
+
+    /**
+     * Pure parser: Yahoo chart `result[0]` (one ticker) → aligned OHLC+date arrays.
+     *
+     * Extracted from fetchDailyOhlc() so the row-alignment/null-dropping logic is
+     * unit-testable offline on a fixture, without stubbing the network layer.
+     * `date` is derived from the chart's per-bar `timestamp` (Unix seconds, UTC)
+     * via gmdate('Y-m-d') — used only to align a bar to "today" by calendar date,
+     * not for intraday timing.
+     *
+     * @param array<string, mixed> $chartResult decoded chart.result[0]
+     * @return array{open: float[], high: float[], low: float[], close: float[], date: string[]}
+     */
+    private static function parseOhlcChartResult(array $chartResult): array
+    {
+        $empty = ['open' => [], 'high' => [], 'low' => [], 'close' => [], 'date' => []];
+
+        $quote      = $chartResult['indicators']['quote'][0] ?? null;
+        $timestamps = $chartResult['timestamp'] ?? null;
+        if (!is_array($quote) || !is_array($timestamps)) {
+            return $empty;
+        }
+
+        $opens  = $quote['open']  ?? [];
         $highs  = $quote['high']  ?? [];
         $lows   = $quote['low']   ?? [];
         $closes = $quote['close'] ?? [];
-        if (!is_array($highs) || !is_array($lows) || !is_array($closes)) {
+        if (!is_array($opens) || !is_array($highs) || !is_array($lows) || !is_array($closes)) {
             return $empty;
         }
 
-        $out = ['high' => [], 'low' => [], 'close' => []];
-        $count = min(count($highs), count($lows), count($closes));
+        $out   = $empty;
+        $count = min(count($opens), count($highs), count($lows), count($closes), count($timestamps));
         for ($i = 0; $i < $count; $i++) {
-            $h = $highs[$i];
-            $l = $lows[$i];
-            $c = $closes[$i];
-            if ($h === null || $l === null || $c === null) {
+            $o  = $opens[$i];
+            $h  = $highs[$i];
+            $l  = $lows[$i];
+            $c  = $closes[$i];
+            $ts = $timestamps[$i];
+            if ($o === null || $h === null || $l === null || $c === null || $ts === null) {
                 continue; // incomplete session — drop the whole row to keep arrays aligned
             }
+            $out['open'][]  = (float) $o;
             $out['high'][]  = (float) $h;
             $out['low'][]   = (float) $l;
             $out['close'][] = (float) $c;
+            $out['date'][]  = gmdate('Y-m-d', (int) $ts);
         }
 
         return $out;
@@ -386,6 +422,59 @@ class FinancialDataFetcher implements LatestPriceSource
         $_SESSION[$spyCacheKey . '_ts'] = time();
 
         return $closes;
+    }
+
+    /**
+     * Fetch daily SPY closes for the last year (change: cvs-experimental-portfolios,
+     * Phase 1) — the Lab module's benchmark (P0) and the /lab NAV chart's SPY
+     * comparison series. Distinct from fetchSpyCloses() above (monthly, used by
+     * MomentumPillar) — different cadence, different cache key, so neither
+     * invalidates the other's TTL.
+     *
+     * SPY is always USD — no FX conversion needed.
+     *
+     * @return array{date: string[], close: float[]}|null null on any fetch/parse failure.
+     */
+    public function fetchSpyDailyCloses(): ?array
+    {
+        $cacheKey = 'cvs_spy_daily_closes';
+        $ttl      = (int) ($this->config['cache_ttl'] ?? 3600);
+
+        if (isset($_SESSION[$cacheKey], $_SESSION[$cacheKey . '_ts'])) {
+            if (time() - $_SESSION[$cacheKey . '_ts'] < $ttl) {
+                return $_SESSION[$cacheKey];
+            }
+        }
+
+        $auth = $this->getCrumbAndCookie();
+        $url  = self::CHART_URL . urlencode('SPY')
+              . '?interval=1d&range=1y'
+              . '&crumb=' . urlencode($auth['crumb']);
+
+        $result = $this->curlGetWithHeaders($url, $auth['cookie'], []);
+        $body   = $result['body'] ?? null;
+        if ($body === null) {
+            return null;
+        }
+
+        try {
+            $decoded = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return null;
+        }
+
+        $chartResult = $decoded['chart']['result'][0] ?? null;
+        if (!is_array($chartResult)) {
+            return null;
+        }
+
+        $parsed = self::parseOhlcChartResult($chartResult);
+        $out    = ['date' => $parsed['date'], 'close' => $parsed['close']];
+
+        $_SESSION[$cacheKey]         = $out;
+        $_SESSION[$cacheKey . '_ts'] = time();
+
+        return $out;
     }
 
     /**
@@ -544,10 +633,10 @@ class FinancialDataFetcher implements LatestPriceSource
      * @param float[]              $spyCloses       Monthly SPY closes (oldest first)
      * @param DateTimeImmutable    $referenceDate   Fetch-time "now", injected (FR-015 determinism seam)
      * @param float|null           $fxRateToUsd     Multiplicative factor: usd = native × rate; null = unavailable
-     * @param array{high: float[], low: float[], close: float[]} $dailyOhlc  Daily OHLC (native; FX-converted to USD inside)
+     * @param array{open?: float[], high: float[], low: float[], close: float[], date?: string[]} $dailyOhlc  Daily OHLC (native; FX-converted to USD inside; date passed through unconverted)
      * @return array<string, mixed>|null
      */
-    private function normalise(array $raw, array $closes, array $spyCloses, DateTimeImmutable $referenceDate, ?float $fxRateToUsd = null, array $dailyOhlc = ['high' => [], 'low' => [], 'close' => []]): ?array
+    private function normalise(array $raw, array $closes, array $spyCloses, DateTimeImmutable $referenceDate, ?float $fxRateToUsd = null, array $dailyOhlc = ['open' => [], 'high' => [], 'low' => [], 'close' => [], 'date' => []]): ?array
     {
         $ap   = $raw['assetProfile']            ?? [];
         $qt   = $raw['quoteType']                ?? [];
@@ -666,10 +755,14 @@ class FinancialDataFetcher implements LatestPriceSource
 
         // Phase 8 (slice 2) — daily OHLC to USD (price scale, like monthly closes) so the
         // ATR / entry-zone levels match current_price. fxP=1.0 for USD tickers and ADRs.
+        // `open` (Lab, cvs-experimental-portfolios) converts the same way as high/low/close;
+        // `date` is a calendar string, passed through unconverted.
         $dailyOhlcUsd = [
+            'open'  => array_map(static fn(float $x): float => $x * $fxP, $dailyOhlc['open']  ?? []),
             'high'  => array_map(static fn(float $x): float => $x * $fxP, $dailyOhlc['high']),
             'low'   => array_map(static fn(float $x): float => $x * $fxP, $dailyOhlc['low']),
             'close' => array_map(static fn(float $x): float => $x * $fxP, $dailyOhlc['close']),
+            'date'  => $dailyOhlc['date'] ?? [],
         ];
 
         // Convert FCF intermediates before deriving forward_fcf_est.
