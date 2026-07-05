@@ -20,6 +20,11 @@ use DateTimeImmutable;
  * Also fetches monthly price history via the chart endpoint (v8) for both
  * the target ticker and SPY (used by MomentumPillar).
  *
+ * fetchDailyOhlc() is public: besides feeding fetch()'s internal ATR/entry-zone
+ * pipeline, LabTickService (change: cvs-experimental-portfolios) calls it
+ * directly for a small set of tickers (stop-loss checks, pending open-execution
+ * fills) without needing a full quoteSummary fetch.
+ *
  * Yahoo Finance crumb flow (required since 2024):
  *   1. GET https://fc.yahoo.com  → set A3 cookie
  *   2. GET /v1/test/getcrumb     → obtain crumb string
@@ -317,7 +322,7 @@ class FinancialDataFetcher implements LatestPriceSource
      *
      * @return array{open: float[], high: float[], low: float[], close: float[], date: string[]}
      */
-    private function fetchDailyOhlc(string $ticker, string $range): array
+    public function fetchDailyOhlc(string $ticker, string $range): array
     {
         $empty = ['open' => [], 'high' => [], 'low' => [], 'close' => [], 'date' => []];
 

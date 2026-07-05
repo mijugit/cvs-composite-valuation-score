@@ -264,6 +264,62 @@ class LabRepositoryTest extends TestCase
         $this->assertSame([], $this->repo->findPendingTrades('P1'));
     }
 
+    public function testFillPendingTradeAppliesToPositionAndCashUsingRealPriceAndFee(): void
+    {
+        $this->repo->initPortfolio('P2', 'Egzekucja na otwarciu', '1', 1000.0);
+        $this->repo->applyTrade('P2', '2026-07-01', [
+            'ticker' => 'AAA', 'action' => 'BUY', 'quantity' => 5.0, 'price' => 100.0, 'fee' => 0.5, 'reason' => 'seed',
+        ], 'pending');
+        $pendingId = (int) $this->repo->findPendingTrades('P2')[0]['id'];
+
+        // Real open turns out different from the day-D estimate — fee recomputed on the real price.
+        $this->repo->fillPendingTrade($pendingId, 102.0, 0.51);
+
+        $this->assertSame([], $this->repo->findPendingTrades('P2'));
+        $positions = $this->repo->getPositions('P2');
+        $this->assertEqualsWithDelta(5.0, $positions['AAA']['quantity'], 1e-9);
+        $this->assertEqualsWithDelta(102.0, $positions['AAA']['avg_entry_price'], 1e-9);
+
+        $portfolio = $this->repo->getPortfolio('P2');
+        $this->assertEqualsWithDelta(1000.0 - (5.0 * 102.0 + 0.51), (float) $portfolio['cash'], 1e-9);
+    }
+
+    public function testFillPendingTradeOnAlreadyFilledIdIsANoOp(): void
+    {
+        $this->repo->initPortfolio('P2', 'Egzekucja na otwarciu', '1', 1000.0);
+        $this->repo->applyTrade('P2', '2026-07-01', [
+            'ticker' => 'AAA', 'action' => 'BUY', 'quantity' => 5.0, 'price' => 100.0, 'fee' => 0.5, 'reason' => 'seed',
+        ], 'pending');
+        $pendingId = (int) $this->repo->findPendingTrades('P2')[0]['id'];
+        $this->repo->fillPendingTrade($pendingId, 102.0, 0.51);
+
+        $this->repo->fillPendingTrade($pendingId, 999.0, 99.0); // already filled — must not re-apply
+
+        $portfolio = $this->repo->getPortfolio('P2');
+        $this->assertEqualsWithDelta(1000.0 - (5.0 * 102.0 + 0.51), (float) $portfolio['cash'], 1e-9);
+    }
+
+    // ------------------------------------------------------------------
+    // hasTradeToday
+    // ------------------------------------------------------------------
+
+    public function testHasTradeTodayFalseWhenNoMatchingTrade(): void
+    {
+        $this->assertFalse($this->repo->hasTradeToday('P1', '2026-07-01', 'rebalance'));
+    }
+
+    public function testHasTradeTodayTrueRegardlessOfFilledOrPendingStatus(): void
+    {
+        $this->repo->initPortfolio('P2', 'Egzekucja na otwarciu', '1', 1000.0);
+        $this->repo->applyTrade('P2', '2026-07-01', [
+            'ticker' => 'AAA', 'action' => 'BUY', 'quantity' => 5.0, 'price' => 100.0, 'fee' => 0.0, 'reason' => 'rebalance',
+        ], 'pending');
+
+        $this->assertTrue($this->repo->hasTradeToday('P2', '2026-07-01', 'rebalance'));
+        $this->assertFalse($this->repo->hasTradeToday('P2', '2026-07-01', 'seed'));
+        $this->assertFalse($this->repo->hasTradeToday('P2', '2026-07-02', 'rebalance'));
+    }
+
     // ------------------------------------------------------------------
     // upsertNav — idempotency
     // ------------------------------------------------------------------

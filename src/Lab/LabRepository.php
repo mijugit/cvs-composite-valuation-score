@@ -107,6 +107,24 @@ class LabRepository
         }, $stmt->fetchAll() ?: []);
     }
 
+    /**
+     * True when a trade with this (portfolio, date, reason) already exists —
+     * regardless of filled/pending status. Guards LabTickService::doRebalance
+     * against re-deciding the same rebalance twice if the tick re-runs same-day:
+     * for 'filled' (close-execution) trades this is naturally idempotent anyway
+     * (positions already converged), but for 'pending' (P2 open-execution)
+     * trades nothing mutates state until the fill the next day, so without this
+     * guard a same-day re-run would queue a duplicate pending trade.
+     */
+    public function hasTradeToday(string $code, string $date, string $reason): bool
+    {
+        $stmt = $this->db->prepare(
+            'SELECT 1 FROM lab_trade WHERE portfolio_code = ? AND trade_date = ? AND reason = ? LIMIT 1'
+        );
+        $stmt->execute([$code, $date, $reason]);
+        return $stmt->fetchColumn() !== false;
+    }
+
     // ------------------------------------------------------------------
     // Positions
     // ------------------------------------------------------------------
@@ -251,6 +269,44 @@ class LabRepository
                 $this->upsertPosition($code, $ticker, $newQty, $pos['avg_entry_price'] ?? $price, $pos['entry_date'] ?? $tradeDate);
             }
             $this->adjustCash($code, $proceeds);
+        }
+    }
+
+    /**
+     * Resolves a pending (P2 open-execution) trade the day after it was decided:
+     * stamps the real fill price + recomputed fee, flips status to 'filled', and
+     * applies it to the position/cash — all atomically. Idempotent: a trade
+     * already filled (or a nonexistent id) is a silent no-op, so LabTickService
+     * can retry a tick without double-applying.
+     */
+    public function fillPendingTrade(int $tradeId, float $price, float $fee): void
+    {
+        $stmt = $this->db->prepare("SELECT * FROM lab_trade WHERE id = ? AND status = 'pending'");
+        $stmt->execute([$tradeId]);
+        $row = $stmt->fetch();
+        if ($row === false) {
+            return;
+        }
+
+        $this->db->beginTransaction();
+        try {
+            $this->db->prepare('UPDATE lab_trade SET price = ?, fee = ?, status = ? WHERE id = ?')
+                ->execute([$price, $fee, 'filled', $tradeId]);
+
+            $this->applyFilledTradeToState(
+                (string) $row['portfolio_code'],
+                strtoupper((string) $row['ticker']),
+                strtoupper((string) $row['action']),
+                (float) $row['quantity'],
+                $price,
+                $fee,
+                (string) $row['trade_date']
+            );
+
+            $this->db->commit();
+        } catch (Throwable $e) {
+            $this->db->rollBack();
+            error_log(sprintf('LabRepository::fillPendingTrade failed for trade #%d: %s', $tradeId, $e->getMessage()));
         }
     }
 
