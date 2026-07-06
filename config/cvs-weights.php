@@ -255,8 +255,12 @@ return [
     // --- CVS trajectory (Phase 8, slice 1) ---
     // Sparkline of headline CVS Swing over time on the analysis page.
     'trajectory' => [
-        'window_days' => 90, // how far back the sparkline reaches
-        'min_points'  => 2,  // fewer points → empty-state instead of a chart
+        'window_days'     => 90, // how far back the sparkline reaches
+        'min_points'      => 2,  // fewer points → empty-state instead of a chart
+        // change: cvs-screener-trend — screener's "near boundary" filter:
+        // a ticker is flagged when its CVS Swing sits within this many points
+        // of ANY recommendation threshold (thresholds.* above).
+        'boundary_margin' => 5,
     ],
 
     // --- ATR entry zones + stops (Phase 8, slice 2) ---

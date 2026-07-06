@@ -27,7 +27,12 @@ class ScreenerController
         // ScreenerRepository::$liveModelVersion / findAllLatest().
         $config      = require dirname(__DIR__, 2) . '/config/cvs-weights.php';
         $liveVersion = $config['model_version'] ?? null;
-        $this->repo  = new ScreenerRepository(null, $liveVersion !== null ? (string) $liveVersion : null);
+        $this->repo  = new ScreenerRepository(
+            null,
+            $liveVersion !== null ? (string) $liveVersion : null,
+            $config['trajectory'] ?? [],
+            $config['thresholds'] ?? []
+        );
     }
 
     public function index(Request $req): void

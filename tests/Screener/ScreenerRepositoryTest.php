@@ -10,7 +10,11 @@ use PHPUnit\Framework\TestCase;
 
 class ScreenerRepositoryTest extends TestCase
 {
-    private function makeRepo(): ScreenerRepository
+    /**
+     * @param array{window_days?: int, min_points?: int, boundary_margin?: float} $trajectoryConfig
+     * @param array<string, float> $thresholds
+     */
+    private function makeRepo(array $trajectoryConfig = [], array $thresholds = []): ScreenerRepository
     {
         $pdo = new PDO('sqlite::memory:');
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -30,7 +34,7 @@ class ScreenerRepositoryTest extends TestCase
                 UNIQUE (ticker, score_date, model_version, origin)
             )
         ');
-        return new ScreenerRepository($pdo);
+        return new ScreenerRepository($pdo, null, $trajectoryConfig, $thresholds);
     }
 
     private function insertSnapshot(PDO $pdo, string $ticker, float $swing, float $fund,
@@ -42,6 +46,15 @@ class ScreenerRepositoryTest extends TestCase
                 reco_swing, golden_signal, quality_gate, origin)
             VALUES (?, ?, date(\'now\'), ?, ?, ?, ?, ?, ?)
         ')->execute([$ticker, $sector, $swing, $fund, $reco, $signal, $gate, $origin]);
+    }
+
+    /** Insert a snapshot on an explicit date, for multi-day trend history. */
+    private function insertSnapshotOn(PDO $pdo, string $ticker, string $scoreDate, float $swing): void
+    {
+        $pdo->prepare('
+            INSERT INTO cvs_snapshots (ticker, score_date, cvs_swing, cvs_fund, reco_swing, quality_gate, origin)
+            VALUES (?, ?, ?, ?, \'SILNE KUPUJ\', 1, \'rescore\')
+        ')->execute([$ticker, $scoreDate, $swing, $swing]);
     }
 
     // ------------------------------------------------------------------
@@ -252,5 +265,88 @@ class ScreenerRepositoryTest extends TestCase
 
         $res = $repo->getFiltered(null, null, 0, null, 'atr');
         $this->assertSame(['INZ', 'BLW', 'ABV'], array_column($res, 'ticker'));
+    }
+
+    // ------------------------------------------------------------------
+    // Trend column (change: cvs-screener-trend, Phase 1)
+    // ------------------------------------------------------------------
+
+    public function test_trend_delta_weekly_computed_from_week_old_history(): void
+    {
+        $repo = $this->makeRepo(['window_days' => 90, 'min_points' => 2]);
+        $db   = $this->dbOf($repo);
+
+        $this->insertSnapshotOn($db, 'TREND', date('Y-m-d', strtotime('-8 days')), 70.0);
+        $this->insertSnapshotOn($db, 'TREND', date('Y-m-d'), 75.0);
+
+        $byTicker = array_column($repo->getFiltered(), 'trend_delta_weekly', 'ticker');
+        $this->assertSame(5.0, $byTicker['TREND']);
+    }
+
+    public function test_trend_delta_weekly_null_when_insufficient_history(): void
+    {
+        $repo = $this->makeRepo(['window_days' => 90, 'min_points' => 2]);
+        $db   = $this->dbOf($repo);
+
+        $this->insertSnapshotOn($db, 'NEWTICKER', date('Y-m-d'), 60.0);
+
+        $byTicker = array_column($repo->getFiltered(), 'trend_delta_weekly', 'ticker');
+        $this->assertNull($byTicker['NEWTICKER']);
+    }
+
+    public function test_trend_delta_weekly_ignores_history_outside_window(): void
+    {
+        // Only history is 200 days old — well outside the 90-day window, so the
+        // ticker's only point in-window is today's: not enough for a delta.
+        $repo = $this->makeRepo(['window_days' => 90, 'min_points' => 2]);
+        $db   = $this->dbOf($repo);
+
+        $this->insertSnapshotOn($db, 'OLDHIST', date('Y-m-d', strtotime('-200 days')), 40.0);
+        $this->insertSnapshotOn($db, 'OLDHIST', date('Y-m-d'), 65.0);
+
+        $byTicker = array_column($repo->getFiltered(), 'trend_delta_weekly', 'ticker');
+        $this->assertNull($byTicker['OLDHIST']);
+    }
+
+    public function test_is_near_boundary_true_exactly_on_threshold(): void
+    {
+        $repo = $this->makeRepo([], ['strong_buy' => 72.0, 'accumulate' => 58.0, 'neutral' => 42.0, 'reduce' => 28.0]);
+        $db   = $this->dbOf($repo);
+        $this->insertSnapshotOn($db, 'ONTHRESH', date('Y-m-d'), 72.0);
+
+        $byTicker = array_column($repo->getFiltered(), 'trend_near_boundary', 'ticker');
+        $this->assertTrue($byTicker['ONTHRESH']);
+    }
+
+    public function test_is_near_boundary_true_within_margin(): void
+    {
+        $repo = $this->makeRepo([], ['strong_buy' => 72.0, 'accumulate' => 58.0, 'neutral' => 42.0, 'reduce' => 28.0]);
+        $db   = $this->dbOf($repo);
+        $this->insertSnapshotOn($db, 'NEARBY', date('Y-m-d'), 76.0); // 4 pts from 72
+
+        $byTicker = array_column($repo->getFiltered(), 'trend_near_boundary', 'ticker');
+        $this->assertTrue($byTicker['NEARBY']);
+    }
+
+    public function test_is_near_boundary_false_outside_margin(): void
+    {
+        $repo = $this->makeRepo([], ['strong_buy' => 72.0, 'accumulate' => 58.0, 'neutral' => 42.0, 'reduce' => 28.0]);
+        $db   = $this->dbOf($repo);
+        $this->insertSnapshotOn($db, 'FARAWAY', date('Y-m-d'), 78.0); // 6 pts from 72, 20 from 58
+
+        $byTicker = array_column($repo->getFiltered(), 'trend_near_boundary', 'ticker');
+        $this->assertFalse($byTicker['FARAWAY']);
+    }
+
+    public function test_is_near_boundary_false_when_thresholds_not_provided(): void
+    {
+        // Backward-compat: default empty thresholds must not crash and simply
+        // never flag anything as near-boundary.
+        $repo = $this->makeRepo();
+        $db   = $this->dbOf($repo);
+        $this->insertSnapshotOn($db, 'NOCFG', date('Y-m-d'), 72.0);
+
+        $byTicker = array_column($repo->getFiltered(), 'trend_near_boundary', 'ticker');
+        $this->assertFalse($byTicker['NOCFG']);
     }
 }

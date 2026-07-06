@@ -6,6 +6,8 @@ namespace CVS\Screener;
 
 use CVS\Core\Database;
 use CVS\TrackRecord\CvsSnapshotRepository;
+use CVS\TrackRecord\TrajectoryCalculator;
+use DateTimeImmutable;
 use PDO;
 
 /**
@@ -31,10 +33,30 @@ class ScreenerRepository
      */
     private ?string $liveModelVersion;
 
-    public function __construct(?PDO $db = null, ?string $liveModelVersion = null)
-    {
+    /** @var array{window_days: int, min_points: int, boundary_margin: float} */
+    private array $trajectoryConfig;
+
+    /** @var array<string, float> */
+    private array $thresholds;
+
+    /**
+     * @param array{window_days?: int, min_points?: int, boundary_margin?: float} $trajectoryConfig
+     * @param array<string, float> $thresholds config/cvs-weights.php → thresholds
+     */
+    public function __construct(
+        ?PDO $db = null,
+        ?string $liveModelVersion = null,
+        array $trajectoryConfig = [],
+        array $thresholds = []
+    ) {
         $this->db               = $db ?? Database::connection();
         $this->liveModelVersion = $liveModelVersion;
+        $this->trajectoryConfig = [
+            'window_days'     => (int) ($trajectoryConfig['window_days'] ?? 90),
+            'min_points'      => (int) ($trajectoryConfig['min_points'] ?? 2),
+            'boundary_margin' => (float) ($trajectoryConfig['boundary_margin'] ?? 5),
+        ];
+        $this->thresholds = $thresholds;
     }
 
     // ------------------------------------------------------------------
@@ -68,12 +90,27 @@ class ScreenerRepository
         // and the ATR column in the view). price_at_snapshot and the zone are both USD
         // and written by the same rescore run, so the comparison is consistent.
         $zones = $this->findZoneMap();
+
+        // change: cvs-screener-trend — same "one bulk query, enrich before filtering"
+        // pattern as the ATR zone map above, instead of N+1 per-ticker trajectory calls.
+        $sinceDate      = (new DateTimeImmutable())->modify('-' . $this->trajectoryConfig['window_days'] . ' days')->format('Y-m-d');
+        $trajectories   = $this->findTrajectoryMap($sinceDate);
+        $minPoints      = $this->trajectoryConfig['min_points'];
+        $boundaryMargin = $this->trajectoryConfig['boundary_margin'];
+
         foreach ($rows as &$row) {
             $ticker = strtoupper((string) ($row['ticker'] ?? ''));
             $price  = $row['price_at_snapshot'] ?? null;
             $row['atr_state'] = ($price !== null && isset($zones[$ticker]))
                 ? $this->classifyAtrState((float) $price, $zones[$ticker]['low'], $zones[$ticker]['high'])
                 : null;
+
+            $summary = TrajectoryCalculator::summarise($trajectories[$ticker] ?? [], $minPoints);
+            $row['trend_delta_weekly'] = $summary['delta_weekly'];
+
+            $row['trend_near_boundary'] = $row['cvs_swing'] !== null
+                ? $this->isNearBoundary((float) $row['cvs_swing'], $this->thresholds, $boundaryMargin)
+                : false;
         }
         unset($row);
 
@@ -161,6 +198,63 @@ class ScreenerRepository
             return 'in_zone';
         }
         return $price > $high ? 'above' : 'below';
+    }
+
+    /**
+     * change: cvs-screener-trend — CVS Swing history for every ticker in one
+     * query (mirrors findZoneMap() above), instead of N+1 per-ticker calls to
+     * CvsSnapshotRepository::findTrajectory(). Same shadow-row guard as
+     * findAllLatest(): filtered to the live model_version when known, since an
+     * unfiltered MAX/GROUP over cvs_snapshots would mix in 3.1/3.2 shadow rows
+     * (lessons.md: "Filtruj shadow model_version przy każdym odczycie latest
+     * snapshot").
+     *
+     * @return array<string, list<array{score_date: string, cvs_swing: float}>>
+     */
+    private function findTrajectoryMap(string $sinceDate): array
+    {
+        $o = CvsSnapshotRepository::ORIGIN_RESCORE;
+
+        if ($this->liveModelVersion !== null) {
+            $stmt = $this->db->prepare(
+                "SELECT ticker, score_date, cvs_swing FROM cvs_snapshots
+                 WHERE origin = '{$o}' AND model_version = ? AND score_date >= ?
+                   AND cvs_swing IS NOT NULL
+                 ORDER BY ticker ASC, score_date ASC"
+            );
+            $stmt->execute([$this->liveModelVersion, $sinceDate]);
+        } else {
+            $stmt = $this->db->prepare(
+                "SELECT ticker, score_date, cvs_swing FROM cvs_snapshots
+                 WHERE origin = '{$o}' AND score_date >= ? AND cvs_swing IS NOT NULL
+                 ORDER BY ticker ASC, score_date ASC"
+            );
+            $stmt->execute([$sinceDate]);
+        }
+
+        $map = [];
+        foreach ($stmt->fetchAll() as $r) {
+            $ticker = strtoupper((string) $r['ticker']);
+            $map[$ticker][] = ['score_date' => (string) $r['score_date'], 'cvs_swing' => (float) $r['cvs_swing']];
+        }
+        return $map;
+    }
+
+    /**
+     * True when $score sits within $margin points of ANY recommendation
+     * threshold (strong_buy/accumulate/neutral/reduce) — the screener's
+     * "near boundary" flag (change: cvs-screener-trend).
+     *
+     * @param array<string, float> $thresholds
+     */
+    private function isNearBoundary(float $score, array $thresholds, float $margin): bool
+    {
+        foreach ($thresholds as $threshold) {
+            if (abs($score - (float) $threshold) <= $margin) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

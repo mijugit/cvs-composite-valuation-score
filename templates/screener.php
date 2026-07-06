@@ -77,6 +77,23 @@ $atrChip = static function (?string $state): string {
 $hint = static fn (string $text): string =>
     ' <span class="chart-hint" tabindex="0">&#9432;<span class="chart-hint__tooltip">' . $text . '</span></span>';
 
+// change: cvs-screener-trend — week-over-week CVS Swing trend chip.
+// null (insufficient history) renders as a dash, matching the analysis
+// page's has_trajectory=false empty state.
+$trendChip = static function (?float $delta): string {
+    if ($delta === null) {
+        return '<span style="color:var(--c-muted);" title="Za mało historii w oknie 90 dni">—</span>';
+    }
+    [$arrow, $color] = match (true) {
+        $delta > 0  => ['↑', 'var(--c-success)'],
+        $delta < 0  => ['↓', 'var(--c-danger)'],
+        default     => ['→', 'var(--c-muted)'],
+    };
+    $sign = $delta > 0 ? '+' : '';
+    return '<span style="color:' . $color . ';font-weight:600;" title="Zmiana CVS Swing względem ~7 dni temu">'
+        . $arrow . ' ' . $sign . number_format($delta, 1) . '</span>';
+};
+
 // S-04: badge "w portfelu" next to the ticker link.
 // Conflict variant (amber/red) when held but reco is REDUKUJ or UNIKAJ.
 $heldBadge = static function (string $ticker, string $reco) use ($heldTickersMap): string {
@@ -225,6 +242,7 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
                 <th><?= $sortLink('ticker', 'Ticker') ?></th>
                 <th><?= $sortLink('swing', 'CVS Swing') . $hint('Złożony wynik 0–100 w horyzoncie swing (1–4 mies.). Wyżej = lepiej.') ?></th>
                 <th><?= $sortLink('fund',  'CVS Fund') . $hint('Złożony wynik 0–100 w horyzoncie fundamentalnym (6–12 mies.).') ?></th>
+                <th>Trend (w/w)<?= $hint('Zmiana CVS Swing względem ~7 dni temu. Odróżnia spółki pnące się w górę od tych, które spadają — przy identycznym dzisiejszym wyniku kierunek dojścia bywa ważniejszy niż sam poziom.') ?></th>
                 <th>Rekomendacja<?= $hint('Etykieta od SILNE KUPUJ do UNIKAJ wynikająca z wyniku CVS Swing.') ?></th>
                 <th>Sygnał<?= $hint('Złoty sygnał: ⭐⭐ wartość + momentum, ⭐ obserwuj (setup fundamentalny), ↑ momentum.') ?></th>
                 <th>Wyniki<?= $hint('Bliskość publikacji wyników kwartalnych (📅 za N dni / w oknie / N dni temu).') ?></th>
@@ -265,6 +283,7 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
             </td>
             <td><strong style="color:var(--c-primary);"><?= $swing ?></strong></td>
             <td><strong style="color:var(--c-fund);"><?= $fund ?></strong></td>
+            <td><?= $trendChip($row['trend_delta_weekly'] ?? null) ?></td>
             <td style="font-size:var(--text-sm);<?= $recoColor ?>"><?= $reco ?></td>
             <td><?= $signalChip($row['golden_signal'] ?? null) ?></td>
             <td><?= $earningsChip(
