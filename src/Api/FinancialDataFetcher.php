@@ -52,6 +52,7 @@ class FinancialDataFetcher implements LatestPriceSource
     private const MODULES = [
         'assetProfile',
         'quoteType',
+        'price',
         'financialData',
         'defaultKeyStatistics',
         'summaryDetail',
@@ -622,6 +623,39 @@ class FinancialDataFetcher implements LatestPriceSource
         return ['body' => (string) $body, 'cookie' => $receivedCookie];
     }
 
+    /**
+     * Picks the price rescore/screener/AnalysisController should treat as
+     * "current" — prefers the extended-hours quote when Yahoo's `price`
+     * module says the market is currently in that session, so a pre-market
+     * gap or post-market reaction isn't hidden behind a stale regular-session
+     * close on a re-score run that fires outside market hours.
+     *
+     * Falls back to financialData.currentPrice (the pre-existing source)
+     * whenever the extended-hours field is absent — thinly-traded tickers
+     * often have no pre/post print — or the market is REGULAR/CLOSED, where
+     * there is no fresher extended-hours quote to offer anyway.
+     *
+     * Deliberately scoped to fetch()/normalise() only. Portfolio and Lab
+     * price reads go through fetchLatestPrice() (chart endpoint) instead —
+     * a separate method this does not touch, so trade sizing/execution keep
+     * today's regular-session-price assumption unchanged.
+     *
+     * @param array<string, mixed> $priceModule raw['price'] ?? []
+     */
+    private static function resolveCurrentPrice(array $priceModule, ?float $financialCurrentPrice): ?float
+    {
+        $v = static fn($obj): ?float => isset($obj['raw']) ? (float) $obj['raw'] : null;
+
+        $marketState = is_string($priceModule['marketState'] ?? null) ? $priceModule['marketState'] : null;
+        $regular     = $v($priceModule['regularMarketPrice'] ?? []);
+
+        return match ($marketState) {
+            'PRE'   => $v($priceModule['preMarketPrice']  ?? []) ?? $regular ?? $financialCurrentPrice,
+            'POST'  => $v($priceModule['postMarketPrice'] ?? []) ?? $regular ?? $financialCurrentPrice,
+            default => $financialCurrentPrice ?? $regular,
+        };
+    }
+
     // ------------------------------------------------------------------
     // Normalisation
     // ------------------------------------------------------------------
@@ -662,7 +696,7 @@ class FinancialDataFetcher implements LatestPriceSource
             return null;
         }
 
-        $currentPrice = $v($fin['currentPrice'] ?? []);
+        $currentPrice = self::resolveCurrentPrice($raw['price'] ?? [], $v($fin['currentPrice'] ?? []));
 
         if ($currentPrice === null) {
             return null; // Cannot continue without a price.
