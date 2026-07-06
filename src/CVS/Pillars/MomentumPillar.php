@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace CVS\CVS\Pillars;
 
 /**
- * Pillar — Price momentum vs. market benchmark (SPY).
+ * Pillar — Price momentum vs. market benchmark.
  *
  * Score 0–100.
  *
@@ -19,14 +19,22 @@ namespace CVS\CVS\Pillars;
  *   6M  → closes[$n-7]   (six months ago)
  *   12M → closes[$n-13]  (twelve months ago; fallback: 6M when history < 13 entries)
  *
- * SPY calibration = same composite on SPY monthly closes (default 15% if unavailable).
- * Excess return  = composite − spyCalib
+ * `$financials['spy_closes']` is the benchmark series — SPY for US tickers by
+ * default, but FinancialDataFetcher::resolveBenchmarkTicker() swaps it for a
+ * market-appropriate ETF (e.g. WIG20TR for Warsaw-listed tickers) so a
+ * non-US company is compared against its own market, not the US market. This
+ * pillar itself is benchmark-agnostic — it never assumes the series is
+ * literally SPY, only that it's "the momentum benchmark for this ticker".
+ *
+ * Benchmark calibration = same composite on the benchmark's monthly closes
+ * (default 15% if unavailable).
+ * Excess return  = composite − benchmarkCalib
  * normRatio      = 1 − (excess / momentum_divisor)
  * score          = sigmoid(normRatio), capped to [momentum_cap_min, momentum_cap_max]
  *
  * Interpretation:
- *  - Excess > 0  (outperforming SPY) → normRatio < 1 → score > 50 (bullish)
- *  - Excess < 0  (underperforming SPY) → normRatio > 1 → score < 50 (bearish)
+ *  - Excess > 0  (outperforming the benchmark) → normRatio < 1 → score > 50 (bullish)
+ *  - Excess < 0  (underperforming the benchmark) → normRatio > 1 → score < 50 (bearish)
  *  - Insufficient price history (< 7 months) → neutral 50
  *
  * Weight in CVS model: from config['modes'][mode]['momentum_weight'].
@@ -88,7 +96,9 @@ class MomentumPillar
             $composite += (float) $weight * ($rocMap[$period] ?? 0.0);
         }
 
-        // --- SPY calibration (same roc_weights applied to SPY closes) ---
+        // --- Benchmark calibration (same roc_weights applied to benchmark closes;
+        //     SPY for US tickers, market-appropriate ETF otherwise — see
+        //     FinancialDataFetcher::resolveBenchmarkTicker()) ---
         /** @var float[] $spyCloses */
         $spyCloses = $financials['spy_closes'] ?? [];
         $sn        = count($spyCloses);

@@ -18,7 +18,9 @@ use DateTimeImmutable;
  * and caches the result in $_SESSION for `cache_ttl` seconds.
  *
  * Also fetches monthly price history via the chart endpoint (v8) for both
- * the target ticker and SPY (used by MomentumPillar).
+ * the target ticker and its MomentumPillar benchmark — SPY for US tickers,
+ * or a market-appropriate ETF for others (see resolveBenchmarkTicker() and
+ * config/cvs-weights.php → data_source.momentum_benchmark).
  *
  * fetchDailyOhlc() is public: besides feeding fetch()'s internal ATR/entry-zone
  * pipeline, LabTickService (change: cvs-experimental-portfolios) calls it
@@ -31,11 +33,12 @@ use DateTimeImmutable;
  *   3. All API calls include Cookie: A3=… and &crumb=… in URL
  * The crumb + cookie are cached in $_SESSION under `cvs_yahoo_crumb` for 1 hour.
  *
- * Cache strategy: per-session, keyed by ticker. SPY closes are shared across
- * all tickers under the key `cvs_spy_closes` (fetched once per session).
- * This is intentionally simple (no Redis / APCu) to stay dependency-free
- * on shared hosting.  The cache is invalidated automatically when the
- * session expires.
+ * Cache strategy: per-session, keyed by ticker. Momentum benchmark closes are
+ * cached per benchmark ticker under `cvs_benchmark_closes_<ticker>` (e.g. SPY
+ * for US tickers, WIG20TR for Warsaw), so a mixed-market batch doesn't evict
+ * one market's cache with another's. This is intentionally simple (no Redis /
+ * APCu) to stay dependency-free on shared hosting. The cache is invalidated
+ * automatically when the session expires.
  *
  * Production note: Yahoo Finance does not offer an official public API.
  * These endpoints work as of the current date but can break without notice.
@@ -118,8 +121,9 @@ class FinancialDataFetcher implements LatestPriceSource
             return null;
         }
 
-        $closes    = $this->fetchChartData($ticker, '3y');
-        $spyCloses = $this->fetchSpyCloses();
+        $closes          = $this->fetchChartData($ticker, '3y');
+        $benchmarkTicker = self::resolveBenchmarkTicker($ticker, $this->config['momentum_benchmark'] ?? []);
+        $spyCloses       = $this->fetchBenchmarkCloses($benchmarkTicker);
         // Phase 8 (slice 2) — daily OHLC for ATR / entry-zone math (AtrZoneCalculator).
         $dailyOhlc = $this->fetchDailyOhlc($ticker, '3mo');
 
@@ -404,28 +408,53 @@ class FinancialDataFetcher implements LatestPriceSource
     }
 
     /**
-     * Fetch monthly SPY closing prices, lazily cached in session under `cvs_spy_closes`.
+     * Picks the MomentumPillar benchmark for a ticker's home market instead of
+     * always comparing against the US market — e.g. WIG20TR for Warsaw-listed
+     * (.WA) tickers, KOSPI 200 for Korea (.KS). Falls back to the configured
+     * default (SPY) for US tickers (no suffix) and any suffix not yet mapped,
+     * so covering a new market later is a one-line config addition, not a
+     * code change.
      *
-     * SPY data is shared across all tickers in a single analysis run,
-     * so we cache it separately from individual ticker data.
+     * @param array{default?: string, by_suffix?: array<string, string>} $benchmarkConfig
+     */
+    private static function resolveBenchmarkTicker(string $ticker, array $benchmarkConfig): string
+    {
+        $default  = (string) ($benchmarkConfig['default'] ?? 'SPY');
+        $bySuffix = $benchmarkConfig['by_suffix'] ?? [];
+
+        $dotPos = strrpos($ticker, '.');
+        if ($dotPos === false) {
+            return $default;
+        }
+
+        $suffix = substr($ticker, $dotPos); // e.g. ".WA"
+        return is_string($bySuffix[$suffix] ?? null) ? $bySuffix[$suffix] : $default;
+    }
+
+    /**
+     * Fetch monthly closing prices for the resolved momentum benchmark, lazily
+     * cached in session under `cvs_benchmark_closes_<ticker>`. Keyed per
+     * benchmark ticker (not a single shared key) because one analysis/rescore
+     * run can now mix tickers from several markets (SPY for US, WIG20TR for
+     * Warsaw, KOSPI 200 for Korea, ...) that must not evict each other's cache.
      *
      * @return float[]
      */
-    private function fetchSpyCloses(): array
+    private function fetchBenchmarkCloses(string $benchmarkTicker): array
     {
-        $spyCacheKey = 'cvs_spy_closes';
-        $ttl         = (int) ($this->config['cache_ttl'] ?? 3600);
+        $cacheKey = 'cvs_benchmark_closes_' . $benchmarkTicker;
+        $ttl      = (int) ($this->config['cache_ttl'] ?? 3600);
 
-        if (isset($_SESSION[$spyCacheKey], $_SESSION[$spyCacheKey . '_ts'])) {
-            if (time() - $_SESSION[$spyCacheKey . '_ts'] < $ttl) {
-                return $_SESSION[$spyCacheKey];
+        if (isset($_SESSION[$cacheKey], $_SESSION[$cacheKey . '_ts'])) {
+            if (time() - $_SESSION[$cacheKey . '_ts'] < $ttl) {
+                return $_SESSION[$cacheKey];
             }
         }
 
-        $closes = $this->fetchChartData('SPY', '1y');
+        $closes = $this->fetchChartData($benchmarkTicker, '1y');
 
-        $_SESSION[$spyCacheKey]         = $closes;
-        $_SESSION[$spyCacheKey . '_ts'] = time();
+        $_SESSION[$cacheKey]         = $closes;
+        $_SESSION[$cacheKey . '_ts'] = time();
 
         return $closes;
     }

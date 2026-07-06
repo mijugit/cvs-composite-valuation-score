@@ -288,6 +288,19 @@ return [
         'cache_ttl'       => 3600,  // seconds; cache raw API response per ticker
         'max_watchlist'   => 100,   // max watchlist entries per user (S-06)
         'max_history'     => 20,    // max analysis-history entries shown on dashboard (S-08)
+
+        // MomentumPillar benchmark per ticker's home market (compare apples to
+        // apples — a WSE-listed construction company shouldn't be scored on
+        // momentum vs. the US market). Matched by ticker suffix; 'default' is
+        // used for US tickers (no suffix) and any suffix not yet mapped here.
+        // Adding a new market later is a one-line addition, no code change.
+        'momentum_benchmark' => [
+            'default'   => 'SPY',
+            'by_suffix' => [
+                '.WA' => 'ETFBW20TR.WA', // Beta ETF WIG20TR — Warsaw Stock Exchange
+                '.KS' => '069500.KS',    // Samsung KODEX 200 — Korea Exchange (KOSPI 200)
+            ],
+        ],
     ],
 
 ];
