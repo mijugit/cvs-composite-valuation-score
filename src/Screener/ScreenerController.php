@@ -50,13 +50,14 @@ class ScreenerController
         $sort     = in_array($req->query('sort'), self::VALID_SORTS, true)
             ? (string) $req->query('sort')
             : 'swing';
+        $nearBoundary = $req->query('near_boundary') === '1';
 
         // Treat empty string as null.
         $reco   = $reco   !== '' ? $reco   : null;
         $signal = $signal !== '' ? $signal : null;
         $sector = $sector !== '' ? $sector : null;
 
-        $rows      = $this->repo->getFiltered($reco, $signal, $minSwing, $sector, $sort, $atr);
+        $rows      = $this->repo->getFiltered($reco, $signal, $minSwing, $sector, $sort, $atr, $nearBoundary);
         $lastScored = $this->repo->getLastScoredAt();
         $sectors   = $this->repo->getDistinctSectors();
 
@@ -74,6 +75,7 @@ class ScreenerController
             'filter_min_swing' => $minSwing,
             'filter_sector'    => $sector,
             'filter_atr'       => $atr,
+            'filter_near_boundary' => $nearBoundary,
             'sort'             => $sort,
             'heldTickersMap'   => $heldTickersMap,
         ]);

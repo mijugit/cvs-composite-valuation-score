@@ -349,4 +349,50 @@ class ScreenerRepositoryTest extends TestCase
         $byTicker = array_column($repo->getFiltered(), 'trend_near_boundary', 'ticker');
         $this->assertFalse($byTicker['NOCFG']);
     }
+
+    // ------------------------------------------------------------------
+    // "Near boundary" filter (change: cvs-screener-trend, Phase 2)
+    // ------------------------------------------------------------------
+
+    private function thresholds(): array
+    {
+        return ['strong_buy' => 72.0, 'accumulate' => 58.0, 'neutral' => 42.0, 'reduce' => 28.0];
+    }
+
+    public function test_near_boundary_filter_isolated(): void
+    {
+        $repo = $this->makeRepo([], $this->thresholds());
+        $db   = $this->dbOf($repo);
+        $this->insertSnapshotOn($db, 'NEARBY', date('Y-m-d'), 74.0); // within 5 of 72
+        $this->insertSnapshotOn($db, 'FARAWAY', date('Y-m-d'), 90.0); // far from all thresholds
+
+        $tickers = array_column($repo->getFiltered(null, null, 0, null, 'swing', null, true), 'ticker');
+        $this->assertSame(['NEARBY'], $tickers);
+    }
+
+    public function test_near_boundary_filter_off_by_default_shows_everything(): void
+    {
+        $repo = $this->makeRepo([], $this->thresholds());
+        $db   = $this->dbOf($repo);
+        $this->insertSnapshotOn($db, 'NEARBY', date('Y-m-d'), 74.0);
+        $this->insertSnapshotOn($db, 'FARAWAY', date('Y-m-d'), 90.0);
+
+        $tickers = array_column($repo->getFiltered(), 'ticker');
+        sort($tickers);
+        $this->assertSame(['FARAWAY', 'NEARBY'], $tickers);
+    }
+
+    public function test_near_boundary_filter_composes_with_sector_filter(): void
+    {
+        $repo = $this->makeRepo([], $this->thresholds());
+        $db   = $this->dbOf($repo);
+        $this->insertSnapshotOn($db, 'TECHNEAR', date('Y-m-d'), 74.0);
+        $db->prepare("UPDATE cvs_snapshots SET sector = 'Technology' WHERE ticker = 'TECHNEAR'")->execute();
+        $this->insertSnapshotOn($db, 'ENERGYNEAR', date('Y-m-d'), 74.0);
+        $db->prepare("UPDATE cvs_snapshots SET sector = 'Energy' WHERE ticker = 'ENERGYNEAR'")->execute();
+
+        // near_boundary=true AND sector=Technology → only the Technology one.
+        $tickers = array_column($repo->getFiltered(null, null, 0, 'Technology', 'swing', null, true), 'ticker');
+        $this->assertSame(['TECHNEAR'], $tickers);
+    }
 }

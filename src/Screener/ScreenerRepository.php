@@ -71,15 +71,17 @@ class ScreenerRepository
      * @param int         $minSwing Minimum cvs_swing (0 = no filter)
      * @param string|null $sector   Exact sector match (null = all)
      * @param string      $sort     'swing'|'fund'|'date'
+     * @param bool        $nearBoundary Only rows within trajectory.boundary_margin of a recommendation threshold
      * @return array<int, array<string, mixed>>
      */
     public function getFiltered(
-        ?string $reco     = null,
-        ?string $signal   = null,
-        int     $minSwing = 0,
-        ?string $sector   = null,
-        string  $sort     = 'swing',
-        ?string $atr      = null
+        ?string $reco        = null,
+        ?string $signal      = null,
+        int     $minSwing    = 0,
+        ?string $sector      = null,
+        string  $sort        = 'swing',
+        ?string $atr         = null,
+        bool    $nearBoundary = false
     ): array {
         $rows = $this->findAllLatest();
 
@@ -144,6 +146,13 @@ class ScreenerRepository
         // Filter: ATR zone state (in_zone / above / below).
         if ($atr !== null && $atr !== '') {
             $rows = array_filter($rows, fn($r) => ($r['atr_state'] ?? null) === $atr);
+        }
+
+        // Filter: near a recommendation threshold (change: cvs-screener-trend,
+        // Phase 2). trend_near_boundary is already computed above in the
+        // enrichment loop — this is a plain array_filter, no new SQL.
+        if ($nearBoundary) {
+            $rows = array_filter($rows, fn($r) => ($r['trend_near_boundary'] ?? false) === true);
         }
 
         // Sort. ATR ranks by actionability for entries: in zone, then below, then above.
