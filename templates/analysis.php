@@ -473,9 +473,10 @@
                                     <strong>Jak czytać wykres?</strong><br>
                                     Obie linie są przeliczone do bazy&nbsp;100 na początku okresu —
                                     porównujesz tempo wzrostu, nie cenę nominalną.<br><br>
+                                    <?php $benchmarkLabel = (string) ($financials['benchmark_label'] ?? 'S&P 500'); ?>
                                     <strong><?= htmlspecialchars($ticker) ?></strong> — miesięczne zamknięcia spółki.<br>
-                                    <strong>SPY</strong> — ETF odwzorowujący indeks S&amp;P 500 (benchmark rynku US).
-                                    Linia spółki powyżej SPY = spółka biła rynek w tym okresie.
+                                    <strong><?= htmlspecialchars($benchmarkLabel) ?></strong> — benchmark rynku macierzystego spółki.
+                                    Linia spółki powyżej <?= htmlspecialchars($benchmarkLabel) ?> = spółka biła swój rynek w tym okresie.
                                 </span>
                             </span>
                         </div>
@@ -1404,9 +1405,10 @@
                 var pCtx = document.getElementById('price-chart');
                 if (!pCtx) return;
 
-                var closes  = <?= json_encode(array_values($financials['monthly_closes'])) ?>;
-                var spyData = <?= json_encode(array_values($financials['spy_closes'] ?? [])) ?>;
-                var ticker  = <?= json_encode($ticker) ?>;
+                var closes    = <?= json_encode(array_values($financials['monthly_closes'])) ?>;
+                var spyData   = <?= json_encode(array_values($financials['spy_closes'] ?? [])) ?>;
+                var ticker    = <?= json_encode($ticker) ?>;
+                var benchmarkLabel = <?= json_encode($financials['benchmark_label'] ?? 'S&P 500') ?>;
                 var n = 12;
 
                 // Take last N points
@@ -1444,7 +1446,7 @@
                 ];
                 if (spyNorm.length) {
                     datasets.push({
-                        label: 'SPY',
+                        label: benchmarkLabel,
                         data: spyNorm,
                         borderColor: 'rgba(160, 160, 160, 0.55)',
                         backgroundColor: 'transparent',

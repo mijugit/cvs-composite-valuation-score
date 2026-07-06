@@ -300,6 +300,13 @@ return [
                 '.WA' => 'ETFBW20TR.WA', // Beta ETF WIG20TR — Warsaw Stock Exchange
                 '.KS' => '069500.KS',    // Samsung KODEX 200 — Korea Exchange (KOSPI 200)
             ],
+            // Human-readable name shown on the analysis chart/tooltip — keyed by
+            // the resolved benchmark ticker itself, not by suffix.
+            'labels' => [
+                'SPY'          => 'S&P 500',
+                'ETFBW20TR.WA' => 'WIG20TR',
+                '069500.KS'    => 'KOSPI 200',
+            ],
         ],
     ],
 

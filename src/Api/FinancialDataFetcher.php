@@ -122,7 +122,9 @@ class FinancialDataFetcher implements LatestPriceSource
         }
 
         $closes          = $this->fetchChartData($ticker, '3y');
-        $benchmarkTicker = self::resolveBenchmarkTicker($ticker, $this->config['momentum_benchmark'] ?? []);
+        $benchmarkConfig = $this->config['momentum_benchmark'] ?? [];
+        $benchmarkTicker = self::resolveBenchmarkTicker($ticker, $benchmarkConfig);
+        $benchmarkLabel  = self::resolveBenchmarkLabel($benchmarkTicker, $benchmarkConfig);
         $spyCloses       = $this->fetchBenchmarkCloses($benchmarkTicker);
         // Phase 8 (slice 2) — daily OHLC for ATR / entry-zone math (AtrZoneCalculator).
         $dailyOhlc = $this->fetchDailyOhlc($ticker, '3mo');
@@ -133,7 +135,7 @@ class FinancialDataFetcher implements LatestPriceSource
         // inside the parsing/scoring layers — keeps them pure and offline-testable.
         $referenceDate = new DateTimeImmutable();
 
-        $normalised = $this->normalise($raw, $closes, $spyCloses, $referenceDate, $fxRateToUsd, $dailyOhlc);
+        $normalised = $this->normalise($raw, $closes, $spyCloses, $referenceDate, $fxRateToUsd, $dailyOhlc, $benchmarkTicker, $benchmarkLabel);
 
         if ($normalised === null) {
             return null;
@@ -432,6 +434,21 @@ class FinancialDataFetcher implements LatestPriceSource
     }
 
     /**
+     * Human-readable name for a resolved benchmark ticker, for the analysis
+     * page's chart legend/tooltip (e.g. "WIG20TR" instead of the raw ticker
+     * "ETFBW20TR.WA"). Falls back to the ticker itself when no label is
+     * configured, so a newly-added market still renders something sensible
+     * before someone gets around to naming it.
+     *
+     * @param array{labels?: array<string, string>} $benchmarkConfig
+     */
+    private static function resolveBenchmarkLabel(string $benchmarkTicker, array $benchmarkConfig): string
+    {
+        $labels = $benchmarkConfig['labels'] ?? [];
+        return is_string($labels[$benchmarkTicker] ?? null) ? $labels[$benchmarkTicker] : $benchmarkTicker;
+    }
+
+    /**
      * Fetch monthly closing prices for the resolved momentum benchmark, lazily
      * cached in session under `cvs_benchmark_closes_<ticker>`. Keyed per
      * benchmark ticker (not a single shared key) because one analysis/rescore
@@ -704,7 +721,7 @@ class FinancialDataFetcher implements LatestPriceSource
      * @param array{open?: float[], high: float[], low: float[], close: float[], date?: string[]} $dailyOhlc  Daily OHLC (native; FX-converted to USD inside; date passed through unconverted)
      * @return array<string, mixed>|null
      */
-    private function normalise(array $raw, array $closes, array $spyCloses, DateTimeImmutable $referenceDate, ?float $fxRateToUsd = null, array $dailyOhlc = ['open' => [], 'high' => [], 'low' => [], 'close' => [], 'date' => []]): ?array
+    private function normalise(array $raw, array $closes, array $spyCloses, DateTimeImmutable $referenceDate, ?float $fxRateToUsd = null, array $dailyOhlc = ['open' => [], 'high' => [], 'low' => [], 'close' => [], 'date' => []], string $benchmarkTicker = 'SPY', string $benchmarkLabel = 'S&P 500'): ?array
     {
         $ap   = $raw['assetProfile']            ?? [];
         $qt   = $raw['quoteType']                ?? [];
@@ -940,6 +957,8 @@ class FinancialDataFetcher implements LatestPriceSource
             // Price history (for MomentumPillar — base-100 index, dimensionless)
             'monthly_closes'             => $closes,
             'spy_closes'                 => $spyCloses,
+            'benchmark_ticker'           => $benchmarkTicker,
+            'benchmark_label'            => $benchmarkLabel,
 
             // Phase 8 (slice 2) — daily OHLC in USD for ATR / entry-zone math (AtrZoneCalculator).
             'daily_ohlc'                 => $dailyOhlcUsd,

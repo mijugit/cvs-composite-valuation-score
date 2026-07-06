@@ -23,6 +23,11 @@ class FinancialDataFetcherBenchmarkTest extends TestCase
             '.WA' => 'ETFBW20TR.WA',
             '.KS' => '069500.KS',
         ],
+        'labels' => [
+            'SPY'          => 'S&P 500',
+            'ETFBW20TR.WA' => 'WIG20TR',
+            '069500.KS'    => 'KOSPI 200',
+        ],
     ];
 
     private function resolve(string $ticker, array $config = self::CONFIG): string
@@ -30,6 +35,13 @@ class FinancialDataFetcherBenchmarkTest extends TestCase
         $m = new \ReflectionMethod(FinancialDataFetcher::class, 'resolveBenchmarkTicker');
         $m->setAccessible(true);
         return $m->invoke(null, $ticker, $config);
+    }
+
+    private function label(string $benchmarkTicker, array $config = self::CONFIG): string
+    {
+        $m = new \ReflectionMethod(FinancialDataFetcher::class, 'resolveBenchmarkLabel');
+        $m->setAccessible(true);
+        return $m->invoke(null, $benchmarkTicker, $config);
     }
 
     public function testUsTickerWithNoSuffixUsesDefault(): void
@@ -61,5 +73,21 @@ class FinancialDataFetcherBenchmarkTest extends TestCase
     {
         $config = ['default' => 'VGK', 'by_suffix' => ['.WA' => 'ETFBW20TR.WA']];
         $this->assertSame('VGK', $this->resolve('SOMETHING.DE', $config));
+    }
+
+    // ------------------------------------------------------------------
+    // resolveBenchmarkLabel
+    // ------------------------------------------------------------------
+
+    public function testLabelReturnsConfiguredHumanReadableName(): void
+    {
+        $this->assertSame('WIG20TR', $this->label('ETFBW20TR.WA'));
+        $this->assertSame('KOSPI 200', $this->label('069500.KS'));
+        $this->assertSame('S&P 500', $this->label('SPY'));
+    }
+
+    public function testLabelFallsBackToTickerWhenUnconfigured(): void
+    {
+        $this->assertSame('EXS1.DE', $this->label('EXS1.DE'));
     }
 }
