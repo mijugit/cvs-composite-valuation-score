@@ -122,10 +122,12 @@ $hintRecoColor = static function (?string $reco): string {
 };
 
 $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor): string {
-    $name  = $row['company_name'] ?? null;
-    $swing = isset($row['cvs_swing']) ? (float) $row['cvs_swing'] : null;
-    $fund  = isset($row['cvs_fund'])  ? (float) $row['cvs_fund']  : null;
-    if ($name === null && $swing === null && $fund === null) {
+    $name   = $row['company_name'] ?? null;
+    $swing  = isset($row['cvs_swing']) ? (float) $row['cvs_swing'] : null;
+    $fund   = isset($row['cvs_fund'])  ? (float) $row['cvs_fund']  : null;
+    $sector = $row['sector'] ?? null;
+    $date   = isset($row['score_date']) ? substr((string) $row['score_date'], 0, 10) : null;
+    if ($name === null && $swing === null && $fund === null && $sector === null && $date === null) {
         return '';
     }
 
@@ -137,6 +139,16 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
         }
         if ($fund !== null) {
             $html .= '<span style="' . $hintRecoColor($row['reco_fund'] ?? null) . '">CVS Fund ' . number_format($fund, 1) . '</span>';
+        }
+        $html .= '</span>';
+    }
+    if ($sector !== null || $date !== null) {
+        $html .= '<span class="ticker-hint__tooltip-scores" style="font-size:var(--text-xs);">';
+        if ($sector !== null) {
+            $html .= '<span>' . htmlspecialchars((string) $sector) . '</span>';
+        }
+        if ($date !== null) {
+            $html .= '<span>Rescore: ' . htmlspecialchars($date) . '</span>';
         }
         $html .= '</span>';
     }
@@ -258,9 +270,7 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
                 <th>Sygnał<?= $hint('Złoty sygnał: ⭐⭐ wartość + momentum, ⭐ obserwuj (setup fundamentalny), ↑ momentum.') ?></th>
                 <th>Wyniki<?= $hint('Bliskość publikacji wyników kwartalnych (📅 za N dni / w oknie / N dni temu).') ?></th>
                 <th><?= $sortLink('atr', 'ATR') . $hint('Pozycja ceny względem strefy akumulacji ATR: ✓ w strefie kupna, ↑ powyżej (czekaj na cofnięcie), ↓ poniżej (pod wsparciem). Sortowanie: najpierw w strefie, potem poniżej, potem powyżej.') ?></th>
-                <th>Sektor</th>
                 <th><?= $sortLink('price', 'Cena') ?></th>
-                <th><?= $sortLink('date', 'Data') ?></th>
             </tr>
         </thead>
         <tbody>
@@ -269,8 +279,6 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
             $fund  = $row['cvs_fund']  !== null ? number_format((float) $row['cvs_fund'],  1) : '—';
             $price = $row['price_at_snapshot'] !== null ? '$' . number_format((float) $row['price_at_snapshot'], 2) : '—';
             $reco  = htmlspecialchars((string) ($row['reco_swing'] ?? '—'));
-            $sec   = htmlspecialchars((string) ($row['sector']     ?? '—'));
-            $date  = htmlspecialchars(substr((string) $row['score_date'], 0, 10));
 
             // Colour reco — full 5-level palette matching watchlist chip colours
             $recoStr   = (string) ($row['reco_swing'] ?? '');
@@ -312,9 +320,7 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
                 isset($row['days_since_earnings']) ? (int) $row['days_since_earnings'] : null
             ) ?></td>
             <td><?= $atrChip($row['atr_state'] ?? null) ?></td>
-            <td style="font-size:var(--text-sm);color:var(--c-muted);"><?= $sec ?></td>
             <td style="font-size:var(--text-sm);"><?= $price ?></td>
-            <td style="font-size:var(--text-xs);color:var(--c-muted);"><?= $date ?></td>
         </tr>
         <?php endforeach; ?>
         </tbody>

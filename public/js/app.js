@@ -1048,4 +1048,47 @@
     window.addEventListener('scroll', hide, true);
 }());
 
+// ------------------------------------------------------------------
+// Column header hint (ⓘ) — portal
+// ------------------------------------------------------------------
+// Same clipping bug as the ticker hover hint above: .chart-hint__tooltip
+// used to be position:absolute inside a <th>, which a card's
+// overflow-x:auto ancestor (screener, track-record tables) clips. Same
+// fix — single body-level portal, repositioned via getBoundingClientRect().
+
+(function () {
+    'use strict';
+
+    const hints = document.querySelectorAll('.chart-hint');
+    if (!hints.length) return;
+
+    const portal = document.createElement('div');
+    portal.className = 'chart-hint-portal';
+    document.body.appendChild(portal);
+
+    function show(hint, tooltip) {
+        portal.innerHTML = tooltip.innerHTML;
+        const r = hint.getBoundingClientRect();
+        portal.style.left = (r.left + r.width / 2) + 'px';
+        portal.style.top = (r.top - 8) + 'px';
+        portal.classList.add('chart-hint-portal--visible');
+    }
+
+    function hide() {
+        portal.classList.remove('chart-hint-portal--visible');
+    }
+
+    hints.forEach(hint => {
+        const tooltip = hint.querySelector('.chart-hint__tooltip');
+        if (!tooltip || tooltip.innerHTML.trim() === '') return;
+
+        hint.addEventListener('mouseenter', () => show(hint, tooltip));
+        hint.addEventListener('mouseleave', hide);
+        hint.addEventListener('focusin', () => show(hint, tooltip));
+        hint.addEventListener('focusout', hide);
+    });
+
+    window.addEventListener('scroll', hide, true);
+}());
+
 })();

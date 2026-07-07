@@ -622,12 +622,21 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
     text-transform: none;
 }
 
-.chart-hint__tooltip {
+/* Content source only — never shown in place. A card with overflow-x:auto
+   (screener, track-record tables) clips any position:absolute/fixed
+   descendant regardless of z-index (CSS overflow spec: overflow-x:auto
+   computes overflow-y to auto too). Rendered instead via a single
+   body-level portal (public/js/app.js, .chart-hint-portal below), same
+   fix as .ticker-hint__tooltip. */
+.chart-hint__tooltip { display: none; }
+
+/* Single shared tooltip, appended to <body> by app.js and repositioned on
+   each hover/focus — a direct child of <body> is never clipped by an
+   ancestor card's overflow:auto. */
+.chart-hint-portal {
     display: none;
-    position: absolute;
-    bottom: calc(100% + .5rem);
-    left: 50%;
-    transform: translateX(-50%);
+    position: fixed;
+    transform: translate(-50%, -100%);
     min-width: 280px;
     max-width: 320px;
     background: var(--c-surface-2);
@@ -638,13 +647,14 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
     line-height: 1.55;
     color: var(--c-text);
     box-shadow: var(--shadow-lg);
-    z-index: 50;
+    z-index: 9999;
     white-space: normal;
+    text-align: left;
     pointer-events: none;
 }
 
-/* Small arrow */
-.chart-hint__tooltip::after {
+/* Small arrow, pointing down at the ⓘ icon */
+.chart-hint-portal::after {
     content: '';
     position: absolute;
     top: 100%;
@@ -654,10 +664,7 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
     border-top-color: var(--c-border);
 }
 
-.chart-hint:hover .chart-hint__tooltip,
-.chart-hint:focus .chart-hint__tooltip {
-    display: block;
-}
+.chart-hint-portal--visible { display: block; }
 
 .price-chart-compact {
     flex: 1;
