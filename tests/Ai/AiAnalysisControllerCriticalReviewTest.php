@@ -1,0 +1,118 @@
+<?php
+
+declare(strict_types=1);
+
+namespace CVS\Tests\Ai;
+
+use CVS\Ai\AiAnalysisController;
+use CVS\Ai\AiAnalysisRepository;
+use CVS\Ai\AiDivergenceService;
+use CVS\Api\FinancialDataFetcher;
+use CVS\CVS\CVSModel;
+use PHPUnit\Framework\TestCase;
+use ReflectionClass;
+
+/**
+ * Tests for criticalReview() (POST, starts background job) and
+ * criticalReviewStatus() (GET, polls the job) — change: cvs-ai-critical-review.
+ *
+ * Same constraint as AiAnalysisControllerShareTest: these actions call
+ * Response::json(), which exits the process, so we cannot invoke them
+ * end-to-end in a unit test. Coverage strategy mirrors that file:
+ *   (1) Structural: methods exist with the correct signature.
+ *   (2) Route: both endpoints are registered in routes.php.
+ *   (3) Constructor: injecting test doubles skips the critical-review
+ *       repository too (no real DB hit), same gating as gate/usageRepo.
+ *   (4) Repository gateway: exact conditions the controller branches on
+ *       (isPending/isFresh/status shapes) are covered in
+ *       AiCriticalReviewRepositoryTest — not duplicated here.
+ *
+ * End-to-end HTTP behaviour (status codes, session, CSRF, exec() firing) is
+ * verified manually after deployment to Cyber_Folks (see plan.md Phase 3).
+ */
+class AiAnalysisControllerCriticalReviewTest extends TestCase
+{
+    // ------------------------------------------------------------------
+    // (1) Structural: methods exist with the correct signature
+    // ------------------------------------------------------------------
+
+    public function test_critical_review_method_exists_and_is_public(): void
+    {
+        $rc = new ReflectionClass(AiAnalysisController::class);
+        $this->assertTrue($rc->hasMethod('criticalReview'));
+
+        $method = $rc->getMethod('criticalReview');
+        $this->assertTrue($method->isPublic());
+
+        $params = $method->getParameters();
+        $this->assertCount(1, $params);
+        $this->assertSame('req', $params[0]->getName());
+
+        $return = $method->getReturnType();
+        $this->assertNotNull($return);
+        $this->assertSame('void', (string) $return);
+    }
+
+    public function test_critical_review_status_method_exists_and_is_public(): void
+    {
+        $rc = new ReflectionClass(AiAnalysisController::class);
+        $this->assertTrue($rc->hasMethod('criticalReviewStatus'));
+
+        $method = $rc->getMethod('criticalReviewStatus');
+        $this->assertTrue($method->isPublic());
+
+        $params = $method->getParameters();
+        $this->assertCount(1, $params);
+        $this->assertSame('req', $params[0]->getName());
+
+        $return = $method->getReturnType();
+        $this->assertNotNull($return);
+        $this->assertSame('void', (string) $return);
+    }
+
+    // ------------------------------------------------------------------
+    // (2) Route: both endpoints are registered in routes.php
+    // ------------------------------------------------------------------
+
+    public function test_critical_review_routes_are_registered_in_routes_php(): void
+    {
+        $routesFile = dirname(__DIR__, 2) . '/src/Core/routes.php';
+        $this->assertFileExists($routesFile);
+        $contents = file_get_contents($routesFile);
+        $this->assertIsString($contents);
+        $this->assertStringContainsString(
+            "post('/analysis/{ticker}/critical-review'",
+            $contents,
+            'routes.php must register POST /analysis/{ticker}/critical-review'
+        );
+        $this->assertStringContainsString(
+            "get('/analysis/{ticker}/critical-review/status'",
+            $contents,
+            'routes.php must register GET /analysis/{ticker}/critical-review/status'
+        );
+    }
+
+    // ------------------------------------------------------------------
+    // (3) Constructor: injected test doubles skip the critical-review repo too
+    // ------------------------------------------------------------------
+
+    public function test_constructor_with_injected_deps_leaves_critical_review_repo_null(): void
+    {
+        $controller = new AiAnalysisController(
+            [],
+            $this->createMock(AiAnalysisRepository::class),
+            $this->createMock(FinancialDataFetcher::class),
+            $this->createMock(CVSModel::class),
+            $this->createMock(AiDivergenceService::class)
+        );
+
+        $rc   = new ReflectionClass($controller);
+        $prop = $rc->getProperty('criticalReviewRepo');
+        $prop->setAccessible(true);
+
+        $this->assertNull(
+            $prop->getValue($controller),
+            'criticalReviewRepo must stay null when test doubles are injected — no real DB hit'
+        );
+    }
+}

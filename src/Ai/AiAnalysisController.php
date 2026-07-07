@@ -18,20 +18,25 @@ use CVS\TrackRecord\TrajectoryCalculator;
 use DateTimeImmutable;
 
 /**
- * Handles POST /analysis/{ticker}/generate-ai and POST /analysis/{ticker}/share-prompt.
+ * Handles POST /analysis/{ticker}/generate-ai, POST /analysis/{ticker}/share-prompt,
+ * POST /analysis/{ticker}/critical-review, and GET /analysis/{ticker}/critical-review/status.
  *
  * generate(): auth → PRO gate → cache check → Claude → log → save → respond.
  * sharePrompt(): auth → cache check → rebuild data block → assemble export prompt → respond.
+ * criticalReview(): auth → require fresh stage-1 → PRO gate → log → markPending →
+ *   fire bin/generate_critical_review.php in the background → 202 (change: cvs-ai-critical-review).
+ * criticalReviewStatus(): auth → read ai_critical_reviews row → respond per status.
  * Always returns JSON; never throws.
  */
 class AiAnalysisController
 {
-    private AiAnalysisRepository $aiRepo;
-    private ?ProGate              $gate;
-    private FinancialDataFetcher  $fetcher;
-    private CVSModel              $model;
-    private AiDivergenceService   $service;
-    private ?AiUsageRepository    $usageRepo;
+    private AiAnalysisRepository        $aiRepo;
+    private ?ProGate                    $gate;
+    private FinancialDataFetcher        $fetcher;
+    private CVSModel                    $model;
+    private AiDivergenceService         $service;
+    private ?AiUsageRepository          $usageRepo;
+    private ?AiCriticalReviewRepository $criticalReviewRepo;
     /** @var array<string, mixed> */
     private array $cvsConfig;
 
@@ -39,8 +44,8 @@ class AiAnalysisController
      * @param array<string, mixed>   $aiConfig Full config/ai.php
      *
      * Optional parameters allow injecting test doubles without hitting the
-     * database. When all four are provided the PRO gate (generate-only) is
-     * skipped; sharePrompt() never needs it.
+     * database. When all four are provided the PRO gate (generate-only) and
+     * the critical-review repository are skipped; sharePrompt() never needs them.
      */
     public function __construct(
         array $aiConfig,
@@ -55,14 +60,17 @@ class AiAnalysisController
         $this->model     = $model    ?? new CVSModel($this->cvsConfig);
         $this->service   = $service  ?? new AiDivergenceService(ClaudeClientFactory::fromConfig($aiConfig));
 
-        // PRO gate only needed by generate(); skip when test doubles are injected.
+        // PRO gate + critical-review repo only needed by generate()/criticalReview();
+        // skip when test doubles are injected.
         if ($aiRepo === null && $fetcher === null && $model === null && $service === null) {
-            $proRepo         = new ProRepository();
-            $this->usageRepo = new AiUsageRepository();
-            $this->gate      = new ProGate($proRepo, $this->usageRepo, $aiConfig);
+            $proRepo                  = new ProRepository();
+            $this->usageRepo          = new AiUsageRepository();
+            $this->gate               = new ProGate($proRepo, $this->usageRepo, $aiConfig);
+            $this->criticalReviewRepo = new AiCriticalReviewRepository();
         } else {
-            $this->gate      = null;
-            $this->usageRepo = null;
+            $this->gate               = null;
+            $this->usageRepo          = null;
+            $this->criticalReviewRepo = null;
         }
     }
 
@@ -149,7 +157,7 @@ class AiAnalysisController
         $cvsResult = $this->model->calculate($ticker, $financials)->toArray();
 
         // Calculate CVS implied fair value (sector-median-parity price).
-        $cvsFairPrice = $this->calcFairPrice($financials);
+        $cvsFairPrice = FairPriceCalculator::compute($financials, $this->cvsConfig);
 
         // Phase 8 enrichment — CVS trajectory + ATR execution plan for the prompt.
         $modelVersion = (string) ($this->cvsConfig['model_version'] ?? '');
@@ -242,7 +250,7 @@ class AiAnalysisController
         }
 
         $cvsResult    = $this->model->calculate($ticker, $financials)->toArray();
-        $cvsFairPrice = $this->calcFairPrice($financials);
+        $cvsFairPrice = FairPriceCalculator::compute($financials, $this->cvsConfig);
 
         $modelVersion = (string) ($this->cvsConfig['model_version'] ?? '');
         $trajWindow   = (int) ($this->cvsConfig['trajectory']['window_days'] ?? 90);
@@ -273,65 +281,152 @@ class AiAnalysisController
         Response::json(['ok' => true, 'prompt' => $prompt, 'lang' => $lang]);
     }
 
+    // ------------------------------------------------------------------
+    // POST /analysis/{ticker}/critical-review — change: cvs-ai-critical-review
+    // ------------------------------------------------------------------
+
     /**
-     * CVS implied fair value: price at which Valuation pillar = 50 (sector-median parity).
-     * Fair EV = median_ev_fcf × FCF × (1 + growth_capped)²
-     * Fair Price = (Fair EV - debt + cash) / shares
-     *
-     * @param array<string, mixed> $financials
+     * Start a stage-2 "Recenzja krytyczna" background job. Returns immediately
+     * (202) — the actual Claude call (web search enabled, measured 90-140s+)
+     * runs in a detached CLI process (bin/generate_critical_review.php) fired
+     * via exec($cmd . ' &'). Poll criticalReviewStatus() for the result.
      */
-    private function calcFairPrice(array $financials): ?float
+    public function criticalReview(Request $req): void
     {
-        $sector     = (string) ($financials['sector'] ?? 'DEFAULT');
-        $benchmarks = $this->cvsConfig['benchmarks'] ?? [];
-        $bm         = $benchmarks[$sector] ?? $benchmarks['DEFAULT'] ?? [];
-        $medEvFcf   = (float) ($bm['median_ev_fcf'] ?? 0);
-        $maxGrowth  = (float) ($bm['max_growth']    ?? 20);
+        AuthController::requireAuth();
 
-        $fcf = (float) ($financials['free_cash_flow'] ?? 0);
-        if ($fcf <= 0) $fcf = (float) ($financials['free_cash_flow_adjusted'] ?? 0);
-
-        $debt   = (float) ($financials['total_debt']         ?? 0);
-        $cash   = (float) ($financials['cash']               ?? 0);
-        $shares = (float) ($financials['shares_outstanding'] ?? 0);
-
-        $fwdEps   = (float) ($financials['forward_eps']  ?? 0);
-        $trailEps = (float) ($financials['trailing_eps'] ?? 0);
-        $growth   = null;
-        if ($fwdEps > 0 && $trailEps > 0) {
-            $implied = ($fwdEps / $trailEps - 1) * 100;
-            if ($implied > 0 && $implied <= 200) $growth = $implied;
-        }
-        if ($growth === null) {
-            $rg = (float) ($financials['revenue_growth'] ?? 0);
-            if ($rg > 0) $growth = $rg * 100;
-        }
-        if ($growth !== null) $growth = min($growth, $maxGrowth);
-
-        if ($fcf <= 0 || $growth === null || $medEvFcf <= 0 || $shares <= 0) {
-            return null;
+        if (!$req->verifyCsrf()) {
+            Response::json(['ok' => false, 'message' => 'Błąd CSRF.'], 403);
+            return;
         }
 
-        // Phase 4 (multi-currency-fx): guard removed — all inputs are in USD after normalise().
-        $fwdFcf = $fcf * (1 + $growth / 100) ** 2;
-        $fairEv = $medEvFcf * $fwdFcf;
-        $price  = ($fairEv - $debt + $cash) / $shares;
-
-        if ($price <= 0) {
-            return null;
+        $ticker = strtoupper(trim((string) $req->param('ticker', '')));
+        if ($ticker === '') {
+            Response::json(['ok' => false, 'message' => 'Brak symbolu spółki.'], 400);
+            return;
         }
 
-        // Sanity bounds: fair value must be within 0.05× – 10× current price.
-        // Values outside this range indicate a data quality problem (currency mismatch,
-        // unusual share structure, stale FCF) — suppress rather than mislead.
-        $currentPrice = (float) ($financials['current_price'] ?? 0);
-        if ($currentPrice > 0) {
-            $ratio = $price / $currentPrice;
-            if ($ratio > 10.0 || $ratio < 0.05) {
-                return null;
+        if ($this->gate === null || $this->usageRepo === null || $this->criticalReviewRepo === null) {
+            Response::json(['ok' => false, 'message' => 'Controller not configured for AI generation.'], 500);
+            return;
+        }
+
+        if (!function_exists('exec')) {
+            Response::json(['ok' => false, 'message' => 'Generowanie w tle jest niedostępne na tym serwerze.'], 500);
+            return;
+        }
+
+        $userId   = (int) $_SESSION['user_id'];
+        $aiConfig = require dirname(__DIR__, 2) . '/config/ai.php';
+        $freshDays = (int) ($aiConfig['pro']['cache_fresh_days'] ?? 7);
+
+        // The critical review deepens an existing stage-1 analysis — require
+        // one to already be fresh, rather than silently generating it first.
+        if (!$this->aiRepo->isFresh($ticker, $freshDays)) {
+            Response::json([
+                'ok'      => false,
+                'message' => 'Najpierw wygeneruj świeżą analizę AI (etap 1) dla tej spółki.',
+            ], 409);
+            return;
+        }
+
+        if ($this->criticalReviewRepo->isPending($ticker)) {
+            Response::json([
+                'ok'      => false,
+                'message' => 'Recenzja krytyczna jest już w trakcie generowania.',
+            ], 409);
+            return;
+        }
+
+        if (!$this->gate->canGenerate($userId)) {
+            $usage = $this->gate->getUsage($userId);
+            if ($usage['today'] >= $usage['daily_limit']) {
+                $msg = 'Osiągnięto dzienny limit analiz AI. Spróbuj jutro.';
+            } elseif ($usage['month'] >= $usage['monthly_limit']) {
+                $msg = 'Osiągnięto miesięczny limit analiz AI.';
+            } else {
+                $msg = 'Brak aktywnego kodu PRO. Aktywuj kod aby generować analizy AI.';
             }
+            Response::json(['ok' => false, 'message' => $msg], 403);
+            return;
         }
 
-        return round($price, 2);
+        // Logged at acceptance time — the background job's own token counts
+        // land in ai_critical_reviews via markCompleted(); this entry only
+        // enforces the PRO usage quota against a duplicate rapid-fire request.
+        $this->usageRepo->log($userId, $this->gate->getSessionCode(), 0, 0);
+        $this->criticalReviewRepo->markPending($ticker, $userId);
+
+        $phpBin = '/usr/local/bin/php82';
+        $script = dirname(__DIR__, 2) . '/bin/generate_critical_review.php';
+        $logDir = dirname(__DIR__, 2) . '/logs';
+        $cmd    = $phpBin . ' ' . escapeshellarg($script)
+                . ' ' . escapeshellarg($ticker)
+                . ' ' . escapeshellarg((string) $userId)
+                . ' >> ' . escapeshellarg($logDir . '/critical_review.log')
+                . ' 2>&1';
+        exec($cmd . ' &');
+
+        Response::json(['ok' => true, 'status' => 'pending'], 202);
+    }
+
+    // ------------------------------------------------------------------
+    // GET /analysis/{ticker}/critical-review/status — change: cvs-ai-critical-review
+    // ------------------------------------------------------------------
+
+    public function criticalReviewStatus(Request $req): void
+    {
+        AuthController::requireAuth();
+
+        $ticker = strtoupper(trim((string) $req->param('ticker', '')));
+        if ($ticker === '') {
+            Response::json(['ok' => false, 'message' => 'Brak symbolu spółki.'], 400);
+            return;
+        }
+
+        if ($this->criticalReviewRepo === null) {
+            Response::json(['ok' => false, 'message' => 'Controller not configured for AI generation.'], 500);
+            return;
+        }
+
+        $row = $this->criticalReviewRepo->findByTicker($ticker);
+        if ($row === null) {
+            Response::json(['ok' => true, 'status' => 'none']);
+            return;
+        }
+
+        $status = (string) $row['status'];
+
+        if ($status === 'completed') {
+            $generatedAt = (string) ($row['generated_at'] ?? '');
+            $stale       = true;
+            $generatedAtDt = $generatedAt !== '' ? DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $generatedAt) : false;
+            if ($generatedAtDt !== false) {
+                $stale = $generatedAtDt < (new DateTimeImmutable())->modify('-48 hours');
+            }
+
+            $sources = json_decode((string) ($row['sources'] ?? '[]'), true);
+
+            Response::json([
+                'ok'           => true,
+                'status'       => 'completed',
+                'content'      => (string) ($row['content'] ?? ''),
+                'sources'      => is_array($sources) ? $sources : [],
+                'generated_at' => $generatedAt,
+                'stale'        => $stale,
+            ]);
+            return;
+        }
+
+        if ($status === 'failed') {
+            Response::json([
+                'ok'            => true,
+                'status'        => 'failed',
+                'error_message' => (string) ($row['error_message'] ?? 'Nieznany błąd.'),
+            ]);
+            return;
+        }
+
+        Response::json(['ok' => true, 'status' => 'pending']);
     }
 }

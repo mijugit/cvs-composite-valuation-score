@@ -124,6 +124,10 @@ $router->post('/pro/request',             fn($req) => $pro->sendRequest($req));
 $router->post('/analysis/{ticker}/generate-ai',  fn($req) => $aiAnalysis->generate($req));
 $router->post('/analysis/{ticker}/share-prompt', fn($req) => $aiAnalysis->sharePrompt($req));
 
+// Recenzja krytyczna (etap 2) — change: cvs-ai-critical-review
+$router->post('/analysis/{ticker}/critical-review',        fn($req) => $aiAnalysis->criticalReview($req));
+$router->get('/analysis/{ticker}/critical-review/status',  fn($req) => $aiAnalysis->criticalReviewStatus($req));
+
 // ------------------------------------------------------------------
 // Track Record (S-02)
 // ------------------------------------------------------------------
