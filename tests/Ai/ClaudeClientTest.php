@@ -251,11 +251,17 @@ class ClaudeClientTest extends TestCase
         $this->assertStringNotContainsString('"tools"', $transport->requests[0]['body']);
     }
 
-    public function test_multiple_text_blocks_are_concatenated_in_order_around_tool_blocks(): void
+    public function test_multiple_text_blocks_are_concatenated_verbatim_around_tool_blocks(): void
     {
+        // change: cvs-ai-critical-review — real responses split ONE continuous
+        // sentence across several text blocks (a citation applies to a span,
+        // not necessarily a whole paragraph). Direct concatenation (no
+        // inserted separator) is what reconstructs the intended text —
+        // whatever spacing the model wants between blocks is already inside
+        // the blocks themselves, as in this fixture's trailing/leading spaces.
         $body = (string) json_encode([
             'content' => [
-                ['type' => 'text', 'text' => 'Szukam świeżych newsów.'],
+                ['type' => 'text', 'text' => 'Szukam świeżych newsów. '],
                 ['type' => 'server_tool_use', 'id' => 'srvtool_1', 'name' => 'web_search', 'input' => ['query' => 'MU stock']],
                 ['type' => 'web_search_tool_result', 'tool_use_id' => 'srvtool_1', 'content' => [
                     ['type' => 'web_search_result', 'url' => 'https://example.com/a', 'title' => 'Wynik A'],
@@ -272,7 +278,68 @@ class ClaudeClientTest extends TestCase
         $result = $client->sendMessage($this->messages(), null, ['tools' => $this->webSearchTool()]);
 
         $this->assertTrue($result->ok);
-        $this->assertSame("Szukam świeżych newsów.\n\nNa podstawie wyników: spółka rośnie.", $result->text);
+        $this->assertSame('Szukam świeżych newsów. Na podstawie wyników: spółka rośnie.', $result->text);
+        $this->assertFalse($result->searchDegraded);
+    }
+
+    public function test_code_execution_tool_result_error_sets_search_degraded(): void
+    {
+        // change: cvs-ai-critical-review — observed live 2026-07-07: some
+        // models route web_search through a code_execution sandbox, which
+        // can itself fail (buggy generated glue code, tool-use budget
+        // exhausted) even when the underlying web_search_tool_result was a
+        // perfectly successful list of results.
+        $body = (string) json_encode([
+            'content' => [
+                ['type' => 'server_tool_use', 'id' => 'c1', 'name' => 'code_execution', 'input' => ['code' => 'x']],
+                ['type' => 'web_search_tool_result', 'tool_use_id' => 'w1', 'content' => [
+                    ['type' => 'web_search_result', 'url' => 'https://example.com/a', 'title' => 'Wynik A'],
+                ]],
+                ['type' => 'code_execution_tool_result', 'tool_use_id' => 'c1', 'content' => [
+                    'type' => 'encrypted_code_execution_result',
+                    'stderr' => 'Server tool use limit exceeded during code execution.',
+                    'return_code' => 1,
+                    'content' => [],
+                ]],
+                ['type' => 'text', 'text' => 'Nie udało się dokończyć wyszukiwania, oto co wiem bez niego.'],
+            ],
+            'stop_reason' => 'end_turn',
+            'model'       => 'claude-test',
+            'usage'       => ['input_tokens' => 5, 'output_tokens' => 5],
+        ]);
+        $transport = new FakeTransport([['status' => 200, 'body' => $body, 'error' => null]]);
+        $client    = new ClaudeClient($this->config(), $transport);
+
+        $result = $client->sendMessage($this->messages(), null, ['tools' => $this->webSearchTool()]);
+
+        $this->assertTrue($result->ok, 'a degraded code_execution search must not fail the whole response');
+        $this->assertTrue($result->searchDegraded);
+        $this->assertSame('Nie udało się dokończyć wyszukiwania, oto co wiem bez niego.', $result->text);
+    }
+
+    public function test_code_execution_tool_result_success_does_not_set_search_degraded(): void
+    {
+        $body = (string) json_encode([
+            'content' => [
+                ['type' => 'server_tool_use', 'id' => 'c1', 'name' => 'code_execution', 'input' => ['code' => 'x']],
+                ['type' => 'code_execution_tool_result', 'tool_use_id' => 'c1', 'content' => [
+                    'type' => 'encrypted_code_execution_result',
+                    'stderr' => '',
+                    'return_code' => 0,
+                    'content' => [],
+                ]],
+                ['type' => 'text', 'text' => 'Wynik po udanym wyszukiwaniu.'],
+            ],
+            'stop_reason' => 'end_turn',
+            'model'       => 'claude-test',
+            'usage'       => ['input_tokens' => 5, 'output_tokens' => 5],
+        ]);
+        $transport = new FakeTransport([['status' => 200, 'body' => $body, 'error' => null]]);
+        $client    = new ClaudeClient($this->config(), $transport);
+
+        $result = $client->sendMessage($this->messages(), null, ['tools' => $this->webSearchTool()]);
+
+        $this->assertTrue($result->ok);
         $this->assertFalse($result->searchDegraded);
     }
 

@@ -256,10 +256,38 @@ final class ClaudeClient
                 if (is_array($inner) && !array_is_list($inner)) {
                     $searchDegraded = true;
                 }
+                continue;
+            }
+
+            // change: cvs-ai-critical-review — observed live (2026-07-07):
+            // some models route web_search through a code_execution sandbox
+            // rather than calling it directly. That sandbox can itself fail
+            // (a bug in the model's own generated glue code, or its internal
+            // tool-use budget running out) even when the underlying
+            // web_search_tool_result above was perfectly successful. A
+            // non-zero return_code or non-empty stderr here means the search
+            // results likely never reached the final answer.
+            if ($type === 'code_execution_tool_result') {
+                $inner = $block['content'] ?? null;
+                if (is_array($inner)) {
+                    $returnCode = $inner['return_code'] ?? null;
+                    $stderr     = $inner['stderr'] ?? null;
+                    if ((is_int($returnCode) && $returnCode !== 0) || (is_string($stderr) && $stderr !== '')) {
+                        $searchDegraded = true;
+                    }
+                }
             }
         }
 
-        $text = implode("\n\n", $textParts);
+        // change: cvs-ai-critical-review — observed live (2026-07-07): citation
+        // attachment can split ONE continuous sentence into several text
+        // blocks (a citation applies to a specific span, not a whole
+        // paragraph). Joining with any separator inserts spurious blank
+        // lines mid-sentence. Direct concatenation reconstructs the intended
+        // text exactly, whether blocks were split for citations or for a
+        // natural "let me search, then continue" reasoning break — Claude's
+        // own text already carries whatever whitespace it wants between them.
+        $text = implode('', $textParts);
         if ($text === '') {
             error_log('[Ai] missing text content in response');
             return [AiResult::failure(AiFailureKind::BadResponse, 'Pusta odpowiedź modelu.'), false, null];
