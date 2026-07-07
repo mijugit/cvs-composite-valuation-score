@@ -967,6 +967,99 @@
                 </p>
             </div>
 
+            <!-- ===================================================== -->
+            <!-- Stage-2: Recenzja krytyczna (change: cvs-ai-critical-review) -->
+            <!-- ===================================================== -->
+            <?php if (!empty($cachedAi)): ?>
+            <?php
+                $crStatus = $criticalReviewStatus ?? 'none';
+                $crCached = $cachedCriticalReview ?? null;
+            ?>
+            <div class="card ai-analysis-card" id="critical-review-section">
+                <div class="ai-analysis-card__header">
+                    <h2>Recenzja krytyczna AI
+                        <span class="chart-hint" tabindex="0">ⓘ
+                            <span class="chart-hint__tooltip">
+                                <strong>Czym różni się od analizy powyżej?</strong><br>
+                                Recenzja krytyczna szuka świeżych newsów (web search, ~14 dni) i
+                                konfrontuje je z analizą etapu 1 — pokazuje co model mógł przeoczyć
+                                i gdzie analiza powyżej bywa zbyt optymistyczna lub ostrożna.
+                                Trwa dłużej (~2-4 min), generuje się w tle.
+                            </span>
+                        </span>
+                    </h2>
+                    <div class="ai-analysis-card__actions">
+                        <?php if ($crCached): ?>
+                            <span class="ai-analysis-card__date" id="critical-review-date">
+                                Recenzja z <?= htmlspecialchars(substr((string) $crCached['generated_at'], 0, 10)) ?>
+                                <?php if (!empty($crCached['stale'])): ?>
+                                    <span style="color:var(--c-warn);font-weight:600;" title="Starsza niż 48h">· może być nieaktualna</span>
+                                <?php endif; ?>
+                            </span>
+                        <?php endif; ?>
+                        <?php if (!empty($canGenerateAi) && $crStatus !== 'pending'): ?>
+                            <button id="btn-critical-review" class="btn btn--primary btn--sm"
+                                    data-ticker="<?= htmlspecialchars($ticker) ?>">
+                                <?= $crCached ? 'Odśwież recenzję' : 'Recenzja krytyczna' ?>
+                            </button>
+                        <?php elseif (empty($canGenerateAi) && !$crCached): ?>
+                            <button id="btn-enter-pro-cr" class="btn btn--secondary btn--sm">
+                                Wprowadź kod PRO
+                            </button>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
+                <div id="critical-review-result" <?= $crCached ? '' : 'hidden' ?>>
+                    <?php if ($crCached): ?>
+                    <div class="ai-narrative">
+                        <?php
+                        $raw  = htmlspecialchars($crCached['content']);
+                        $html = preg_replace('/^## (\d+\. .+)$/m', '<h3 class="ai-narrative__section">$1</h3>', $raw);
+                        $html = preg_replace('/\n{2,}/', '</p><p>', $html ?? $raw);
+                        $html = str_replace("\n", '<br>', $html ?? $raw);
+                        echo '<p>' . $html . '</p>';
+                        ?>
+                    </div>
+                    <?php if (!empty($crCached['sources'])): ?>
+                    <div id="critical-review-sources" style="margin-top:.75rem;font-size:var(--text-sm);">
+                        <strong>Źródła:</strong>
+                        <ul style="margin:.35rem 0 0 1.1rem;">
+                            <?php foreach ($crCached['sources'] as $src): ?>
+                                <li><a href="<?= htmlspecialchars((string) ($src['url'] ?? '')) ?>" target="_blank" rel="noopener noreferrer">
+                                    <?= htmlspecialchars((string) ($src['title'] ?? $src['url'] ?? '')) ?>
+                                </a></li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </div>
+                    <?php else: ?>
+                    <div id="critical-review-sources" style="margin-top:.75rem;font-size:var(--text-sm);"></div>
+                    <?php endif; ?>
+                    <?php endif; ?>
+                </div>
+
+                <?php if ($crStatus === 'pending'): ?>
+                <p style="color:var(--c-muted);font-size:var(--text-sm);" id="critical-review-placeholder">
+                    Recenzja jest generowana w tle — strona sama się zaktualizuje (~2-4 min).
+                </p>
+                <?php elseif ($crStatus === 'failed' && !$crCached): ?>
+                <p style="color:var(--c-danger);font-size:var(--text-sm);" id="critical-review-placeholder">
+                    Poprzednia próba się nie powiodła. Spróbuj ponownie.
+                </p>
+                <?php elseif (!$crCached): ?>
+                <p style="color:var(--c-muted);font-size:var(--text-sm);" id="critical-review-placeholder">
+                    Kliknij „Recenzja krytyczna", aby sprawdzić świeże katalizatory i skonfrontować
+                    je z analizą powyżej.
+                </p>
+                <?php endif; ?>
+
+                <p class="disclaimer-inline" style="margin-top:.75rem;">
+                    Recenzja krytyczna to hipoteza modelu analitycznego, nie rekomendacja
+                    inwestycyjna. Inwestuj świadomie.
+                </p>
+            </div>
+            <?php endif; ?>
+
             <!-- PRO code activation modal -->
             <div id="pro-modal" class="ai-modal" hidden>
                 <div class="ai-modal__inner" style="max-width:360px;">
@@ -1343,6 +1436,178 @@
                         btn.className   = 'btn btn--sm ' + (d.enabled ? 'btn--secondary' : 'btn--ghost');
                     });
                 });
+
+                // ── Recenzja krytyczna (stage 2) — change: cvs-ai-critical-review ──
+                var crTicker         = <?= json_encode($ticker) ?>;
+                var crInitialStatus  = <?= json_encode($criticalReviewStatus ?? 'none') ?>;
+                var crCanGenerate    = <?= json_encode(!empty($canGenerateAi)) ?>;
+                var crResultEl       = document.getElementById('critical-review-result');
+                var crSourcesEl      = document.getElementById('critical-review-sources');
+                var crPlaceholderEl  = document.getElementById('critical-review-placeholder');
+                var crBtn            = document.getElementById('btn-critical-review');
+                var crPollTimer      = null;
+                var crStageTimer     = null;
+                var crPollStart      = null;
+                var crStageIdx       = 0;
+                var crStages = ['Przeszukuję newsy…', 'Konfrontuję z modelem…', 'Piszę recenzję…', 'Prawie gotowe…'];
+                var CR_MAX_WAIT_MS      = 5 * 60 * 1000;
+                var CR_POLL_INTERVAL_MS = 5000;
+
+                function crHandleClick() {
+                    if (crBtn) crBtn.disabled = true;
+                    fetch('/analysis/' + encodeURIComponent(crTicker) + '/critical-review', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type':     'application/x-www-form-urlencoded',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-Token':     csrf,
+                        },
+                        body: new URLSearchParams({ _csrf: csrf }),
+                    })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        if (data.ok) {
+                            crStartPolling();
+                        } else {
+                            if (crBtn) crBtn.disabled = false;
+                            crShowMessage(data.message || 'Nie udało się uruchomić generowania.', true);
+                        }
+                    })
+                    .catch(function () {
+                        if (crBtn) crBtn.disabled = false;
+                        crShowMessage('Błąd sieci. Sprawdź połączenie i spróbuj ponownie.', true);
+                    });
+                }
+
+                function crShowMessage(text, isError) {
+                    if (!crPlaceholderEl) {
+                        var container = document.getElementById('critical-review-result');
+                        if (!container || !container.parentNode) return;
+                        crPlaceholderEl = document.createElement('p');
+                        crPlaceholderEl.id = 'critical-review-placeholder';
+                        crPlaceholderEl.style.fontSize = 'var(--text-sm)';
+                        container.parentNode.insertBefore(crPlaceholderEl, container.nextSibling);
+                    }
+                    crPlaceholderEl.hidden = false;
+                    crPlaceholderEl.style.color = isError ? 'var(--c-danger)' : 'var(--c-muted)';
+                    crPlaceholderEl.textContent = text;
+                }
+
+                function crRenderCompleted(content, sources, generatedAt) {
+                    if (crResultEl) {
+                        var html = String(content)
+                            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                            .replace(/## (\d+\. .+)/g, '<h3 class="ai-narrative__section">$1</h3>')
+                            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                            .replace(/\n\n/g, '</p><p>')
+                            .replace(/\n/g, '<br>');
+                        crResultEl.innerHTML = '<div class="ai-narrative"><p>' + html + '</p></div>';
+                        crResultEl.hidden = false;
+                    }
+                    if (crSourcesEl && Array.isArray(sources) && sources.length) {
+                        var lis = sources.map(function (s) {
+                            var url   = String(s.url || '').replace(/"/g, '&quot;');
+                            var title = String(s.title || s.url || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                            return '<li><a href="' + url + '" target="_blank" rel="noopener noreferrer">' + title + '</a></li>';
+                        }).join('');
+                        crSourcesEl.innerHTML = '<strong>Źródła:</strong><ul style="margin:.35rem 0 0 1.1rem;">' + lis + '</ul>';
+                    }
+                    if (crPlaceholderEl) crPlaceholderEl.hidden = true;
+
+                    if (generatedAt) {
+                        var dateText = 'Recenzja z ' + String(generatedAt).substring(0, 10);
+                        var dateEl = document.getElementById('critical-review-date');
+                        if (dateEl) {
+                            dateEl.textContent = dateText;
+                        } else {
+                            var hdr = document.querySelector('#critical-review-section .ai-analysis-card__actions');
+                            if (hdr) {
+                                var span = document.createElement('span');
+                                span.className = 'ai-analysis-card__date';
+                                span.id = 'critical-review-date';
+                                span.textContent = dateText;
+                                hdr.prepend(span);
+                            }
+                        }
+                    }
+
+                    if (crBtn) {
+                        crBtn.textContent = 'Odśwież recenzję';
+                        crBtn.disabled = false;
+                        crBtn.hidden = false;
+                    } else if (crCanGenerate) {
+                        var actions = document.querySelector('#critical-review-section .ai-analysis-card__actions');
+                        if (actions) {
+                            crBtn = document.createElement('button');
+                            crBtn.id = 'btn-critical-review';
+                            crBtn.className = 'btn btn--primary btn--sm';
+                            crBtn.dataset.ticker = crTicker;
+                            crBtn.textContent = 'Odśwież recenzję';
+                            crBtn.addEventListener('click', crHandleClick);
+                            actions.appendChild(crBtn);
+                        }
+                    }
+                }
+
+                function crStopPolling() {
+                    if (crPollTimer) { clearInterval(crPollTimer); crPollTimer = null; }
+                    if (crStageTimer) { clearInterval(crStageTimer); crStageTimer = null; }
+                    if (crBtn) crBtn.disabled = false;
+                }
+
+                function crPoll() {
+                    if (Date.now() - crPollStart > CR_MAX_WAIT_MS) {
+                        crStopPolling();
+                        crShowMessage('Generowanie trwa dłużej niż zwykle — sprawdź ponownie za chwilę.', false);
+                        return;
+                    }
+                    fetch('/analysis/' + encodeURIComponent(crTicker) + '/critical-review/status', {
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        if (!data.ok) return;
+                        if (data.status === 'completed') {
+                            crStopPolling();
+                            crRenderCompleted(data.content, data.sources, data.generated_at);
+                        } else if (data.status === 'failed') {
+                            crStopPolling();
+                            crShowMessage(data.error_message || 'Recenzja się nie powiodła. Spróbuj ponownie.', true);
+                        }
+                        // 'pending' → keep polling silently.
+                    })
+                    .catch(function () { /* transient network hiccup — keep polling */ });
+                }
+
+                function crStartPolling() {
+                    crPollStart = Date.now();
+                    if (crBtn) crBtn.disabled = true;
+                    crStageIdx = 0;
+                    crShowMessage(crStages[0], false);
+                    crStageTimer = setInterval(function () {
+                        crStageIdx = (crStageIdx + 1) % crStages.length;
+                        crShowMessage(crStages[crStageIdx], false);
+                    }, 8000);
+                    crPollTimer = setInterval(crPoll, CR_POLL_INTERVAL_MS);
+                    crPoll();
+                }
+
+                if (crBtn) {
+                    crBtn.addEventListener('click', crHandleClick);
+                }
+
+                document.getElementById('btn-enter-pro-cr')?.addEventListener('click', function () {
+                    if (proErrEl) { proErrEl.style.display = 'none'; proErrEl.textContent = ''; }
+                    if (proInput) proInput.value = '';
+                    proModal.hidden = false;
+                    setTimeout(function () { if (proInput) proInput.focus(); }, 50);
+                });
+
+                // Tab was closed/reopened while a background job was still running —
+                // resume polling instead of leaving the page in a dead "pending" state.
+                if (crInitialStatus === 'pending') {
+                    crStartPolling();
+                }
             })();
             </script>
 

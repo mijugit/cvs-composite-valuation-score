@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CVS\CVS;
 
 use CVS\Ai\AiAnalysisRepository;
+use CVS\Ai\AiCriticalReviewRepository;
 use CVS\Alerts\AlertRepository;
 use CVS\Alerts\PriceAlertRepository;
 use CVS\Auth\AuthController;
@@ -215,6 +216,24 @@ class AnalysisController
         $translationRepo   = new TranslationRepository();
         $cachedDescriptionPl = $translationRepo->find($ticker, 'pl', 'long_description');
 
+        // Stage-2 "Recenzja krytyczna" (change: cvs-ai-critical-review) — server-side
+        // render of an already-completed review; pending/failed just drive the button
+        // label and (for pending) resume polling on page load without losing state.
+        $criticalReviewRow    = (new AiCriticalReviewRepository())->findByTicker($ticker);
+        $criticalReviewStatus = $criticalReviewRow['status'] ?? 'none';
+        $cachedCriticalReview = null;
+        if ($criticalReviewStatus === 'completed') {
+            $generatedAt = (string) ($criticalReviewRow['generated_at'] ?? '');
+            $generatedAtDt = $generatedAt !== '' ? DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $generatedAt) : false;
+            $sources = json_decode((string) ($criticalReviewRow['sources'] ?? '[]'), true);
+            $cachedCriticalReview = [
+                'content'      => (string) ($criticalReviewRow['content'] ?? ''),
+                'sources'      => is_array($sources) ? $sources : [],
+                'generated_at' => $generatedAt,
+                'stale'        => $generatedAtDt !== false ? $generatedAtDt < (new DateTimeImmutable())->modify('-48 hours') : true,
+            ];
+        }
+
         Response::view('analysis', [
             'ticker'               => $ticker,
             'result'               => $result->toArray(),
@@ -230,6 +249,8 @@ class AnalysisController
             'trajectory'           => $trajectory,           // Phase 8 slice 1 — CVS sparkline
             'execPlan'             => $execPlan,             // Phase 8 slice 2 — ATR entry zone + stops
             'priceAlertEnabled'    => $priceAlertEnabled,    // Phase 8 slice 3 — "price in zone" alert
+            'criticalReviewStatus' => $criticalReviewStatus, // change: cvs-ai-critical-review
+            'cachedCriticalReview' => $cachedCriticalReview, // change: cvs-ai-critical-review
             'error'                => null,
         ]);
     }
