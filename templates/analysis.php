@@ -1053,10 +1053,18 @@
                 </p>
                 <?php endif; ?>
 
-                <p class="disclaimer-inline" style="margin-top:.75rem;">
+                <?php if (!$crCached): ?>
+                <!-- Cached review content already ends with this exact disclaimer
+                     (mandated by the AiCriticalReviewService system prompt) — only
+                     show the static fallback when there's no AI text to carry it.
+                     Hidden client-side too once a fresh poll completes (see
+                     crRenderCompleted() below), so it's never shown alongside the
+                     AI's own disclaimer within the same page session. -->
+                <p class="disclaimer-inline" id="critical-review-disclaimer-fallback" style="margin-top:.75rem;">
                     Recenzja krytyczna to hipoteza modelu analitycznego, nie rekomendacja
                     inwestycyjna. Inwestuj świadomie.
                 </p>
+                <?php endif; ?>
             </div>
             <?php endif; ?>
 
@@ -1513,6 +1521,8 @@
                         crSourcesEl.innerHTML = '<strong>Źródła:</strong><ul style="margin:.35rem 0 0 1.1rem;">' + lis + '</ul>';
                     }
                     if (crPlaceholderEl) crPlaceholderEl.hidden = true;
+                    var crFallbackDisclaimer = document.getElementById('critical-review-disclaimer-fallback');
+                    if (crFallbackDisclaimer) crFallbackDisclaimer.hidden = true;
 
                     if (generatedAt) {
                         var dateText = 'Recenzja z ' + String(generatedAt).substring(0, 10);

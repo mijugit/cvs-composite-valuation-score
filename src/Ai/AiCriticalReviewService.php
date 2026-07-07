@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CVS\Ai;
 
+use DateTimeImmutable;
+
 /**
  * Builds the prompt and calls Claude API (web search enabled) to generate a
  * 4-section critical review of the existing stage-1 divergence analysis —
@@ -90,7 +92,18 @@ final class AiCriticalReviewService
 
     private function buildUserMessage(string $ticker, string $dataBlock, string $stage1Analysis): string
     {
+        $today = (new DateTimeImmutable())->format('Y-m-d');
+
         return <<<MSG
+TODAY'S DATE: {$today}
+
+This is your ONLY reference point for "recent". Your training data has its own
+cutoff and may describe a completely different point in time as "current" —
+do not use it to judge recency. Before presenting any dated fact, check its
+date against {$today}: if it is not within roughly the last 14 days, it is NOT
+a fresh catalyst — treat it as background context (or omit it) rather than
+presenting it as recent news.
+
 COMPANY UNDER REVIEW: {$ticker}
 
 {$dataBlock}
@@ -132,9 +145,22 @@ material events for this company in the last ~14 days, say so explicitly —
 do not invent or infer catalysts to fill space. A quiet news cycle is itself
 a useful, honest data point for the reader.
 
+DATE DISCIPLINE (MANDATORY): The user message states today's real date. Your
+own training data has a different, older cutoff and will "feel" current to
+you — it is not. A fact you recall from training (e.g. an earnings report,
+a guidance update) is NOT a fresh catalyst just because you don't have a
+newer memory to compare it to. Only present something as a "recent" or
+"świeży" catalyst if your web search actually returned it with a date within
+~14 days of today's stated date. Older facts belong in section 2 or 3 as
+background, clearly framed as such — never re-dated or implied to be current.
+
 ANTI-HALLUCINATION GUARDRAIL: Base your analysis only on the data block, the
 existing stage-1 analysis, and what your web search actually returns. If a
 data point is missing, acknowledge its absence rather than assuming a value.
+
+NO META-COMMENTARY (MANDATORY): Do not narrate your own process (e.g. "I'll
+search for...", "Mam wystarczające dane..."). Output ONLY the four sections
+below, starting directly with "## 1." — no preamble, no meta text before it.
 
 Structure your response in exactly these 4 sections using the exact headers
 below:

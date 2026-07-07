@@ -118,6 +118,42 @@ class AiCriticalReviewServiceTest extends TestCase
         $this->assertStringContainsString('Inwestuj świadomie', $systemText);
     }
 
+    /**
+     * Real-world bug (production, ticker MU, 2026-07-07): with no anchor for
+     * "today", the model presented training-era news (mid-2025) as being
+     * within the last 14 days. The user message must state the actual current
+     * date so the model has something concrete to check recency against.
+     */
+    public function test_user_message_includes_todays_date_anchor(): void
+    {
+        $transport = new FakeTransport([['status' => 200, 'body' => $this->okBody(), 'error' => null]]);
+        $client    = new ClaudeClient($this->config(), $transport);
+        $service   = $this->service($client);
+
+        $service->generate('MU', $this->cvsResult(), $this->financials(), 'x');
+
+        $sentBody = json_decode($transport->requests[0]['body'], true);
+        $userMsg  = $sentBody['messages'][0]['content'];
+
+        $today = (new \DateTimeImmutable())->format('Y-m-d');
+        $this->assertStringContainsString("TODAY'S DATE: {$today}", $userMsg);
+    }
+
+    public function test_system_prompt_contains_date_discipline_and_no_meta_commentary_guardrails(): void
+    {
+        $transport = new FakeTransport([['status' => 200, 'body' => $this->okBody(), 'error' => null]]);
+        $client    = new ClaudeClient($this->config(), $transport);
+        $service   = $this->service($client);
+
+        $service->generate('MU', $this->cvsResult(), $this->financials(), 'x');
+
+        $sentBody   = json_decode($transport->requests[0]['body'], true);
+        $systemText = $sentBody['system'][0]['text'];
+
+        $this->assertStringContainsString('DATE DISCIPLINE', $systemText);
+        $this->assertStringContainsString('NO META-COMMENTARY', $systemText);
+    }
+
     public function test_generate_surfaces_degraded_search_without_failing(): void
     {
         $body = (string) json_encode([
