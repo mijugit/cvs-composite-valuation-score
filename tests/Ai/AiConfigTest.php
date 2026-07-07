@@ -49,4 +49,27 @@ class AiConfigTest extends TestCase
         $this->assertSame('2023-06-01', $config['anthropic_version']);
         $this->assertStringContainsString('api.anthropic.com', (string) $config['base_url']);
     }
+
+    /**
+     * change: cvs-ai-critical-review — the background worker needs a much longer
+     * budget than the synchronous stage-1 flow (measured 138.8s live vs. ~20-25s
+     * defaults above). A production run without this override failed with a
+     * transport timeout; this locks the override's shape in place.
+     */
+    public function test_critical_review_timeout_override_present_and_larger_than_sync_defaults(): void
+    {
+        $config = $this->loadConfig();
+
+        $this->assertArrayHasKey('critical_review', $config);
+        $review = $config['critical_review'];
+
+        foreach (['timeout', 'total_timeout', 'max_retries'] as $key) {
+            $this->assertArrayHasKey($key, $review, "critical_review must define '$key'");
+            $this->assertIsInt($review[$key]);
+        }
+
+        $this->assertGreaterThan($config['timeout'], $review['timeout']);
+        $this->assertGreaterThan($config['total_timeout'], $review['total_timeout']);
+        $this->assertSame(0, $review['max_retries']);
+    }
 }

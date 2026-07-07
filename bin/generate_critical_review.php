@@ -122,8 +122,13 @@ try {
         ? AtrZoneCalculator::compute($financials['daily_ohlc'], (float) $financials['current_price'], $atrCfg)
         : null;
 
+    // The web-search-enabled call runs detached from any HTTP request lifecycle —
+    // override the client's timeout with the much larger budget config/ai.php
+    // reserves for it (measured 138.8s live; the synchronous defaults are ~20-25s).
+    $reviewAiConfig = array_merge($aiConfig, is_array($aiConfig['critical_review'] ?? null) ? $aiConfig['critical_review'] : []);
+
     $service = new AiCriticalReviewService(
-        ClaudeClientFactory::fromConfig($aiConfig),
+        ClaudeClientFactory::fromConfig($reviewAiConfig),
         new AiDivergenceService(ClaudeClientFactory::fromConfig($aiConfig))
     );
 
