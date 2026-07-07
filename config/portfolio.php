@@ -76,7 +76,7 @@ return [
     // Merged via array_merge($aiConfig, $portfolioConfig['llm']) in bin/portfolio-rebalance.php.
     'llm' => [
         'max_retries'         => 0,     // service-level retry owns the policy (DecisionService)
-        'max_tokens'          => 2048,
+        'max_tokens'          => 4096,
         'timeout'             => 45,    // per-attempt seconds (bumped: full-screener prompt is a long call)
         'total_timeout'       => 55,
         'retry_base_delay_ms' => 0,     // irrelevant at max_retries=0

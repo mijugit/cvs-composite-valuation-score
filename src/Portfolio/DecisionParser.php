@@ -29,6 +29,10 @@ final class DecisionParser
         $decoded = json_decode($clean, true);
 
         if (!is_array($decoded)) {
+            $decoded = $this->extractJsonArray($clean);
+        }
+
+        if (!is_array($decoded)) {
             throw new \InvalidArgumentException(
                 'LLM response is not a valid JSON array. JSON error: ' . json_last_error_msg() .
                 ' | First 200 chars: ' . substr($clean, 0, 200)
@@ -150,6 +154,50 @@ final class DecisionParser
             'price_usd' => $priceUsd,
             'reason'    => $reason,
         ];
+    }
+
+    /**
+     * Attempts to locate and decode a JSON array embedded in free-text.
+     *
+     * Handles: (a) LLM reasoning text before the JSON, (b) truncated JSON
+     * where max_tokens cut the response mid-object.
+     *
+     * @return array<mixed>|null
+     */
+    private function extractJsonArray(string $text): ?array
+    {
+        $start = strpos($text, '[');
+        if ($start === false) {
+            return null;
+        }
+
+        $end = strrpos($text, ']');
+
+        if ($end !== false && $end > $start) {
+            $candidate = substr($text, $start, $end - $start + 1);
+            $decoded   = json_decode($candidate, true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        // JSON likely truncated — find the last complete object `}` and close the array.
+        $fragment    = substr($text, $start);
+        $lastBrace   = strrpos($fragment, '}');
+
+        if ($lastBrace === false) {
+            return null;
+        }
+
+        $repaired = substr($fragment, 0, $lastBrace + 1) . ']';
+        $decoded  = json_decode($repaired, true);
+
+        if (is_array($decoded) && count($decoded) > 0) {
+            error_log('DecisionParser: recovered truncated JSON array (' . count($decoded) . ' items).');
+            return $decoded;
+        }
+
+        return null;
     }
 
     private function stripMarkdownFences(string $text): string

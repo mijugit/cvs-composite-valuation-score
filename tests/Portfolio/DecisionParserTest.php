@@ -193,4 +193,46 @@ class DecisionParserTest extends TestCase
         $this->assertSame('MSFT', $result[1]['ticker']);
         $this->assertSame('GOOG', $result[2]['ticker']);
     }
+
+    // --- Free-text preamble extraction ---
+
+    public function testExtractsJsonFromFreeTextPreamble(): void
+    {
+        $raw = "Najpierw przeanalizuję stan portfela...\n\n**SELL MU** bo stop-loss.\n\n"
+             . '[{"action":"SELL","ticker":"MU","quantity":1,"reason":"Stop-loss"},'
+             . '{"action":"HOLD","ticker":"AAPL","quantity":null,"reason":"OK"}]';
+
+        $result = $this->parser->parse($raw);
+
+        $this->assertCount(2, $result);
+        $this->assertSame('SELL', $result[0]['action']);
+        $this->assertSame('MU', $result[0]['ticker']);
+        $this->assertSame('HOLD', $result[1]['action']);
+    }
+
+    public function testRecoversTruncatedJsonArray(): void
+    {
+        $raw = '[{"action":"SELL","ticker":"MU","quantity":1,"reason":"Stop-loss"},'
+             . '{"action":"HOLD","ticker":"AAPL","quantity":null,"reason":"OK"},'
+             . '{"action":"HOLD","ticker":"GOOG","quantity":null,"reason":"Swing 65.20, waga 9.2';
+
+        $result = $this->parser->parse($raw);
+
+        $this->assertCount(2, $result);
+        $this->assertSame('MU', $result[0]['ticker']);
+        $this->assertSame('AAPL', $result[1]['ticker']);
+    }
+
+    public function testPreamblePlusTruncationCombined(): void
+    {
+        $raw = "Analiza sektorowa:\n- Tech: 40%\n\n"
+             . '[{"action":"BUY","ticker":"DELL","quantity":2,"reason":"Strong"},'
+             . '{"action":"HOLD","ticker":"NOW","quantity":null,"reason":"Swing 70.30, tru';
+
+        $result = $this->parser->parse($raw);
+
+        $this->assertCount(1, $result);
+        $this->assertSame('BUY', $result[0]['action']);
+        $this->assertSame('DELL', $result[0]['ticker']);
+    }
 }
