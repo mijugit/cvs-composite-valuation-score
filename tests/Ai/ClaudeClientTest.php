@@ -217,4 +217,173 @@ class ClaudeClientTest extends TestCase
 
         $this->assertStringContainsString('"max_tokens":1', $transport->requests[0]['body']);
     }
+
+    // ------------------------------------------------------------------
+    // Web search tool support (change: cvs-ai-critical-review, Phase 1)
+    // ------------------------------------------------------------------
+
+    /** @return list<array{type: string, name: string, max_uses: int}> */
+    private function webSearchTool(int $maxUses = 5): array
+    {
+        return [['type' => 'web_search_20260209', 'name' => 'web_search', 'max_uses' => $maxUses]];
+    }
+
+    public function test_tools_option_is_included_in_request_body_when_provided(): void
+    {
+        $transport = new FakeTransport([['status' => 200, 'body' => $this->okBody(), 'error' => null]]);
+        $client    = new ClaudeClient($this->config(), $transport);
+
+        $client->sendMessage($this->messages(), null, ['tools' => $this->webSearchTool()]);
+
+        $body = $transport->requests[0]['body'];
+        $this->assertStringContainsString('web_search_20260209', $body);
+        $this->assertStringContainsString('"max_uses":5', $body);
+    }
+
+    public function test_tools_key_absent_from_body_when_not_provided(): void
+    {
+        // Regression guard for etap 1 (AiDivergenceService never passes tools).
+        $transport = new FakeTransport([['status' => 200, 'body' => $this->okBody(), 'error' => null]]);
+        $client    = new ClaudeClient($this->config(), $transport);
+
+        $client->sendMessage($this->messages());
+
+        $this->assertStringNotContainsString('"tools"', $transport->requests[0]['body']);
+    }
+
+    public function test_multiple_text_blocks_are_concatenated_in_order_around_tool_blocks(): void
+    {
+        $body = (string) json_encode([
+            'content' => [
+                ['type' => 'text', 'text' => 'Szukam świeżych newsów.'],
+                ['type' => 'server_tool_use', 'id' => 'srvtool_1', 'name' => 'web_search', 'input' => ['query' => 'MU stock']],
+                ['type' => 'web_search_tool_result', 'tool_use_id' => 'srvtool_1', 'content' => [
+                    ['type' => 'web_search_result', 'url' => 'https://example.com/a', 'title' => 'Wynik A'],
+                ]],
+                ['type' => 'text', 'text' => 'Na podstawie wyników: spółka rośnie.'],
+            ],
+            'stop_reason' => 'end_turn',
+            'model'       => 'claude-test',
+            'usage'       => ['input_tokens' => 5, 'output_tokens' => 5],
+        ]);
+        $transport = new FakeTransport([['status' => 200, 'body' => $body, 'error' => null]]);
+        $client    = new ClaudeClient($this->config(), $transport);
+
+        $result = $client->sendMessage($this->messages(), null, ['tools' => $this->webSearchTool()]);
+
+        $this->assertTrue($result->ok);
+        $this->assertSame("Szukam świeżych newsów.\n\nNa podstawie wyników: spółka rośnie.", $result->text);
+        $this->assertFalse($result->searchDegraded);
+    }
+
+    public function test_citations_are_collected_and_deduplicated_by_url(): void
+    {
+        $body = (string) json_encode([
+            'content' => [
+                ['type' => 'text', 'text' => 'Fakt jeden.', 'citations' => [
+                    ['url' => 'https://example.com/a', 'title' => 'Źródło A'],
+                ]],
+                ['type' => 'text', 'text' => 'Fakt dwa, ten sam link.', 'citations' => [
+                    ['url' => 'https://example.com/a', 'title' => 'Źródło A'],
+                    ['url' => 'https://example.com/b', 'title' => 'Źródło B'],
+                ]],
+            ],
+            'stop_reason' => 'end_turn',
+            'model'       => 'claude-test',
+            'usage'       => ['input_tokens' => 5, 'output_tokens' => 5],
+        ]);
+        $transport = new FakeTransport([['status' => 200, 'body' => $body, 'error' => null]]);
+        $client    = new ClaudeClient($this->config(), $transport);
+
+        $result = $client->sendMessage($this->messages(), null, ['tools' => $this->webSearchTool()]);
+
+        $this->assertTrue($result->ok);
+        $this->assertCount(2, $result->citations, 'duplicate URL must be deduplicated');
+        $urls = array_column($result->citations, 'url');
+        $this->assertContains('https://example.com/a', $urls);
+        $this->assertContains('https://example.com/b', $urls);
+    }
+
+    public function test_web_search_error_shape_sets_search_degraded_without_failing_the_response(): void
+    {
+        // Error shape: web_search_tool_result.content is an associative error
+        // object (e.g. max_uses_exceeded), not a list of results — no
+        // exception, no non-2xx status, just this shape difference.
+        $body = (string) json_encode([
+            'content' => [
+                ['type' => 'server_tool_use', 'id' => 'srvtool_1', 'name' => 'web_search', 'input' => ['query' => 'x']],
+                ['type' => 'web_search_tool_result', 'tool_use_id' => 'srvtool_1', 'content' => [
+                    'type'       => 'web_search_tool_result_error',
+                    'error_code' => 'max_uses_exceeded',
+                ]],
+                ['type' => 'text', 'text' => 'Recenzja mimo ograniczonego wyszukiwania.'],
+            ],
+            'stop_reason' => 'end_turn',
+            'model'       => 'claude-test',
+            'usage'       => ['input_tokens' => 5, 'output_tokens' => 5],
+        ]);
+        $transport = new FakeTransport([['status' => 200, 'body' => $body, 'error' => null]]);
+        $client    = new ClaudeClient($this->config(), $transport);
+
+        $result = $client->sendMessage($this->messages(), null, ['tools' => $this->webSearchTool()]);
+
+        $this->assertTrue($result->ok, 'a degraded search must not fail the whole response');
+        $this->assertTrue($result->searchDegraded);
+        $this->assertSame('Recenzja mimo ograniczonego wyszukiwania.', $result->text);
+    }
+
+    public function test_pause_turn_continues_conversation_appending_assistant_content(): void
+    {
+        $firstContent = [
+            ['type' => 'text', 'text' => 'Zaczynam analizę…'],
+            ['type' => 'server_tool_use', 'id' => 'srvtool_1', 'name' => 'web_search', 'input' => ['query' => 'x']],
+        ];
+        $first = (string) json_encode([
+            'content'     => $firstContent,
+            'stop_reason' => 'pause_turn',
+            'model'       => 'claude-test',
+            'usage'       => ['input_tokens' => 5, 'output_tokens' => 5],
+        ]);
+        $second = $this->okBody('Dokończona recenzja.');
+
+        $transport = new FakeTransport([
+            ['status' => 200, 'body' => $first, 'error' => null],
+            ['status' => 200, 'body' => $second, 'error' => null],
+        ]);
+        $client = new ClaudeClient($this->config(), $transport);
+
+        $result = $client->sendMessage($this->messages(), null, ['tools' => $this->webSearchTool()]);
+
+        $this->assertTrue($result->ok);
+        $this->assertSame('Dokończona recenzja.', $result->text);
+        $this->assertSame('end_turn', $result->stopReason);
+        $this->assertCount(2, $transport->requests, 'must send exactly one continuation request');
+
+        $secondRequestBody = json_decode($transport->requests[1]['body'], true);
+        $lastMessage       = end($secondRequestBody['messages']);
+        $this->assertSame('assistant', $lastMessage['role']);
+        $this->assertSame($firstContent, $lastMessage['content'], 'continuation must resend the assistant content verbatim');
+    }
+
+    public function test_pause_turn_stops_after_max_continuations_and_returns_last_result(): void
+    {
+        $pausedBody = (string) json_encode([
+            'content'     => [['type' => 'text', 'text' => 'wciąż szukam…']],
+            'stop_reason' => 'pause_turn',
+            'model'       => 'claude-test',
+            'usage'       => ['input_tokens' => 5, 'output_tokens' => 5],
+        ]);
+        $transport = new FakeTransport([
+            ['status' => 200, 'body' => $pausedBody, 'error' => null],
+            ['status' => 200, 'body' => $pausedBody, 'error' => null],
+            ['status' => 200, 'body' => $pausedBody, 'error' => null],
+        ]);
+        $client = new ClaudeClient($this->config(), $transport);
+
+        $result = $client->sendMessage($this->messages(), null, ['tools' => $this->webSearchTool()]);
+
+        $this->assertTrue($result->ok, 'still a successfully parsed response, just capped');
+        $this->assertSame('pause_turn', $result->stopReason);
+        $this->assertCount(3, $transport->requests, '1 initial + 2 continuations, then stop');
+    }
 }

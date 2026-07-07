@@ -31,11 +31,14 @@ final class ClaudeClient
         private readonly HttpTransport $transport,
     ) {}
 
+    /** Hard cap on server-side pause_turn continuations per sendMessage() call. */
+    private const MAX_CONTINUATIONS = 2;
+
     /**
      * Send a Messages API request and return a typed result.
      *
-     * @param list<array{role: string, content: string}> $messages
-     * @param array<string, mixed>                        $options   e.g. ['max_tokens' => 1024]
+     * @param list<array{role: string, content: mixed}> $messages
+     * @param array<string, mixed>                        $options   e.g. ['max_tokens' => 1024, 'tools' => [...]]
      */
     public function sendMessage(array $messages, ?CacheableSystem $system = null, array $options = []): AiResult
     {
@@ -53,40 +56,62 @@ final class ClaudeClient
         $maxRetries = (int) ($this->config['max_retries'] ?? 2);
         $budget     = (float) ($this->config['total_timeout'] ?? 25);
         $baseDelay  = (int) ($this->config['retry_base_delay_ms'] ?? 500);
+        /** @var list<array<string, mixed>> $tools */
+        $tools      = is_array($options['tools'] ?? null) ? $options['tools'] : [];
 
-        $bodyJson = $this->buildBody($messages, $system, $model, $maxTokens);
-        if ($bodyJson === null) {
-            error_log('[Ai] failed to encode request body');
-            return AiResult::failure(AiFailureKind::BadResponse, 'Nie udało się zbudować żądania.');
-        }
         $headers = $this->buildHeaders($apiKey, $version, $system);
-
         $deadline = microtime(true) + $budget;
         $attempt  = 0;
+        $continuations   = 0;
+        $workingMessages = $messages;
 
         while (true) {
+            $bodyJson = $this->buildBody($workingMessages, $system, $model, $maxTokens, $tools);
+            if ($bodyJson === null) {
+                error_log('[Ai] failed to encode request body');
+                return AiResult::failure(AiFailureKind::BadResponse, 'Nie udało się zbudować żądania.');
+            }
+
             $resp = $this->transport->send($url, $bodyJson, $headers, $timeout);
-            [$result, $retryable] = $this->interpret($resp, $model);
+            [$result, $retryable, $rawContent] = $this->interpret($resp, $model);
 
-            if ($result->ok || !$retryable || $attempt >= $maxRetries) {
-                return $result;
+            if (!$result->ok) {
+                if (!$retryable || $attempt >= $maxRetries) {
+                    return $result;
+                }
+                $delaySeconds = ($baseDelay * (2 ** $attempt)) / 1000.0;
+                if (microtime(true) + $delaySeconds >= $deadline) {
+                    return $result; // no budget left for another attempt
+                }
+                if ($delaySeconds > 0.0) {
+                    usleep((int) ($delaySeconds * 1_000_000));
+                }
+                $attempt++;
+                continue;
             }
 
-            $delaySeconds = ($baseDelay * (2 ** $attempt)) / 1000.0;
-            if (microtime(true) + $delaySeconds >= $deadline) {
-                return $result; // no budget left for another attempt
+            // change: cvs-ai-critical-review — server-side tool loop paused after
+            // its iteration limit. Continue the conversation by appending the
+            // assistant's own (unmodified) content blocks, no new user message.
+            if ($result->stopReason === 'pause_turn'
+                && $continuations < self::MAX_CONTINUATIONS
+                && $rawContent !== null
+                && microtime(true) < $deadline
+            ) {
+                $continuations++;
+                $workingMessages[] = ['role' => 'assistant', 'content' => $rawContent];
+                continue;
             }
-            if ($delaySeconds > 0.0) {
-                usleep((int) ($delaySeconds * 1_000_000));
-            }
-            $attempt++;
+
+            return $result;
         }
     }
 
     /**
-     * @param list<array{role: string, content: string}> $messages
+     * @param list<array{role: string, content: mixed}> $messages
+     * @param list<array<string, mixed>>                 $tools
      */
-    private function buildBody(array $messages, ?CacheableSystem $system, string $model, int $maxTokens): ?string
+    private function buildBody(array $messages, ?CacheableSystem $system, string $model, int $maxTokens, array $tools = []): ?string
     {
         $body = [
             'model'      => $model,
@@ -100,6 +125,10 @@ final class ClaudeClient
                 'text'          => $system->text,
                 'cache_control' => ['type' => 'ephemeral', 'ttl' => $system->ttl],
             ]];
+        }
+
+        if ($tools !== []) {
+            $body['tools'] = $tools;
         }
 
         $json = json_encode($body);
@@ -126,10 +155,15 @@ final class ClaudeClient
     }
 
     /**
-     * Map a transport response to (AiResult, retryable).
+     * Map a transport response to (AiResult, retryable, raw content blocks).
+     *
+     * Raw content blocks (3rd element) are the exact, unmodified `content`
+     * array from a successful response — needed verbatim to continue a
+     * pause_turn conversation (change: cvs-ai-critical-review). Null on
+     * failure or when there's nothing to continue.
      *
      * @param array{status: int, body: string, error: string|null} $resp
-     * @return array{0: AiResult, 1: bool}
+     * @return array{0: AiResult, 1: bool, 2: list<array<string, mixed>>|null}
      */
     private function interpret(array $resp, string $model): array
     {
@@ -139,13 +173,13 @@ final class ClaudeClient
                 ? AiFailureKind::Timeout
                 : AiFailureKind::Network;
             error_log('[Ai] transport error: ' . $kind->value);
-            return [AiResult::failure($kind, $this->message($kind)), true];
+            return [AiResult::failure($kind, $this->message($kind)), true, null];
         }
 
         $status = $resp['status'];
 
         if ($status >= 200 && $status < 300) {
-            return [$this->parseSuccess($resp['body'], $model), false];
+            return $this->parseSuccess($resp['body'], $model);
         }
 
         $decoded  = json_decode($resp['body'], true);
@@ -165,43 +199,80 @@ final class ClaudeClient
         };
 
         error_log('[Ai] api error status=' . $status . ' kind=' . $mapped[0]->value);
-        return [AiResult::failure($mapped[0], $this->message($mapped[0])), $mapped[1]];
+        return [AiResult::failure($mapped[0], $this->message($mapped[0])), $mapped[1], null];
     }
 
-    private function parseSuccess(string $body, string $model): AiResult
+    /**
+     * @return array{0: AiResult, 1: bool, 2: list<array<string, mixed>>|null}
+     */
+    private function parseSuccess(string $body, string $model): array
     {
         $decoded = json_decode($body, true);
         if (!is_array($decoded)) {
             error_log('[Ai] non-JSON 2xx response');
-            return AiResult::failure(AiFailureKind::BadResponse, 'Nieprawidłowa odpowiedź modelu.');
+            return [AiResult::failure(AiFailureKind::BadResponse, 'Nieprawidłowa odpowiedź modelu.'), false, null];
         }
 
-        $text    = null;
         $content = $decoded['content'] ?? null;
-        if (is_array($content)) {
-            foreach ($content as $block) {
-                if (is_array($block)
-                    && ($block['type'] ?? null) === 'text'
-                    && isset($block['text'])
-                    && is_string($block['text'])
-                ) {
-                    $text = $block['text'];
-                    break;
+        if (!is_array($content)) {
+            error_log('[Ai] missing text content in response');
+            return [AiResult::failure(AiFailureKind::BadResponse, 'Pusta odpowiedź modelu.'), false, null];
+        }
+
+        // change: cvs-ai-critical-review — a web-search-enabled response can
+        // interleave text blocks with server_tool_use/web_search_tool_result
+        // blocks. Concatenate every text block (in order) instead of taking
+        // only the first, collect citations, and flag a degraded (but still
+        // completed) search rather than failing the whole response.
+        $textParts      = [];
+        $citationsByUrl = [];
+        $searchDegraded = false;
+
+        foreach ($content as $block) {
+            if (!is_array($block)) {
+                continue;
+            }
+            $type = $block['type'] ?? null;
+
+            if ($type === 'text' && isset($block['text']) && is_string($block['text'])) {
+                $textParts[] = $block['text'];
+                foreach ((is_array($block['citations'] ?? null) ? $block['citations'] : []) as $c) {
+                    if (is_array($c) && isset($c['url']) && is_string($c['url'])) {
+                        $citationsByUrl[$c['url']] = [
+                            'url'   => $c['url'],
+                            'title' => is_string($c['title'] ?? null) ? $c['title'] : $c['url'],
+                        ];
+                    }
+                }
+                continue;
+            }
+
+            if ($type === 'web_search_tool_result') {
+                // Success shape: 'content' is a LIST of result objects.
+                // Error shape: 'content' is a single associative error object
+                // (e.g. {"type": "web_search_tool_result_error", ...}) — no
+                // exception, no non-2xx status, just this shape difference.
+                $inner = $block['content'] ?? null;
+                if (is_array($inner) && !array_is_list($inner)) {
+                    $searchDegraded = true;
                 }
             }
         }
 
-        if ($text === null || $text === '') {
+        $text = implode("\n\n", $textParts);
+        if ($text === '') {
             error_log('[Ai] missing text content in response');
-            return AiResult::failure(AiFailureKind::BadResponse, 'Pusta odpowiedź modelu.');
+            return [AiResult::failure(AiFailureKind::BadResponse, 'Pusta odpowiedź modelu.'), false, null];
         }
 
-        $usageRaw    = $decoded['usage'] ?? null;
-        $usage       = is_array($usageRaw) ? AiUsage::fromApi($usageRaw) : new AiUsage(0, 0, 0, 0);
-        $stopReason  = is_string($decoded['stop_reason'] ?? null) ? $decoded['stop_reason'] : '';
-        $respModel   = is_string($decoded['model'] ?? null) ? $decoded['model'] : $model;
+        $usageRaw   = $decoded['usage'] ?? null;
+        $usage      = is_array($usageRaw) ? AiUsage::fromApi($usageRaw) : new AiUsage(0, 0, 0, 0);
+        $stopReason = is_string($decoded['stop_reason'] ?? null) ? $decoded['stop_reason'] : '';
+        $respModel  = is_string($decoded['model'] ?? null) ? $decoded['model'] : $model;
 
-        return AiResult::success($text, $usage, $stopReason, $respModel);
+        $result = AiResult::success($text, $usage, $stopReason, $respModel, array_values($citationsByUrl), $searchDegraded);
+
+        return [$result, false, $content];
     }
 
     private function message(AiFailureKind $kind): string

@@ -24,7 +24,23 @@ class AiResult
     public readonly ?AiFailureKind $failureKind;
     /** Human-readable failure detail (Polish where user-facing). Null on success. */
     public readonly ?string        $failureMessage;
+    /**
+     * Deduplicated web search citations, change: cvs-ai-critical-review.
+     * Empty for callers that never pass `tools` (etap 1 unaffected).
+     *
+     * @var list<array{url: string, title: string}>
+     */
+    public readonly array $citations;
+    /**
+     * True when a web search tool call degraded (e.g. max_uses_exceeded) but
+     * the response still completed — change: cvs-ai-critical-review. Always
+     * false for callers that never pass `tools`.
+     */
+    public readonly bool $searchDegraded;
 
+    /**
+     * @param list<array{url: string, title: string}> $citations
+     */
     private function __construct(
         bool           $ok,
         ?string        $text,
@@ -33,6 +49,8 @@ class AiResult
         ?string        $model,
         ?AiFailureKind $failureKind,
         ?string        $failureMessage,
+        array          $citations,
+        bool           $searchDegraded,
     ) {
         $this->ok             = $ok;
         $this->text           = $text;
@@ -41,17 +59,24 @@ class AiResult
         $this->model          = $model;
         $this->failureKind    = $failureKind;
         $this->failureMessage = $failureMessage;
+        $this->citations      = $citations;
+        $this->searchDegraded = $searchDegraded;
     }
 
     // ------------------------------------------------------------------
     // Named constructors
     // ------------------------------------------------------------------
 
+    /**
+     * @param list<array{url: string, title: string}> $citations
+     */
     public static function success(
         string  $text,
         AiUsage $usage,
         string  $stopReason,
         string  $model,
+        array   $citations = [],
+        bool    $searchDegraded = false,
     ): self {
         return new self(
             ok:             true,
@@ -61,6 +86,8 @@ class AiResult
             model:          $model,
             failureKind:    null,
             failureMessage: null,
+            citations:      $citations,
+            searchDegraded: $searchDegraded,
         );
     }
 
@@ -74,6 +101,8 @@ class AiResult
             model:          null,
             failureKind:    $kind,
             failureMessage: $message,
+            citations:      [],
+            searchDegraded: false,
         );
     }
 
@@ -96,6 +125,8 @@ class AiResult
             'model'           => $this->model,
             'failure_kind'    => $this->failureKind?->value,
             'failure_message' => $this->failureMessage,
+            'citations'       => $this->citations,
+            'search_degraded' => $this->searchDegraded,
         ];
     }
 }
