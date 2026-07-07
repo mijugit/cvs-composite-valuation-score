@@ -73,6 +73,24 @@ class ExportPromptBuilderTest extends TestCase
         $this->assertStringContainsString('Do NOT change', $result);
     }
 
+    // change: cvs-ai-critical-review lesson (Perplexity/MU: "46.2%" instead of
+    // "48.2%" despite the anchor rule already being present) — the anchor
+    // protects verdicts, not necessarily verbatim quoted figures. Applied here
+    // to the existing ExportPromptBuilder ahead of the not-yet-built critical
+    // review feature, since it's the exact same failure mode.
+
+    public function test_pl_output_contains_number_fidelity_guardrail(): void
+    {
+        $result = $this->builder->build('AAPL', 'Technology', $this->dataBlock(), $this->aiAnalysis(), 'pl');
+        $this->assertStringContainsString('przepisuj je dokładnie', $result);
+    }
+
+    public function test_en_output_contains_number_fidelity_guardrail(): void
+    {
+        $result = $this->builder->build('AAPL', 'Technology', $this->dataBlock(), $this->aiAnalysis(), 'en');
+        $this->assertStringContainsString('transcribe them exactly', $result);
+    }
+
     public function test_en_output_contains_disclaimer(): void
     {
         $result = $this->builder->build('AAPL', 'Technology', $this->dataBlock(), $this->aiAnalysis(), 'en');

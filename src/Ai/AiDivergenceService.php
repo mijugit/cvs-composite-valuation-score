@@ -238,6 +238,15 @@ SYSTEM;
         $lines[] = "- Momentum - Swing profile: {$pMomSwing}/100";
         $lines[] = "- Momentum - Fundamental profile: {$pMomFund}/100";
         $lines[] = "- Quality (gross margin, leverage, growth): {$pQual}/100";
+        // change: cvs-momentum-benchmark-per-market (2026-07-06) — the momentum
+        // benchmark is no longer always the US market (SPY); it's resolved per
+        // the ticker's home exchange (e.g. WIG20TR for .WA, KOSPI 200 for .KS).
+        // Both this internal prompt and the user-facing export prompt
+        // (ExportPromptBuilder, same data block) need this to interpret
+        // momentum correctly instead of silently assuming SPY.
+        $benchmarkLabel = (string) ($financials['benchmark_label'] ?? 'S&P 500');
+        $lines[] = "- Momentum benchmark: {$benchmarkLabel} (the company's home-market index/ETF,"
+            . ' not always the US market — do not assume S&P 500 unless this says so)';
         $lines[] = '';
         $lines[] = 'CVS MODEL IMPLIED FAIR VALUE (Sector-Parity Price):';
         if ($cvsFairPrice !== null) {

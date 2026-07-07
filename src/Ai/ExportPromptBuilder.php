@@ -62,6 +62,7 @@ ZASADA NADRZĘDNA (KOTWICA — OBOWIĄZKOWA)
 Liczby modelu CVS (score, filary, fair value) są DETERMINISTYCZNE i policzone z danych
 finansowych. NIE zmieniaj ich ani nie „przeliczaj" po swojemu. Możesz się z ich
 INTERPRETACJĄ nie zgadzać — ale wtedy powiedz to wprost i uzasadnij, zamiast podmieniać wynik.
+Cytując liczby z bloku danych, przepisuj je dokładnie — każda rozbieżność z kotwicą to błąd.
 
 ══════════════════════════════════════════════════════
 TWARDE DANE Z MODELU CVS — {$ticker} (SEKTOR: {$sector})
@@ -120,6 +121,8 @@ PRIME DIRECTIVE (ANCHOR — MANDATORY)
 The CVS model numbers (score, pillars, fair value) are DETERMINISTIC — computed from financial
 data. Do NOT change or "recalculate" them on your own. You MAY disagree with their
 INTERPRETATION — but then say so explicitly and justify it, rather than substituting the result.
+When quoting numbers from the data block, transcribe them exactly — any mismatch with the
+anchor is an error.
 
 ══════════════════════════════════════════════════════
 CVS MODEL HARD DATA — {$ticker} (SECTOR: {$sector})

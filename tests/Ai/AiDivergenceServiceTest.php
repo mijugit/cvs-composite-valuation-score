@@ -128,6 +128,46 @@ class AiDivergenceServiceTest extends TestCase
         $this->assertStringContainsString('78.0', $userMsg); // valuation pillar
     }
 
+    // change: cvs-momentum-benchmark-per-market follow-up (2026-07-07) — the
+    // AI prompt (and the user-facing export prompt, same data block) must
+    // disclose which index/ETF the Momentum pillar was actually benchmarked
+    // against, since it's no longer always SPY.
+
+    public function test_prompt_discloses_default_benchmark_when_financials_omit_it(): void
+    {
+        $transport = new FakeTransport([
+            ['status' => 200, 'body' => $this->okBody(), 'error' => null],
+        ]);
+        $service = new AiDivergenceService(new ClaudeClient($this->config(), $transport));
+
+        $service->generate('AAPL', $this->cvsResult(), $this->financials());
+
+        $sentBody = json_decode($transport->requests[0]['body'], true);
+        $userMsg  = $sentBody['messages'][0]['content'];
+
+        $this->assertStringContainsString('Momentum benchmark: S&P 500', $userMsg);
+    }
+
+    public function test_prompt_discloses_local_benchmark_for_non_us_ticker(): void
+    {
+        $transport = new FakeTransport([
+            ['status' => 200, 'body' => $this->okBody(), 'error' => null],
+        ]);
+        $service = new AiDivergenceService(new ClaudeClient($this->config(), $transport));
+
+        $financials = $this->financials();
+        $financials['benchmark_ticker'] = 'ETFBW20TR.WA';
+        $financials['benchmark_label']  = 'WIG20TR';
+
+        $service->generate('KGH.WA', $this->cvsResult(), $financials);
+
+        $sentBody = json_decode($transport->requests[0]['body'], true);
+        $userMsg  = $sentBody['messages'][0]['content'];
+
+        $this->assertStringContainsString('Momentum benchmark: WIG20TR', $userMsg);
+        $this->assertStringNotContainsString('Momentum benchmark: S&P 500', $userMsg);
+    }
+
     public function test_prompt_contains_analyst_data(): void
     {
         $transport = new FakeTransport([
