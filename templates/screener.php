@@ -79,12 +79,13 @@ $atrChip = static function (?string $state): string {
 $hint = static fn (string $text): string =>
     ' <span class="chart-hint" tabindex="0">&#9432;<span class="chart-hint__tooltip">' . $text . '</span></span>';
 
-// change: cvs-screener-trend — week-over-week CVS Swing trend chip.
-// null (insufficient history) renders as a dash, matching the analysis
-// page's has_trajectory=false empty state.
-$trendChip = static function (?float $delta): string {
+// change: cvs-screener-trend — CVS Swing trend chip, shared by the
+// day-over-day and week-over-week columns. null (insufficient history)
+// renders as a dash, matching the analysis page's has_trajectory=false empty
+// state. $emptyTitle/$title let the two callers customise the tooltip.
+$trendChip = static function (?float $delta, string $title, string $emptyTitle): string {
     if ($delta === null) {
-        return '<span style="color:var(--c-muted);" title="Za mało historii w oknie 90 dni">—</span>';
+        return '<span style="color:var(--c-muted);" title="' . htmlspecialchars($emptyTitle) . '">—</span>';
     }
     [$arrow, $color] = match (true) {
         $delta > 0  => ['↑', 'var(--c-success)'],
@@ -92,7 +93,7 @@ $trendChip = static function (?float $delta): string {
         default     => ['→', 'var(--c-muted)'],
     };
     $sign = $delta > 0 ? '+' : '';
-    return '<span style="color:' . $color . ';font-weight:600;" title="Zmiana CVS Swing względem ~7 dni temu">'
+    return '<span style="color:' . $color . ';font-weight:600;" title="' . htmlspecialchars($title) . '">'
         . $arrow . ' ' . $sign . number_format($delta, 1) . '</span>';
 };
 
@@ -251,6 +252,7 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
                 <th><?= $sortLink('ticker', 'Ticker') ?></th>
                 <th><?= $sortLink('swing', 'CVS Swing') . $hint('Złożony wynik 0–100 w horyzoncie swing (1–4 mies.). Wyżej = lepiej.') ?></th>
                 <th><?= $sortLink('fund',  'CVS Fund') . $hint('Złożony wynik 0–100 w horyzoncie fundamentalnym (6–12 mies.).') ?></th>
+                <th>Trend (d/d)<?= $hint('Zmiana CVS Swing względem poprzedniego rescore (zwykle poprzedni dzień roboczy). Bardziej zaszumiony niż w/w — pojedynczy dzień potrafi się cofnąć mimo trwałego trendu w górę, i odwrotnie.') ?></th>
                 <th>Trend (w/w)<?= $hint('Zmiana CVS Swing względem ~7 dni temu. Odróżnia spółki pnące się w górę od tych, które spadają — przy identycznym dzisiejszym wyniku kierunek dojścia bywa ważniejszy niż sam poziom.') ?></th>
                 <th>Rekomendacja<?= $hint('Etykieta od SILNE KUPUJ do UNIKAJ wynikająca z wyniku CVS Swing.') ?></th>
                 <th>Sygnał<?= $hint('Złoty sygnał: ⭐⭐ wartość + momentum, ⭐ obserwuj (setup fundamentalny), ↑ momentum.') ?></th>
@@ -292,7 +294,16 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
             </td>
             <td><strong style="color:var(--c-primary);"><?= $swing ?></strong></td>
             <td><strong style="color:var(--c-fund);"><?= $fund ?></strong></td>
-            <td><?= $trendChip($row['trend_delta_weekly'] ?? null) ?></td>
+            <td><?= $trendChip(
+                $row['trend_delta_daily'] ?? null,
+                'Zmiana CVS Swing względem poprzedniego rescore',
+                'Brak poprzedniego punktu rescore'
+            ) ?></td>
+            <td><?= $trendChip(
+                $row['trend_delta_weekly'] ?? null,
+                'Zmiana CVS Swing względem ~7 dni temu',
+                'Za mało historii w oknie 90 dni'
+            ) ?></td>
             <td style="font-size:var(--text-sm);<?= $recoColor ?>"><?= $reco ?></td>
             <td><?= $signalChip($row['golden_signal'] ?? null) ?></td>
             <td><?= $earningsChip(

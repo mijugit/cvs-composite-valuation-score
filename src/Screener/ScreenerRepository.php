@@ -109,6 +109,7 @@ class ScreenerRepository
 
             $summary = TrajectoryCalculator::summarise($trajectories[$ticker] ?? [], $minPoints);
             $row['trend_delta_weekly'] = $summary['delta_weekly'];
+            $row['trend_delta_daily']  = $summary['delta_daily'];
 
             $row['trend_near_boundary'] = $row['cvs_swing'] !== null
                 ? $this->isNearBoundary((float) $row['cvs_swing'], $this->thresholds, $boundaryMargin)

@@ -308,6 +308,29 @@ class ScreenerRepositoryTest extends TestCase
         $this->assertNull($byTicker['OLDHIST']);
     }
 
+    public function test_trend_delta_daily_computed_from_previous_snapshot(): void
+    {
+        $repo = $this->makeRepo(['window_days' => 90, 'min_points' => 2]);
+        $db   = $this->dbOf($repo);
+
+        $this->insertSnapshotOn($db, 'TREND', date('Y-m-d', strtotime('-1 day')), 70.0);
+        $this->insertSnapshotOn($db, 'TREND', date('Y-m-d'), 68.5);
+
+        $byTicker = array_column($repo->getFiltered(), 'trend_delta_daily', 'ticker');
+        $this->assertSame(-1.5, $byTicker['TREND']);
+    }
+
+    public function test_trend_delta_daily_null_when_insufficient_history(): void
+    {
+        $repo = $this->makeRepo(['window_days' => 90, 'min_points' => 2]);
+        $db   = $this->dbOf($repo);
+
+        $this->insertSnapshotOn($db, 'NEWTICKER', date('Y-m-d'), 60.0);
+
+        $byTicker = array_column($repo->getFiltered(), 'trend_delta_daily', 'ticker');
+        $this->assertNull($byTicker['NEWTICKER']);
+    }
+
     public function test_is_near_boundary_true_exactly_on_threshold(): void
     {
         $repo = $this->makeRepo([], ['strong_buy' => 72.0, 'accumulate' => 58.0, 'neutral' => 42.0, 'reduce' => 28.0]);
