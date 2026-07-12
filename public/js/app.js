@@ -912,7 +912,7 @@
                             {
                                 label: 'EV/Sales',
                                 data: d.ev_sales,
-                                yAxisID: 'y',
+                                yAxisID: 'y2',
                                 borderColor: 'rgba(250, 204, 21, 0.9)',
                                 backgroundColor: 'rgba(250, 204, 21, 0.1)',
                                 tension: 0.3,
@@ -936,7 +936,7 @@
                         scales: {
                             y: {
                                 position: 'left',
-                                title: { display: true, text: 'Mnożnik (×)' },
+                                title: { display: true, text: 'EV/FCF (×)' },
                             },
                             y1: {
                                 position: 'right',
@@ -944,6 +944,15 @@
                                 min: 0,
                                 max: 100,
                                 grid: { drawOnChartArea: false },
+                            },
+                            y2: {
+                                position: 'right',
+                                title: { display: true, text: 'EV/Sales (×)' },
+                                grid: { drawOnChartArea: false },
+                                // Separate scale from EV/FCF (y): sector medians for
+                                // EV/Sales run much smaller (e.g. ~8x vs ~32x for
+                                // Technology) — sharing one axis flattened the
+                                // EV/Sales line near zero and hid its own movement.
                             },
                         },
                     },
