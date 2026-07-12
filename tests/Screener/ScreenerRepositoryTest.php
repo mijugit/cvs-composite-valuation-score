@@ -31,6 +31,7 @@ class ScreenerRepositoryTest extends TestCase
                 golden_signal TEXT NULL, quality_gate INTEGER NOT NULL DEFAULT 0,
                 gate_failures TEXT NULL, pillar_scores TEXT NULL, signals TEXT NULL,
                 fx_rate_to_usd REAL NULL, native_currency TEXT NULL, native_price REAL NULL,
+                fair_value_price REAL NULL,
                 UNIQUE (ticker, score_date, model_version, origin)
             )
         ');
@@ -417,5 +418,69 @@ class ScreenerRepositoryTest extends TestCase
         // near_boundary=true AND sector=Technology → only the Technology one.
         $tickers = array_column($repo->getFiltered(null, null, 0, 'Technology', 'swing', null, true), 'ticker');
         $this->assertSame(['TECHNEAR'], $tickers);
+    }
+
+    // ------------------------------------------------------------------
+    // FV column (migration 031) — CVS Fair Value margin over price
+    // ------------------------------------------------------------------
+
+    private function insertWithFv(PDO $db, string $ticker, float $price, ?float $fairValue): void
+    {
+        $db->prepare('
+            INSERT INTO cvs_snapshots (ticker, score_date, price_at_snapshot, fair_value_price,
+                cvs_swing, cvs_fund, reco_swing, quality_gate, origin)
+            VALUES (?, date(\'now\'), ?, ?, 80.0, 70.0, \'SILNE KUPUJ\', 1, \'rescore\')
+        ')->execute([$ticker, $price, $fairValue]);
+    }
+
+    public function test_fv_margin_pct_positive_when_fair_value_above_price(): void
+    {
+        $repo = $this->makeRepo();
+        $this->insertWithFv($this->dbOf($repo), 'MU', 979.30, 1882.69);
+
+        $byTicker = array_column($repo->getFiltered(), 'fv_margin_pct', 'ticker');
+        $this->assertEqualsWithDelta(92.28, $byTicker['MU'], 0.1);
+    }
+
+    public function test_fv_margin_pct_negative_when_fair_value_below_price(): void
+    {
+        $repo = $this->makeRepo();
+        $this->insertWithFv($this->dbOf($repo), 'SNDK', 1915.92, 1273.73);
+
+        $byTicker = array_column($repo->getFiltered(), 'fv_margin_pct', 'ticker');
+        $this->assertEqualsWithDelta(-33.5, $byTicker['SNDK'], 0.1);
+    }
+
+    public function test_fv_margin_pct_null_when_fair_value_missing(): void
+    {
+        $repo = $this->makeRepo();
+        $this->insertWithFv($this->dbOf($repo), 'XTB', 34.19, null);
+
+        $byTicker = array_column($repo->getFiltered(), 'fv_margin_pct', 'ticker');
+        $this->assertNull($byTicker['XTB']);
+    }
+
+    public function test_fv_only_filter_keeps_only_positive_margin(): void
+    {
+        $repo = $this->makeRepo();
+        $db   = $this->dbOf($repo);
+        $this->insertWithFv($db, 'MU',   979.30, 1882.69);  // +92%
+        $this->insertWithFv($db, 'SNDK', 1915.92, 1273.73); // -33%
+        $this->insertWithFv($db, 'XTB',  34.19, null);      // unavailable
+
+        $tickers = array_column($repo->getFiltered(null, null, 0, null, 'swing', null, false, true), 'ticker');
+        $this->assertSame(['MU'], $tickers);
+    }
+
+    public function test_sort_by_fv_ranks_highest_margin_first(): void
+    {
+        $repo = $this->makeRepo();
+        $db   = $this->dbOf($repo);
+        $this->insertWithFv($db, 'SNDK', 1915.92, 1273.73); // -33%
+        $this->insertWithFv($db, 'MU',   979.30, 1882.69);  // +92%
+        $this->insertWithFv($db, 'XTB',  34.19, null);      // unavailable, sorts last
+
+        $tickers = array_column($repo->getFiltered(null, null, 0, null, 'fv'), 'ticker');
+        $this->assertSame(['MU', 'SNDK', 'XTB'], $tickers);
     }
 }

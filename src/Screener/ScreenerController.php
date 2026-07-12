@@ -17,7 +17,7 @@ class ScreenerController
 {
     private ScreenerRepository $repo;
 
-    private const VALID_SORTS = ['swing', 'fund', 'date', 'ticker', 'price', 'atr'];
+    private const VALID_SORTS = ['swing', 'fund', 'date', 'ticker', 'price', 'atr', 'fv'];
     private const VALID_ATR   = ['in_zone', 'above', 'below'];
 
     public function __construct()
@@ -51,13 +51,14 @@ class ScreenerController
             ? (string) $req->query('sort')
             : 'swing';
         $nearBoundary = $req->query('near_boundary') === '1';
+        $fvOnly       = $req->query('fv_only') === '1';
 
         // Treat empty string as null.
         $reco   = $reco   !== '' ? $reco   : null;
         $signal = $signal !== '' ? $signal : null;
         $sector = $sector !== '' ? $sector : null;
 
-        $rows      = $this->repo->getFiltered($reco, $signal, $minSwing, $sector, $sort, $atr, $nearBoundary);
+        $rows      = $this->repo->getFiltered($reco, $signal, $minSwing, $sector, $sort, $atr, $nearBoundary, $fvOnly);
         $lastScored = $this->repo->getLastScoredAt();
         $sectors   = $this->repo->getDistinctSectors();
 
@@ -76,6 +77,7 @@ class ScreenerController
             'filter_sector'    => $sector,
             'filter_atr'       => $atr,
             'filter_near_boundary' => $nearBoundary,
+            'filter_fv_only'   => $fvOnly,
             'sort'             => $sort,
             'heldTickersMap'   => $heldTickersMap,
         ]);

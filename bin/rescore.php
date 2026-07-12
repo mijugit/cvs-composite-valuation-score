@@ -58,6 +58,7 @@ $_SESSION = [];
 
 $config = require ROOT_PATH . '/config/cvs-weights.php';
 
+use CVS\Ai\FairPriceCalculator;
 use CVS\Alerts\AlertRepository;
 use CVS\Alerts\AlertService;
 use CVS\Alerts\PriceAlertRepository;
@@ -126,9 +127,14 @@ foreach ($tickers as $ticker) {
     $nativeCurrency = isset($financials['native_currency']) ? (string) $financials['native_currency'] : null;
     $nativePrice    = isset($financials['native_price'])   ? (float)  $financials['native_price']   : null;
 
+    // Screener FV column: same $financials already fetched above for scoring —
+    // zero extra Yahoo calls. Returns null when inputs are missing/out of the
+    // 0.05x-10x sanity band (FairPriceCalculator's own guard).
+    $fairValue = FairPriceCalculator::compute($financials, $config);
+
     // Base (4.0) + shadow (3.1/3.2) rows in one call — shadow mode (FR-016/FR-019).
     // FX fields propagate to every version row (same stock, same point in time).
-    $writer->persist($result, $price, $sector, $industry, CvsSnapshotRepository::ORIGIN_RESCORE, $companyName, $fxRateToUsd, $nativeCurrency, $nativePrice);
+    $writer->persist($result, $price, $sector, $industry, CvsSnapshotRepository::ORIGIN_RESCORE, $companyName, $fxRateToUsd, $nativeCurrency, $nativePrice, $fairValue);
 
     // Phase 8 (slice 3): cache the ATR entry zone per ticker (from already-fetched
     // daily OHLC — zero extra Yahoo calls) so the light price-alert cron can read it.

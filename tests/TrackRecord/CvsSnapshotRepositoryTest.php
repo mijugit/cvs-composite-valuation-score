@@ -51,6 +51,7 @@ class CvsSnapshotRepositoryTest extends TestCase
                 fx_rate_to_usd     REAL    NULL,
                 native_currency    TEXT    NULL,
                 native_price       REAL    NULL,
+                fair_value_price   REAL    NULL,
                 UNIQUE (ticker, score_date)
             )
         ');
@@ -477,6 +478,7 @@ class CvsSnapshotRepositoryTest extends TestCase
                 fx_rate_to_usd     REAL    NULL,
                 native_currency    TEXT    NULL,
                 native_price       REAL    NULL,
+                fair_value_price   REAL    NULL,
                 UNIQUE (ticker, score_date, model_version, origin)
             )
         ');

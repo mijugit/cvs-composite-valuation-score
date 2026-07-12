@@ -58,6 +58,9 @@ class CvsSnapshotRepository
      *                                              (calibration layer, Phase 7 slice 1)
      * @param string|null          $companyName     Yahoo Finance long name (FinancialDataFetcher
      *                                              'long_name'), for watchlist tooltip (migration 018)
+     * @param float|null           $fairValuePrice  CVS implied fair value (FairPriceCalculator::compute()),
+     *                                              same figure across every model-version row for a given
+     *                                              ticker-day — for the screener FV column (migration 031)
      */
     public function save(
         string  $ticker,
@@ -70,7 +73,8 @@ class CvsSnapshotRepository
         ?string $companyName     = null,
         ?float  $fxRateToUsd    = null,
         ?string $nativeCurrency  = null,
-        ?float  $nativePrice     = null
+        ?float  $nativePrice     = null,
+        ?float  $fairValuePrice  = null
     ): void {
         $scoreDate = (new DateTimeImmutable())->format('Y-m-d');
         $scoredAt  = (new DateTimeImmutable())->format('Y-m-d H:i:s');
@@ -117,6 +121,7 @@ class CvsSnapshotRepository
             ':fx_rate_to_usd'        => $fxRateToUsd,
             ':native_currency'       => $nativeCurrency,
             ':native_price'          => $nativePrice,
+            ':fair_value_price'      => $fairValuePrice,
         ];
 
         try {
@@ -126,13 +131,13 @@ class CvsSnapshotRepository
                      price_at_snapshot, cvs_swing, cvs_fund, reco_swing, reco_fund,
                      golden_signal, quality_gate, gate_failures, pillar_scores, signals,
                      days_since_earnings, days_to_earnings, earnings_state, earnings_guard_active,
-                     fx_rate_to_usd, native_currency, native_price)
+                     fx_rate_to_usd, native_currency, native_price, fair_value_price)
                 VALUES
                     (:ticker, :company_name, :sector, :industry, :model_version, :origin, :score_date, :scored_at,
                      :price_at_snapshot, :cvs_swing, :cvs_fund, :reco_swing, :reco_fund,
                      :golden_signal, :quality_gate, :gate_failures, :pillar_scores, :signals,
                      :days_since_earnings, :days_to_earnings, :earnings_state, :earnings_guard_active,
-                     :fx_rate_to_usd, :native_currency, :native_price)
+                     :fx_rate_to_usd, :native_currency, :native_price, :fair_value_price)
             ');
             $stmt->execute($params);
         } catch (PDOException $e) {
@@ -170,7 +175,8 @@ class CvsSnapshotRepository
                         earnings_guard_active = :earnings_guard_active,
                         fx_rate_to_usd        = :fx_rate_to_usd,
                         native_currency       = :native_currency,
-                        native_price          = :native_price
+                        native_price          = :native_price,
+                        fair_value_price      = :fair_value_price
                     WHERE ticker = :ticker AND score_date = :score_date
                       AND (model_version = :model_version_match
                            OR (model_version IS NULL AND :model_version_match_null IS NULL))

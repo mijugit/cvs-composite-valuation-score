@@ -59,7 +59,8 @@ class CvsSnapshotRepositoryFxTest extends TestCase
                 earnings_guard_active INTEGER NULL,
                 fx_rate_to_usd        REAL NULL,
                 native_currency       TEXT NULL,
-                native_price          REAL NULL
+                native_price          REAL NULL,
+                fair_value_price      REAL NULL
             )
         ');
 

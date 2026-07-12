@@ -72,6 +72,7 @@ class ScreenerRepository
      * @param string|null $sector   Exact sector match (null = all)
      * @param string      $sort     'swing'|'fund'|'date'
      * @param bool        $nearBoundary Only rows within trajectory.boundary_margin of a recommendation threshold
+     * @param bool        $fvOnly   Only rows where fair_value_price > price_at_snapshot (both non-null)
      * @return array<int, array<string, mixed>>
      */
     public function getFiltered(
@@ -81,7 +82,8 @@ class ScreenerRepository
         ?string $sector      = null,
         string  $sort        = 'swing',
         ?string $atr         = null,
-        bool    $nearBoundary = false
+        bool    $nearBoundary = false,
+        bool    $fvOnly      = false
     ): array {
         $rows = $this->findAllLatest();
 
@@ -114,6 +116,14 @@ class ScreenerRepository
             $row['trend_near_boundary'] = $row['cvs_swing'] !== null
                 ? $this->isNearBoundary((float) $row['cvs_swing'], $this->thresholds, $boundaryMargin)
                 : false;
+
+            // FV column (migration 031): margin of CVS Fair Value over the snapshot
+            // price, as a percentage. Null when either side is missing (pre-migration
+            // row, or FairPriceCalculator returned null for this ticker/day).
+            $fv = $row['fair_value_price'] ?? null;
+            $row['fv_margin_pct'] = ($fv !== null && $price !== null && (float) $price > 0)
+                ? (((float) $fv / (float) $price) - 1) * 100
+                : null;
         }
         unset($row);
 
@@ -156,6 +166,12 @@ class ScreenerRepository
             $rows = array_filter($rows, fn($r) => ($r['trend_near_boundary'] ?? false) === true);
         }
 
+        // Filter: Fair Value above price — the "trap check" from the CVS manual
+        // (identical headline signal, but only one side clears this bar).
+        if ($fvOnly) {
+            $rows = array_filter($rows, fn($r) => ($r['fv_margin_pct'] ?? null) !== null && $r['fv_margin_pct'] > 0);
+        }
+
         // Sort. ATR ranks by actionability for entries: in zone, then below, then above.
         $atrRank = static fn (?string $s): int => ['in_zone' => 0, 'below' => 1, 'above' => 2][$s] ?? 3;
         $rows = array_values($rows);
@@ -166,6 +182,7 @@ class ScreenerRepository
                 'ticker' => strcmp((string) ($a['ticker'] ?? ''), (string) ($b['ticker'] ?? '')),
                 'price'  => (float) ($b['price_at_snapshot'] ?? 0) <=> (float) ($a['price_at_snapshot'] ?? 0),
                 'atr'    => $atrRank($a['atr_state'] ?? null) <=> $atrRank($b['atr_state'] ?? null),
+                'fv'     => ($b['fv_margin_pct'] ?? -PHP_FLOAT_MAX) <=> ($a['fv_margin_pct'] ?? -PHP_FLOAT_MAX),
                 default  => (float) ($b['cvs_swing'] ?? 0) <=> (float) ($a['cvs_swing'] ?? 0),
             };
         });

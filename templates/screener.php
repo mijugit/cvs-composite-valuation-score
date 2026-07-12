@@ -8,6 +8,7 @@
 /** @var string|null $filter_sector */
 /** @var string|null $filter_atr */
 /** @var bool $filter_near_boundary */
+/** @var bool $filter_fv_only */
 /** @var string $sort */
 /** @var array<string, true> $heldTickersMap */
 
@@ -27,7 +28,7 @@ $signalLabels = [
 ];
 
 // Helper: sort link with arrow indicator
-$sortLink = static function (string $col, string $label) use ($sort, $filter_reco, $filter_signal, $filter_min_swing, $filter_sector, $filter_atr, $filter_near_boundary): string {
+$sortLink = static function (string $col, string $label) use ($sort, $filter_reco, $filter_signal, $filter_min_swing, $filter_sector, $filter_atr, $filter_near_boundary, $filter_fv_only): string {
     $arrow = $col === $sort ? ' ↓' : '';
     $params = http_build_query(array_filter([
         'reco'          => $filter_reco,
@@ -36,6 +37,7 @@ $sortLink = static function (string $col, string $label) use ($sort, $filter_rec
         'sector'        => $filter_sector,
         'atr'           => $filter_atr,
         'near_boundary' => $filter_near_boundary ? '1' : null,
+        'fv_only'       => $filter_fv_only ? '1' : null,
         'sort'          => $col,
     ], fn($v) => $v !== null && $v !== ''));
     return '<a href="/screener?' . $params . '" style="color:inherit;text-decoration:none;">'
@@ -73,6 +75,23 @@ $atrChip = static function (?string $state): string {
         'below'   => '<span class="signal-pill" style="background:rgba(239,68,68,.15);color:var(--c-danger,#ef4444);" title="Cena poniżej strefy akumulacji (poniżej wsparcia)">↓ poniżej</span>',
         default   => '<span style="color:var(--c-muted);" title="Brak danych strefy ATR dla tej spółki">—</span>',
     };
+};
+
+// FV column: CVS Fair Value margin over price, as a signed percentage.
+// Same colour convention as $trendChip. Null (pre-migration row, sector where
+// FairPriceCalculator can't produce a number, e.g. Financial Services) → dash,
+// same "model has no opinion here" convention as $atrChip's default branch.
+$fvChip = static function (?float $marginPct): string {
+    if ($marginPct === null) {
+        return '<span style="color:var(--c-muted);" title="Fair Value niedostępne dla tej spółki (brak danych lub sektor słabo mierzony przez EV/FCF)">—</span>';
+    }
+    $color = $marginPct > 0 ? 'var(--c-success)' : 'var(--c-danger)';
+    $sign  = $marginPct > 0 ? '+' : '';
+    $title = $marginPct > 0
+        ? 'CVS Fair Value powyżej ceny — model widzi margines bezpieczeństwa'
+        : 'CVS Fair Value poniżej ceny mimo rekomendacji — sprawdź filar Wyceny i Jakości przed decyzją';
+    return '<span style="color:' . $color . ';font-weight:600;" title="' . htmlspecialchars($title) . '">'
+        . $sign . number_format($marginPct, 0) . '%</span>';
 };
 
 // Helper: column-header info hint (ⓘ tooltip), reusing the .chart-hint pattern.
@@ -232,6 +251,13 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
             </label>
         </div>
 
+        <div class="form-group" style="margin:0;display:flex;align-items:center;gap:.4rem;">
+            <label style="font-size:var(--text-xs);display:flex;align-items:center;gap:.35rem;cursor:pointer;">
+                <input type="checkbox" name="fv_only" value="1" <?= $filter_fv_only ? 'checked' : '' ?>>
+                Tylko FV &gt; cena
+            </label>
+        </div>
+
         <input type="hidden" name="sort" value="<?= htmlspecialchars($sort) ?>">
 
         <div style="display:flex;gap:.4rem;">
@@ -270,6 +296,7 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
                 <th>Sygnał<?= $hint('Złoty sygnał: ⭐⭐ wartość + momentum, ⭐ obserwuj (setup fundamentalny), ↑ momentum.') ?></th>
                 <th>Wyniki<?= $hint('Bliskość publikacji wyników kwartalnych (📅 za N dni / w oknie / N dni temu).') ?></th>
                 <th><?= $sortLink('atr', 'ATR') . $hint('Pozycja ceny względem strefy akumulacji ATR: ✓ w strefie kupna, ↑ powyżej (czekaj na cofnięcie), ↓ poniżej (pod wsparciem). Sortowanie: najpierw w strefie, potem poniżej, potem powyżej.') ?></th>
+                <th><?= $sortLink('fv', 'FV') . $hint('Margines implikowanej wartości godziwej CVS (Fair Value) nad lub pod bieżącą ceną. Dodatni = model widzi margines bezpieczeństwa. Ujemny mimo dobrej rekomendacji = sygnał ciągnięty głównie przez momentum, nie przez wycenę — sprawdź kartę spółki przed decyzją.') ?></th>
                 <th><?= $sortLink('price', 'Cena') ?></th>
             </tr>
         </thead>
@@ -320,6 +347,7 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
                 isset($row['days_since_earnings']) ? (int) $row['days_since_earnings'] : null
             ) ?></td>
             <td><?= $atrChip($row['atr_state'] ?? null) ?></td>
+            <td><?= $fvChip(isset($row['fv_margin_pct']) ? (float) $row['fv_margin_pct'] : null) ?></td>
             <td style="font-size:var(--text-sm);"><?= $price ?></td>
         </tr>
         <?php endforeach; ?>

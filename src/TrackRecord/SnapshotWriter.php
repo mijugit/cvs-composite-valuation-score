@@ -42,6 +42,8 @@ class SnapshotWriter
      * @param string      $origin      CvsSnapshotRepository::ORIGIN_RESCORE | ORIGIN_CORPUS
      * @param string|null $companyName Yahoo Finance long name (FinancialDataFetcher 'long_name'),
      *                                  for watchlist tooltip (migration 018)
+     * @param float|null  $fairValuePrice CVS implied fair value (FairPriceCalculator::compute()) —
+     *                                  same figure for every version row of this ticker-day (migration 031)
      */
     public function persist(
         CVSResult $result,
@@ -52,7 +54,8 @@ class SnapshotWriter
         ?string   $companyName    = null,
         ?float    $fxRateToUsd   = null,
         ?string   $nativeCurrency = null,
-        ?float    $nativePrice    = null
+        ?float    $nativePrice    = null,
+        ?float    $fairValuePrice = null
     ): int {
         $resultArray  = $result->toArray();
         $modelVersion = $result->modelVersion !== '' ? $result->modelVersion : null;
@@ -65,7 +68,7 @@ class SnapshotWriter
             $resultArray['signals'] = $rawSignals;
         }
 
-        $this->repo->save($result->ticker, $resultArray, $price, $sector, $industry, $modelVersion, $origin, $companyName, $fxRateToUsd, $nativeCurrency, $nativePrice);
+        $this->repo->save($result->ticker, $resultArray, $price, $sector, $industry, $modelVersion, $origin, $companyName, $fxRateToUsd, $nativeCurrency, $nativePrice, $fairValuePrice);
         $written = 1;
 
         // Fan out over the full shadows[] list (3.1 + 3.2 today) instead of the
@@ -86,7 +89,8 @@ class SnapshotWriter
                 $companyName,
                 $fxRateToUsd,
                 $nativeCurrency,
-                $nativePrice
+                $nativePrice,
+                $fairValuePrice
             );
             $written++;
         }
