@@ -1180,8 +1180,15 @@
         modal.hidden = false;
         destroyZoomChart();
 
-        const zoomData    = cloneForChart(srcChart.data);
-        const zoomOptions = cloneForChart(srcChart.options);
+        // srcChart.data/.options are Chart.js's LIVE resolved view for this
+        // specific instance (options in particular is backed by an internal
+        // scriptable-option resolver) — merely reading through them again for
+        // a second instance is what threw "t.startsWith is not a function"
+        // deep in Chart.js internals. srcChart.config.data/.options is the
+        // original plain config object passed into `new Chart()`, unresolved
+        // and safe to clone.
+        const zoomData    = cloneForChart(srcChart.config.data);
+        const zoomOptions = cloneForChart(srcChart.config.options);
         zoomOptions.responsive = true;
         zoomOptions.animation = false;
         // Radar keeps its aspect ratio (a stretched triangle looks wrong);
