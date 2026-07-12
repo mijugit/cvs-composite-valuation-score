@@ -1194,6 +1194,17 @@
         // Radar keeps its aspect ratio (a stretched triangle looks wrong);
         // line charts (price/trajectory) fill the modal's rectangular canvas.
         zoomOptions.maintainAspectRatio = srcChart.config.type === 'radar';
+        // The small radar hides Chart.js's legend and relies on the external
+        // .detail-radar-legend HTML instead (not present in the modal) — turn
+        // the built-in legend on here so Swing/Fundamentalny are still labelled.
+        if (srcChart.config.type === 'radar') {
+            zoomOptions.plugins = zoomOptions.plugins || {};
+            zoomOptions.plugins.legend = Object.assign({}, zoomOptions.plugins.legend, {
+                display: true,
+                position: 'top',
+                labels: { color: 'rgba(255,255,255,0.75)' },
+            });
+        }
 
         new Chart(canvas.getContext('2d'), {
             type: srcChart.config.type,
