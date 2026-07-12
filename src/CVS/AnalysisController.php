@@ -203,9 +203,19 @@ class AnalysisController
         $aiRepo      = new AiAnalysisRepository();
         $freshDays   = (int) ($aiConfig['pro']['cache_fresh_days']  ?? 7);
         $minHours    = (int) ($aiConfig['pro']['refresh_min_hours'] ?? 24);
-        $cachedAi    = $aiRepo->isFresh($ticker, $freshDays) ? $aiRepo->findByTicker($ticker) : null;
+        // Analyses never disappear once generated — only get flagged stale past
+        // cache_fresh_days (mirrors the stage-2 critical-review 'stale' flag
+        // below, which already gets this right). Previously this nulled out
+        // $cachedAi entirely once stale, making the whole card — and, since
+        // the critical-review section is gated on $cachedAi, that card too —
+        // revert to "never generated" instead of showing old content with a
+        // staleness badge.
+        $cachedAiRow = $aiRepo->findByTicker($ticker);
+        $cachedAi    = $cachedAiRow !== null
+            ? $cachedAiRow + ['stale' => !$aiRepo->isFresh($ticker, $freshDays)]
+            : null;
         $aiCanRefresh = $gate->canGenerate($userId)
-            && $aiRepo->findByTicker($ticker) !== null
+            && $cachedAiRow !== null
             && $aiRepo->needsRefresh($ticker, $minHours);
 
         $alertRepo          = new AlertRepository();

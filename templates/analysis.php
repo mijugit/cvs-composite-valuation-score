@@ -941,6 +941,9 @@
                         <?php if (!empty($cachedAi)): ?>
                             <span class="ai-analysis-card__date">
                                 Analiza z <?= htmlspecialchars(substr((string) $cachedAi['generated_at'], 0, 10)) ?>
+                                <?php if (!empty($cachedAi['stale'])): ?>
+                                    <span style="color:var(--c-warn);font-weight:600;" title="Starsza niż tydzień">· może być nieaktualna</span>
+                                <?php endif; ?>
                             </span>
                             <button id="btn-share-prompt" class="btn btn--ghost btn--sm"
                                     data-ticker="<?= htmlspecialchars($ticker) ?>"
@@ -1236,20 +1239,30 @@
                         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
                         .replace(/\n\n/g, '</p><p>')
                         .replace(/\n/g, '<br>');
+                    // "Share for your LLM" and the whole Recenzja krytyczna card
+                    // are only server-rendered when a cached analysis already
+                    // existed at page load — on a ticker's first-ever generation
+                    // neither is in the DOM at all, and no amount of DOM
+                    // patching here reveals them. Reload once to pick up the
+                    // now-populated server state (same "state changed server-
+                    // side → reload" pattern already used after PRO activation
+                    // below) instead of hand-duplicating that markup in JS.
+                    if (!document.getElementById('btn-share-prompt') || !document.getElementById('critical-review-section')) {
+                        window.location.reload();
+                        return;
+                    }
+
                     resultEl.innerHTML = '<p>' + html + '</p>';
                     resultEl.hidden = false;
                     if (placeholder) placeholder.hidden = true;
 
-                    // Show generated date and hide generate button
+                    // Refresh of an existing analysis: update the date in place —
+                    // this also clears any "może być nieaktualna" staleness badge
+                    // (nested inside the same span), since a fresh regeneration
+                    // is never stale.
                     var dateEl = document.querySelector('.ai-analysis-card__date');
-                    if (!dateEl && generatedAt) {
-                        var hdr = document.querySelector('.ai-analysis-card__actions');
-                        if (hdr) {
-                            var span = document.createElement('span');
-                            span.className = 'ai-analysis-card__date';
-                            span.textContent = 'Analiza z ' + generatedAt.substring(0, 10);
-                            hdr.prepend(span);
-                        }
+                    if (dateEl && generatedAt) {
+                        dateEl.textContent = 'Analiza z ' + generatedAt.substring(0, 10);
                     }
                     var btnGen = document.getElementById('btn-generate-ai');
                     if (btnGen) btnGen.hidden = true;
