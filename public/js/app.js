@@ -932,7 +932,11 @@
                     options: {
                         responsive: true,
                         interaction: { mode: 'index', intersect: false },
-                        plugins: { legend: { display: true } },
+                        // Native canvas legend replaced by the HTML legend row in the
+                        // modal (templates/admin/sectors.php #sector-history-legend) —
+                        // lets each series carry a .chart-hint tooltip, which a
+                        // Chart.js-drawn canvas legend can't host.
+                        plugins: { legend: { display: false } },
                         scales: {
                             y: {
                                 position: 'left',
