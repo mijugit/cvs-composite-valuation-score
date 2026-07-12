@@ -1154,7 +1154,16 @@
         if (Array.isArray(value)) return value.map(cloneForChart);
         if (value !== null && typeof value === 'object' && value.constructor === Object) {
             const out = {};
-            for (const k in value) out[k] = cloneForChart(value[k]);
+            for (const k in value) {
+                // Chart.js stamps internal per-instance bookkeeping onto dataset/
+                // option objects after construction (e.g. `_meta`, keyed by chart
+                // id) — cloning that alongside the real config carried over stale
+                // per-instance state and broke the new chart ("t.startsWith is
+                // not a function" deep in Chart.js internals). Only clone the
+                // config a caller actually wrote.
+                if (k.charAt(0) === '_') continue;
+                out[k] = cloneForChart(value[k]);
+            }
             return out;
         }
         return value;
