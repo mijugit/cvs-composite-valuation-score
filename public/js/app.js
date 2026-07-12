@@ -1190,7 +1190,14 @@
         const zoomData    = cloneForChart(srcChart.config.data);
         const zoomOptions = cloneForChart(srcChart.config.options);
         zoomOptions.responsive = true;
-        zoomOptions.animation = false;
+        // Small charts disable animation (several render at once on page
+        // load — no flourish worth the flicker). The zoom modal only ever
+        // builds one chart at a time, on a deliberate user click — a nice
+        // spot for Chart.js's default "grow in from zero" reveal (radar
+        // points expand from centre, lines draw left-to-right). Replays
+        // every time the modal opens, since it's a fresh Chart instance
+        // each time (see destroyZoomChart() above).
+        zoomOptions.animation = { duration: 800, easing: 'easeOutQuart' };
         // Radar keeps its aspect ratio (a stretched triangle looks wrong);
         // line charts (price/trajectory) fill the modal's rectangular canvas.
         zoomOptions.maintainAspectRatio = srcChart.config.type === 'radar';
