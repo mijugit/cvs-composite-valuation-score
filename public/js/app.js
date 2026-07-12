@@ -1104,4 +1104,85 @@
     window.addEventListener('scroll', hide, true);
 }());
 
+// ------------------------------------------------------------------
+// Analysis page — chart zoom modal (desktop only)
+// ------------------------------------------------------------------
+// Radar / price / trajectory charts render small on the analysis page.
+// Clicking one re-renders the SAME Chart.js instance's data/options at a
+// much larger size in a modal — an accessibility nicety, not a new chart.
+// Desktop only, on purpose: reliably closing a full-screen modal on small
+// viewports is its own unsolved problem elsewhere in this app, so the
+// interaction is simply never offered below the 768px breakpoint (matches
+// .chart-zoom-target's cursor/hint-icon media query in app.css).
+
+(function () {
+    'use strict';
+
+    const targets = document.querySelectorAll('.chart-zoom-target');
+    if (!targets.length) return;
+
+    const modal    = document.getElementById('chart-zoom-modal');
+    const titleEl  = document.getElementById('chart-zoom-title');
+    const canvas   = document.getElementById('chart-zoom-canvas');
+    const closeBtn = document.getElementById('chart-zoom-close');
+    if (!modal || !canvas) return;
+
+    const isMobile = () => window.matchMedia('(max-width: 768px)').matches;
+
+    function destroyZoomChart() {
+        const existing = typeof Chart !== 'undefined' ? Chart.getChart(canvas) : null;
+        if (existing) existing.destroy();
+    }
+
+    function openZoom(sourceId, title) {
+        if (typeof Chart === 'undefined') return;
+        const srcCanvas = document.getElementById(sourceId);
+        if (!srcCanvas) return;
+        const srcChart = Chart.getChart(srcCanvas);
+        if (!srcChart) return; // chart hasn't rendered yet (or failed) — nothing to zoom
+
+        titleEl.textContent = title || '—';
+        modal.hidden = false;
+        destroyZoomChart();
+
+        // Reuse the live chart's data/options by reference — Chart.js keys its
+        // internal per-dataset cache by chart id, so the same dataset arrays
+        // safely back a second, independent instance. Only shallow-copy so we
+        // can flip top-level sizing flags without mutating the small chart's
+        // own config (nested scales/plugins — including tooltip callbacks —
+        // stay shared, which is fine since we never write into them).
+        const zoomOptions = Object.assign({}, srcChart.options);
+        zoomOptions.responsive = true;
+        zoomOptions.animation = false;
+        // Radar keeps its aspect ratio (a stretched triangle looks wrong);
+        // line charts (price/trajectory) fill the modal's rectangular canvas.
+        zoomOptions.maintainAspectRatio = srcChart.config.type === 'radar';
+
+        new Chart(canvas.getContext('2d'), {
+            type: srcChart.config.type,
+            data: srcChart.data,
+            options: zoomOptions,
+        });
+    }
+
+    function closeZoom() {
+        modal.hidden = true;
+        destroyZoomChart();
+    }
+
+    targets.forEach(target => {
+        target.addEventListener('click', e => {
+            if (isMobile()) return;
+            if (e.target.closest('a, .chart-hint')) return; // let links/hints work normally
+            const sourceId = target.dataset.zoomCanvas;
+            const title    = target.dataset.zoomTitle;
+            if (sourceId) openZoom(sourceId, title);
+        });
+    });
+
+    closeBtn?.addEventListener('click', closeZoom);
+    modal.addEventListener('click', e => { if (e.target === modal) closeZoom(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.hidden) closeZoom(); });
+}());
+
 })();

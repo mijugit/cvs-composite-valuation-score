@@ -601,6 +601,35 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
 }
 .detail-radar-legend  { font-size: var(--text-xs); color: var(--c-muted); margin-top: .5rem; }
 
+/* Chart zoom affordance (desktop only — public/js/app.js wires the click
+   handler only above the 768px breakpoint; the hint icon is hidden below it
+   too, so mobile never shows an interaction it won't offer). */
+.chart-zoom-target { position: relative; cursor: zoom-in; }
+.chart-zoom-target__hint {
+    position: absolute;
+    top: .4rem;
+    right: .4rem;
+    width: 1.6rem;
+    height: 1.6rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--text-sm);
+    line-height: 1;
+    background: rgba(7, 16, 30, .55);
+    border-radius: 50%;
+    opacity: 0;
+    transition: opacity .15s;
+    pointer-events: none;
+}
+.chart-zoom-target:hover .chart-zoom-target__hint,
+.chart-zoom-target:focus-within .chart-zoom-target__hint { opacity: .85; }
+
+@media (max-width: 768px) {
+    .chart-zoom-target { cursor: default; }
+    .chart-zoom-target__hint { display: none; }
+}
+
 /* --- Chart hint tooltip ----------------------------------- */
 .chart-hint {
     position: relative;
@@ -801,6 +830,18 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
     text-align: center;
     max-width: 320px;
     box-shadow: var(--shadow-lg);
+}
+
+.chart-zoom-modal__inner {
+    max-width: min(900px, 92vw);
+    width: 100%;
+    padding: 1.5rem 1.75rem;
+    text-align: left;
+}
+.chart-zoom-modal__canvas-wrap {
+    position: relative;
+    width: 100%;
+    height: min(65vh, 520px);
 }
 
 .ai-modal__spinner {

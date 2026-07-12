@@ -474,7 +474,8 @@
 
                 <!-- Radar + Price chart side-by-side -->
                 <div class="radar-price-row">
-                    <div class="detail-radar-wrapper">
+                    <div class="detail-radar-wrapper chart-zoom-target" data-zoom-canvas="detail-radar" data-zoom-title="Radar 3 filarów — Swing vs Fundamentalny">
+                        <span class="chart-zoom-target__hint" aria-hidden="true">🔍</span>
                         <canvas id="detail-radar" width="300" height="300"></canvas>
                         <div class="detail-radar-legend">
                             <span class="legend-dot legend-dot--swing"></span> Swing &nbsp;
@@ -482,7 +483,8 @@
                         </div>
                     </div>
                     <?php if (!empty($financials['monthly_closes'])): ?>
-                    <div class="price-chart-compact">
+                    <div class="price-chart-compact chart-zoom-target" data-zoom-canvas="price-chart" data-zoom-title="Kurs akcji — 12 miesięcy (baza=100)">
+                        <span class="chart-zoom-target__hint" aria-hidden="true">🔍</span>
                         <div class="price-chart-compact__label">
                             Kurs akcji — 12 miesięcy (baza=100)
                             <span class="chart-hint" tabindex="0">ⓘ
@@ -503,7 +505,10 @@
                 </div>
 
                 <!-- CVS trajectory (Phase 8 slice 1) -->
-                <div class="trajectory-block">
+                <?php $hasTrajChart = !empty($trajectory) && !empty($trajectory['has_trajectory']); ?>
+                <div class="trajectory-block<?= $hasTrajChart ? ' chart-zoom-target' : '' ?>"
+                     <?= $hasTrajChart ? 'data-zoom-canvas="trajectory-chart" data-zoom-title="Trajektoria CVS Swing · 90 dni"' : '' ?>>
+                    <?php if ($hasTrajChart): ?><span class="chart-zoom-target__hint" aria-hidden="true">🔍</span><?php endif; ?>
                     <h3>Trajektoria CVS <span class="trajectory-block__sub">Swing · 90 dni</span>
                         <span class="chart-hint" tabindex="0">ⓘ
                             <span class="chart-hint__tooltip">
@@ -517,7 +522,7 @@
                             </span>
                         </span>
                     </h3>
-                    <?php if (!empty($trajectory) && !empty($trajectory['has_trajectory'])): ?>
+                    <?php if ($hasTrajChart): ?>
                         <?php
                         $deltaChip = static function ($d): string {
                             if ($d === null) {
@@ -545,6 +550,23 @@
                     <?php else: ?>
                         <p class="trajectory-empty">Za mało danych — trajektoria pojawi się po kolejnych odświeżeniach (spółka jest obserwowana).</p>
                     <?php endif; ?>
+                </div>
+
+                <!-- Chart zoom modal (desktop only — see .chart-zoom-target click
+                     handler in app.js). Reuses the already-rendered Chart.js
+                     instance's data/options at a larger size; never wired on
+                     mobile, where closing a full-screen modal reliably is its
+                     own unsolved problem elsewhere in this app. -->
+                <div id="chart-zoom-modal" class="ai-modal" hidden>
+                    <div class="ai-modal__inner chart-zoom-modal__inner">
+                        <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:1rem;">
+                            <h3 id="chart-zoom-title" style="margin:0;font-size:var(--text-lg);">—</h3>
+                            <button id="chart-zoom-close" class="btn btn--ghost btn--sm" type="button">✕</button>
+                        </div>
+                        <div class="chart-zoom-modal__canvas-wrap">
+                            <canvas id="chart-zoom-canvas"></canvas>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Execution plan (Phase 8 slice 2) -->
@@ -1823,7 +1845,7 @@
             </script>
             <?php endif; ?>
 
-            <?php if (!empty($trajectory) && !empty($trajectory['has_trajectory'])): ?>
+            <?php if ($hasTrajChart): ?>
             <script>
             window.addEventListener('load', function () {
                 if (typeof Chart === 'undefined') return;
