@@ -78,6 +78,38 @@
     line-height: 1.3;
 }
 
+/* "Po korekcie" shadow-model rows (3.1/3.2) under a score tile — see
+   $shadowDeltaChip in templates/analysis.php. Dashed divider keeps them
+   visually subordinate to the real score above. */
+.score-tile__shadows {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    width: 100%;
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px dashed var(--c-border);
+}
+
+.score-tile__shadow-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .3rem;
+    font-size: var(--text-xs);
+}
+
+.score-tile__shadow-label {
+    font-weight: 600;
+    color: var(--c-muted);
+    opacity: .8;
+}
+
+.score-tile__shadow-value {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+}
+
 /* Mode accent on the value */
 .score-tile--swing .score-tile__value { color: var(--c-primary); }
 .score-tile--fund  .score-tile__value { color: var(--c-fund); }

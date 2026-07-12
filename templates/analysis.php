@@ -313,6 +313,85 @@
                 if ($cvs >= 42) return 'score-tile--neutral';
                 return 'score-tile--weak';
             };
+
+            // Shadow overlays (3.1/3.2) computed once here so both the compact
+            // "po korekcie" badges on the score tiles below AND the detailed
+            // breakdown chips further down read the same variables — previously
+            // each block recomputed its own copy from $result.
+            $overlay = $result['overlay'] ?? null;
+            if ($overlay !== null) {
+                $ovPenalties = $overlay['penalties'] ?? [];
+                $ovCoverage  = $overlay['coverage']  ?? [];
+                $ovTotal     = (float) ($ovPenalties['total']    ?? 0.0);
+                $ovRevision  = (float) ($ovPenalties['revision'] ?? 0.0);
+                $ovTarget    = (float) ($ovPenalties['target']   ?? 0.0);
+                $ovVersion   = (string) ($overlay['shadow_version'] ?? '3.1');
+
+                $ovMissing = [];
+                if (!empty($ovCoverage['missing_eps_trend'])) $ovMissing[] = 'rewizja';
+                if (!empty($ovCoverage['missing_target']))    $ovMissing[] = 'target';
+
+                $ov31BreakdownHtml = '<strong>Skąd ta korekta (' . htmlspecialchars($ovVersion) . ')?</strong><br>'
+                    . 'Kara za rewizję EPS: ' . htmlspecialchars(number_format($ovRevision, 1)) . ' pkt<br>'
+                    . 'Kara za cel cenowy analityków: ' . htmlspecialchars(number_format($ovTarget, 1)) . ' pkt'
+                    . ($ovMissing !== [] ? '<br><em>Brak danych: ' . htmlspecialchars(implode('/', $ovMissing)) . '</em>' : '')
+                    . '<br><br>Tryb cieniowy eksperymentalny — nigdy nie zmienia oficjalnej rekomendacji pokazanej wyżej.';
+            }
+
+            $shadow32 = null;
+            foreach (($result['shadows'] ?? []) as $shadowBlock) {
+                if (($shadowBlock['shadow_version'] ?? '') === '3.2') {
+                    $shadow32 = $shadowBlock;
+                    break;
+                }
+            }
+            if ($shadow32 !== null) {
+                $s32Penalties = $shadow32['penalties'] ?? [];
+                $s32Signals   = $shadow32['signals']   ?? [];
+                $s32Coverage  = $shadow32['coverage']  ?? [];
+                $s32Adj       = $s32Signals['adjustments'] ?? [];
+                $s32Total     = (float) ($s32Penalties['total']         ?? 0.0);
+                $s32Pead      = (float) ($s32Penalties['earnings_guard'] ?? 0.0);
+                $s32Breadth   = (float) ($s32Adj['breadth']    ?? 0.0);
+                $s32High52w   = (float) ($s32Adj['high_52w']   ?? 0.0);
+                $s32Consist   = (float) ($s32Adj['consistency'] ?? 0.0);
+
+                $s32Missing = [];
+                if (!empty($s32Coverage['missing_surprise']))    $s32Missing[] = 'zaskoczenie';
+                if (!empty($s32Coverage['missing_breadth']))     $s32Missing[] = 'rewizje';
+                if (!empty($s32Coverage['missing_52w']))         $s32Missing[] = '52w';
+                if (!empty($s32Coverage['missing_consistency'])) $s32Missing[] = 'konsystencja';
+
+                $ov32BreakdownHtml = '<strong>Skąd ta korekta (3.2)?</strong><br>'
+                    . 'PEAD (reakcja na wyniki): ' . htmlspecialchars(number_format($s32Pead, 1)) . ' pkt<br>'
+                    . 'Szerokość rewizji analityków: ' . htmlspecialchars(number_format($s32Breadth, 1)) . ' pkt<br>'
+                    . 'Bliskość 52-tyg. maksimum: ' . htmlspecialchars(number_format($s32High52w, 1)) . ' pkt<br>'
+                    . 'Konsystencja pobić prognoz: ' . htmlspecialchars(number_format($s32Consist, 1)) . ' pkt'
+                    . ($s32Missing !== [] ? '<br><em>Brak danych: ' . htmlspecialchars(implode('/', $s32Missing)) . '</em>' : '')
+                    . '<br><br>Tryb cieniowy eksperymentalny — nigdy nie zmienia oficjalnej rekomendacji pokazanej wyżej.';
+            }
+
+            // Compact "po korekcie" row rendered under each score tile — the same
+            // shadow number the breakdown chips explain in detail below, placed
+            // next to the real indicator it adjusts. Delta arrow/colour mirrors
+            // the screener's $trendChip convention.
+            $shadowDeltaChip = static function (string $version, float $adjusted, float $base, string $shadowReco, string $officialReco, string $breakdownHtml): string {
+                $delta = round($adjusted - $base, 1);
+                [$arrow, $color] = match (true) {
+                    $delta > 0  => ['↑', 'var(--c-success)'],
+                    $delta < 0  => ['↓', 'var(--c-danger)'],
+                    default     => ['→', 'var(--c-muted)'],
+                };
+                $deltaText = $delta != 0.0 ? ' ' . $arrow . ' ' . number_format(abs($delta), 1) : ' ' . $arrow;
+                $recoNote = $shadowReco !== '' && $shadowReco !== $officialReco
+                    ? ' Rekomendacja cieniowa: <strong>' . htmlspecialchars($shadowReco) . '</strong> (różni się od oficjalnej).'
+                    : '';
+                return '<span class="score-tile__shadow-row">'
+                    . '<span class="score-tile__shadow-label">' . htmlspecialchars($version) . '</span>'
+                    . '<span class="score-tile__shadow-value" style="color:' . $color . ';">' . number_format($adjusted, 1) . $deltaText . '</span>'
+                    . '<span class="chart-hint" tabindex="0">ⓘ<span class="chart-hint__tooltip">' . $breakdownHtml . $recoNote . '</span></span>'
+                    . '</span>';
+            };
             ?>
 
 
@@ -330,6 +409,16 @@
                         <span class="score-tile__mode"><?= htmlspecialchars($modeSwing['label'] ?? 'Swing') ?></span>
                         <span class="score-tile__value"><?= number_format((float)($swing['cvs'] ?? 0), 1) ?></span>
                         <span class="score-tile__reco"><?= htmlspecialchars($swing['recommendation'] ?? '') ?></span>
+                        <?php if ($overlay !== null || $shadow32 !== null): ?>
+                        <div class="score-tile__shadows">
+                            <?php if ($overlay !== null): ?>
+                                <?= $shadowDeltaChip($ovVersion, (float) $overlay['swing'], (float) ($swing['cvs'] ?? 0), (string) ($overlay['swing_reco'] ?? ''), (string) ($swing['recommendation'] ?? ''), $ov31BreakdownHtml) ?>
+                            <?php endif; ?>
+                            <?php if ($shadow32 !== null): ?>
+                                <?= $shadowDeltaChip('3.2', (float) $shadow32['swing'], (float) ($swing['cvs'] ?? 0), (string) ($shadow32['swing_reco'] ?? ''), (string) ($swing['recommendation'] ?? ''), $ov32BreakdownHtml) ?>
+                            <?php endif; ?>
+                        </div>
+                        <?php endif; ?>
                     </div>
 
                     <!-- Fundamental score -->
@@ -337,6 +426,16 @@
                         <span class="score-tile__mode"><?= htmlspecialchars($modeFund['label'] ?? 'Fundamentalny') ?></span>
                         <span class="score-tile__value"><?= number_format((float)($fund['cvs'] ?? 0), 1) ?></span>
                         <span class="score-tile__reco"><?= htmlspecialchars($fund['recommendation'] ?? '') ?></span>
+                        <?php if ($overlay !== null || $shadow32 !== null): ?>
+                        <div class="score-tile__shadows">
+                            <?php if ($overlay !== null): ?>
+                                <?= $shadowDeltaChip($ovVersion, (float) $overlay['fund'], (float) ($fund['cvs'] ?? 0), (string) ($overlay['fund_reco'] ?? ''), (string) ($fund['recommendation'] ?? ''), $ov31BreakdownHtml) ?>
+                            <?php endif; ?>
+                            <?php if ($shadow32 !== null): ?>
+                                <?= $shadowDeltaChip('3.2', (float) $shadow32['fund'], (float) ($fund['cvs'] ?? 0), (string) ($shadow32['fund_reco'] ?? ''), (string) ($fund['recommendation'] ?? ''), $ov32BreakdownHtml) ?>
+                            <?php endif; ?>
+                        </div>
+                        <?php endif; ?>
                     </div>
                 </div>
 
@@ -344,19 +443,9 @@
                 // Phase 5 (slice 1) — shadow model_version (3.1) preview chip.
                 // Shown alongside the headline 3.0 scores above; never replaces them
                 // (guardrail FR-016 — displayed reco stays at 3.0 until recalibration).
-                $overlay = $result['overlay'] ?? null;
-                if ($overlay !== null):
-                    $ovPenalties = $overlay['penalties'] ?? [];
-                    $ovCoverage  = $overlay['coverage']  ?? [];
-                    $ovTotal     = (float) ($ovPenalties['total']    ?? 0.0);
-                    $ovRevision  = (float) ($ovPenalties['revision'] ?? 0.0);
-                    $ovTarget    = (float) ($ovPenalties['target']   ?? 0.0);
-                    $ovVersion   = (string) ($overlay['shadow_version'] ?? '3.1');
-
-                    $ovMissing = [];
-                    if (!empty($ovCoverage['missing_eps_trend'])) $ovMissing[] = 'rewizja';
-                    if (!empty($ovCoverage['missing_target']))    $ovMissing[] = 'target';
-                ?>
+                // $overlay/$ovPenalties/etc. computed earlier, above the score tiles
+                // — shared with the compact "po korekcie" badges on those tiles.
+                if ($overlay !== null): ?>
                 <div class="overlay-preview-chip"
                      style="margin-top:.6rem;padding:.5rem .75rem;border-radius:6px;
                             font-size:.8rem;line-height:1.5;color:var(--c-muted);
@@ -379,30 +468,9 @@
                 // 3.1 penalties + directional PEAD guard + symmetric signals
                 // (breadth/52w/consistency). Same guardrail as 3.1 above —
                 // headline reco stays at 3.0 (FR-020).
-                $shadow32 = null;
-                foreach (($result['shadows'] ?? []) as $shadowBlock) {
-                    if (($shadowBlock['shadow_version'] ?? '') === '3.2') {
-                        $shadow32 = $shadowBlock;
-                        break;
-                    }
-                }
-                if ($shadow32 !== null):
-                    $s32Penalties = $shadow32['penalties'] ?? [];
-                    $s32Signals   = $shadow32['signals']   ?? [];
-                    $s32Coverage  = $shadow32['coverage']  ?? [];
-                    $s32Adj       = $s32Signals['adjustments'] ?? [];
-                    $s32Total     = (float) ($s32Penalties['total']         ?? 0.0);
-                    $s32Pead      = (float) ($s32Penalties['earnings_guard'] ?? 0.0);
-                    $s32Breadth   = (float) ($s32Adj['breadth']    ?? 0.0);
-                    $s32High52w   = (float) ($s32Adj['high_52w']   ?? 0.0);
-                    $s32Consist   = (float) ($s32Adj['consistency'] ?? 0.0);
-
-                    $s32Missing = [];
-                    if (!empty($s32Coverage['missing_surprise']))    $s32Missing[] = 'zaskoczenie';
-                    if (!empty($s32Coverage['missing_breadth']))     $s32Missing[] = 'rewizje';
-                    if (!empty($s32Coverage['missing_52w']))         $s32Missing[] = '52w';
-                    if (!empty($s32Coverage['missing_consistency'])) $s32Missing[] = 'konsystencja';
-                ?>
+                // $shadow32/$s32Penalties/etc. computed earlier, above the score
+                // tiles — shared with the compact "po korekcie" badges on those tiles.
+                if ($shadow32 !== null): ?>
                 <div class="overlay-preview-chip"
                      style="margin-top:.6rem;padding:.5rem .75rem;border-radius:6px;
                             font-size:.8rem;line-height:1.5;color:var(--c-muted);
