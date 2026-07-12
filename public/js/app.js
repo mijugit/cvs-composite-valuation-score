@@ -1127,6 +1127,13 @@
     const closeBtn = document.getElementById('chart-zoom-close');
     if (!modal || !canvas) return;
 
+    // The modal is templated inside .card--result, which has backdrop-filter —
+    // that establishes a containing block for position:fixed descendants (CSS
+    // spec), so "fixed" would resolve against the card's box instead of the
+    // viewport. Same fix as the .chart-hint/.ticker-hint tooltip portals: move
+    // it to a direct child of <body> before anything else can position it.
+    document.body.appendChild(modal);
+
     const isMobile = () => window.matchMedia('(max-width: 768px)').matches;
 
     function destroyZoomChart() {
