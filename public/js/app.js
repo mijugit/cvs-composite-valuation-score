@@ -1141,6 +1141,25 @@
         if (existing) existing.destroy();
     }
 
+    // Chart.js v4 instruments nested option/data objects with per-instance
+    // scriptable-option resolution state (its internal `_scriptable` cache).
+    // Reusing the SAME nested objects across two live Chart instances throws
+    // "Recursion detected: _scriptable->_scriptable" the moment it tries to
+    // resolve them (confirmed while building this feature — the first cut
+    // shared srcChart.options/.data by reference and silently rendered an
+    // empty canvas, only throwing once something forced a re-resolve).
+    // Deep-clone plain objects/arrays; pass functions through by reference —
+    // tooltip callbacks etc. are stateless, safe to share.
+    function cloneForChart(value) {
+        if (Array.isArray(value)) return value.map(cloneForChart);
+        if (value !== null && typeof value === 'object' && value.constructor === Object) {
+            const out = {};
+            for (const k in value) out[k] = cloneForChart(value[k]);
+            return out;
+        }
+        return value;
+    }
+
     function openZoom(sourceId, title) {
         if (typeof Chart === 'undefined') return;
         const srcCanvas = document.getElementById(sourceId);
@@ -1152,13 +1171,8 @@
         modal.hidden = false;
         destroyZoomChart();
 
-        // Reuse the live chart's data/options by reference — Chart.js keys its
-        // internal per-dataset cache by chart id, so the same dataset arrays
-        // safely back a second, independent instance. Only shallow-copy so we
-        // can flip top-level sizing flags without mutating the small chart's
-        // own config (nested scales/plugins — including tooltip callbacks —
-        // stay shared, which is fine since we never write into them).
-        const zoomOptions = Object.assign({}, srcChart.options);
+        const zoomData    = cloneForChart(srcChart.data);
+        const zoomOptions = cloneForChart(srcChart.options);
         zoomOptions.responsive = true;
         zoomOptions.animation = false;
         // Radar keeps its aspect ratio (a stretched triangle looks wrong);
@@ -1167,7 +1181,7 @@
 
         new Chart(canvas.getContext('2d'), {
             type: srcChart.config.type,
-            data: srcChart.data,
+            data: zoomData,
             options: zoomOptions,
         });
     }
