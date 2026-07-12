@@ -322,7 +322,6 @@
             if ($overlay !== null) {
                 $ovPenalties = $overlay['penalties'] ?? [];
                 $ovCoverage  = $overlay['coverage']  ?? [];
-                $ovTotal     = (float) ($ovPenalties['total']    ?? 0.0);
                 $ovRevision  = (float) ($ovPenalties['revision'] ?? 0.0);
                 $ovTarget    = (float) ($ovPenalties['target']   ?? 0.0);
                 $ovVersion   = (string) ($overlay['shadow_version'] ?? '3.1');
@@ -350,7 +349,6 @@
                 $s32Signals   = $shadow32['signals']   ?? [];
                 $s32Coverage  = $shadow32['coverage']  ?? [];
                 $s32Adj       = $s32Signals['adjustments'] ?? [];
-                $s32Total     = (float) ($s32Penalties['total']         ?? 0.0);
                 $s32Pead      = (float) ($s32Penalties['earnings_guard'] ?? 0.0);
                 $s32Breadth   = (float) ($s32Adj['breadth']    ?? 0.0);
                 $s32High52w   = (float) ($s32Adj['high_52w']   ?? 0.0);
@@ -440,61 +438,12 @@
                 </div>
 
                 <?php
-                // Phase 5 (slice 1) — shadow model_version (3.1) preview chip.
-                // Shown alongside the headline 3.0 scores above; never replaces them
-                // (guardrail FR-016 — displayed reco stays at 3.0 until recalibration).
-                // $overlay/$ovPenalties/etc. computed earlier, above the score tiles
-                // — shared with the compact "po korekcie" badges on those tiles.
-                if ($overlay !== null): ?>
-                <div class="overlay-preview-chip"
-                     style="margin-top:.6rem;padding:.5rem .75rem;border-radius:6px;
-                            font-size:.8rem;line-height:1.5;color:var(--c-muted);
-                            background:rgba(255,255,255,.04);">
-                    <strong style="color:var(--c-text);">Podgląd <?= htmlspecialchars($ovVersion) ?>:</strong>
-                    <?= htmlspecialchars(number_format($ovTotal, 1)) ?> pkt
-                    (rewizja <?= htmlspecialchars(number_format($ovRevision, 1)) ?> /
-                     target <?= htmlspecialchars(number_format($ovTarget, 1)) ?>)
-                    <?php if ($ovMissing !== []): ?>
-                        <span style="opacity:.75;"> — brak danych: <?= htmlspecialchars(implode('/', $ovMissing)) ?></span>
-                    <?php endif; ?>
-                    <span style="display:block;margin-top:.15rem;opacity:.65;">
-                        Tryb cieniowy (eksperymentalny) — oficjalna rekomendacja pozostaje wg modelu 3.0 powyżej.
-                    </span>
-                </div>
-                <?php endif; ?>
-
-                <?php
-                // Phase 7 (slice 2) — shadow model_version (3.2) preview chip:
-                // 3.1 penalties + directional PEAD guard + symmetric signals
-                // (breadth/52w/consistency). Same guardrail as 3.1 above —
-                // headline reco stays at 3.0 (FR-020).
-                // $shadow32/$s32Penalties/etc. computed earlier, above the score
-                // tiles — shared with the compact "po korekcie" badges on those tiles.
-                if ($shadow32 !== null): ?>
-                <div class="overlay-preview-chip"
-                     style="margin-top:.6rem;padding:.5rem .75rem;border-radius:6px;
-                            font-size:.8rem;line-height:1.5;color:var(--c-muted);
-                            background:rgba(255,255,255,.04);">
-                    <strong style="color:var(--c-text);">Podgląd 3.2:</strong>
-                    <?= htmlspecialchars(number_format($s32Total, 1)) ?> pkt
-                    (PEAD <?= htmlspecialchars(number_format($s32Pead, 1)) ?> /
-                     rewizje <?= htmlspecialchars(number_format($s32Breadth, 1)) ?> /
-                     52w <?= htmlspecialchars(number_format($s32High52w, 1)) ?> /
-                     konsystencja <?= htmlspecialchars(number_format($s32Consist, 1)) ?>)
-                    <?php if ($s32Missing !== []): ?>
-                        <span style="opacity:.75;"> — brak danych: <?= htmlspecialchars(implode('/', $s32Missing)) ?></span>
-                    <?php endif; ?>
-                    <span style="display:block;margin-top:.15rem;opacity:.65;">
-                        Tryb cieniowy (eksperymentalny) — oficjalna rekomendacja pozostaje wg modelu 3.0 powyżej.
-                    </span>
-                </div>
-                <?php endif; ?>
-
-                <?php
                 // Phase 5 (slice 2) — earnings-timing badge (FR-010). Always present,
                 // independent of overlays/earnings_guard flags (badge ≠ guard
-                // separation, FR-017) — a sibling block to the shadow preview chip
-                // above, deliberately NOT nested inside `$overlay !== null`.
+                // separation, FR-017) — deliberately NOT nested inside
+                // `$overlay !== null` (the 3.1/3.2 breakdown chips that used to sit
+                // here were removed once their numbers moved onto the score tiles
+                // themselves as "po korekcie" badges — see $shadowDeltaChip above).
                 if (($et = $result['earnings_timing'] ?? null) !== null && $et['state'] !== null):
                     $etState  = (string) $et['state'];
                     $etDaysTo = $et['days_to']    ?? null;
