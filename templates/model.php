@@ -321,6 +321,13 @@
     Dla każdego, kto chce zrozumieć, co kryje się za liczbami widocznymi na stronie analizy.
     Nie zakładamy wcześniejszej wiedzy finansowej — każde pojęcie jest wyjaśnione.
 </div>
+<div class="callout callout--tip">
+    <strong>Szukasz przykładu z życia, nie tylko wzorów?</strong>
+    Ten artykuł tłumaczy <em>jak liczony jest</em> wynik. Osobny manual pokazuje
+    <em>jak z niego korzystać</em> — krok po kroku, na żywych przykładach spółek
+    (m.in. Micron vs Sandisk, gdzie identyczna rekomendacja ukrywa bardzo różną jakość okazji):
+    <a href="https://blog.timeflow.fun/post/cvs-krok-po-kroku-10-miejsc-zanim-zaufasz-wynikowi-2026-07-12" target="_blank">CVS krok po kroku: 10 miejsc, zanim zaufasz wynikowi</a>.
+</div>
 
 <!-- ══════════════════════════════════════════════════════════════════════ -->
 <h2 id="skad-dane">Skąd pochodzą dane?</h2>
@@ -336,7 +343,8 @@
     <li>Wolne przepływy pieniężne (FCF) i kapitał obrotowy</li>
     <li>Dane analityków: konsensus cenowy, rekomendacje, prognozy przychodów</li>
     <li>Kalendarz wyników (data ostatnich i kolejnych wyników kwartalnych)</li>
-    <li>Dane rynkowe indeksu SPY (S&amp;P 500) do kalibracji momentum</li>
+    <li>Dane rynkowe właściwego benchmarku rynkowego (S&amp;P 500 domyślnie, a dla giełd
+        zagranicznych — WIG20TR, KOSPI 200, DAX, FTSE 100 lub CAC 40) do kalibracji momentum</li>
 </ul>
 <p>
     Dane są <strong>buforowane przez 1 godzinę</strong> — wielokrotne zapytania o tę samą spółkę
@@ -405,7 +413,7 @@
         <div class="pillar-card__icon">📈</div>
         <div class="pillar-card__name">Momentum</div>
         <div class="pillar-card__weight">Swing: 45 % · Fundamentalny: 15 %</div>
-        <div class="pillar-card__desc">Czy akcje rosną szybciej niż rynek (S&amp;P 500)? Wysoki wynik = trend wzrostowy względem indeksu.</div>
+        <div class="pillar-card__desc">Czy akcje rosną szybciej niż właściwy dla tej giełdy benchmark (S&amp;P 500, WIG20TR, KOSPI 200…)? Wysoki wynik = trend wzrostowy względem indeksu.</div>
     </div>
     <div class="pillar-card pillar-card--quality mp-glass">
         <div class="pillar-card__icon">🏛️</div>
@@ -484,16 +492,39 @@
 <!-- FILAR 2 -->
 <h3>Filar Momentum — czy rynek lubi tę spółkę?</h3>
 <p>
-    Momentum mierzy, czy kurs akcji rośnie <em>szybciej niż rynek</em> (S&amp;P 500, symbol SPY).
+    Momentum mierzy, czy kurs akcji rośnie <em>szybciej niż właściwy dla niej rynek</em>.
     Liczymy <strong>Return on Capital (ROC)</strong>, czyli procentową zmianę kursu od 1 miesiąca,
     3 miesięcy, 6 miesięcy i 12 miesięcy temu.
 </p>
 <div class="formula">ROC(Nm) = (cena_dziś / cena_N_miesięcy_temu − 1) × 100 %</div>
 <p>
     Następnie obliczamy <strong>ważoną kompozytową stopę zwrotu</strong> spółki i identyczną
-    wartość dla SPY. Różnica to tzw. <em>nadwyżkowy zwrot (excess return)</em>.
+    wartość dla benchmarku. Różnica to tzw. <em>nadwyżkowy zwrot (excess return)</em>.
 </p>
-<div class="formula">excess_return = kompozyt_spółki − kompozyt_SPY</div>
+<div class="formula">excess_return = kompozyt_spółki − kompozyt_benchmarku</div>
+<h4 style="font-size:var(--text-sm);font-weight:600;margin:.75rem 0 .25rem;">Benchmark zależy od giełdy notowania</h4>
+<p>
+    Domyślnie benchmarkiem jest S&amp;P 500 (SPY). Ale porównywanie polskiej czy koreańskiej
+    spółki do amerykańskiego indeksu miałoby niewiele sensu — model dobiera benchmark
+    na podstawie sufiksu tickera:
+</p>
+<table class="mode-table">
+    <thead><tr><th>Sufiks tickera</th><th>Giełda</th><th>Benchmark</th></tr></thead>
+    <tbody>
+        <tr><td>brak (np. AAPL, MU)</td><td>USA</td><td>S&amp;P 500</td></tr>
+        <tr><td>.WA</td><td>GPW (Warszawa)</td><td>WIG20TR</td></tr>
+        <tr><td>.KS</td><td>Korea (KOSPI)</td><td>KOSPI 200</td></tr>
+        <tr><td>.DE</td><td>Xetra (Frankfurt)</td><td>DAX</td></tr>
+        <tr><td>.L</td><td>Londyn (LSE)</td><td>FTSE 100</td></tr>
+        <tr><td>.PA</td><td>Euronext Paris</td><td>CAC 40</td></tr>
+    </tbody>
+</table>
+<div class="callout callout--tip">
+    <strong>Dlaczego to ważne przy czytaniu wykresu</strong>
+    Na stronie analizy spółki wykres ceny pokazuje kurs na tle tego samego benchmarku,
+    którego użył filar Momentum. „Linia powyżej benchmarku" znaczy co innego dla spółki
+    z S&amp;P 500 niż dla spółki z WIG20 — zawsze sprawdź, z czym akurat porównujesz.
+</div>
 <p>
     Wynik > 0% (spółka bije rynek) → score > 50. Wynik &lt; 0% (spółka za rynkiem) → score &lt; 50.
     Transformacja jest też sigmoidalna, ograniczona do zakresu [5, 95], żeby outlier nie
@@ -676,8 +707,10 @@
 <p>
     Po obliczeniu CVS opcjonalnie dostępna jest <strong>narracyjna analiza AI</strong> generowana
     przez model językowy Claude firmy Anthropic. AI <em>nie zmienia</em> żadnego wyniku CVS —
-    jest wyłącznie warstwą interpretacyjną.
+    jest wyłącznie warstwą interpretacyjną. Generowanie analizy AI (obu etapów opisanych niżej)
+    wymaga aktywnego kodu PRO i podlega dziennemu/miesięcznemu limitowi zapytań.
 </p>
+<h3>Etap 1 — Analiza rozjazdu CVS vs analitycy</h3>
 <p>
     Do modelu językowego przekazywane są następujące dane:
 </p>
@@ -701,10 +734,35 @@
     <li><strong>Komu wierzyć i w jakim horyzoncie</strong> — praktyczna wskazówka z uwzględnieniem niepewności</li>
 </ol>
 <div class="callout callout--warn">
-    <strong>Ograniczenie AI</strong>: model językowy odpowiada wyłącznie na podstawie danych
+    <strong>Ograniczenie etapu 1</strong>: model językowy odpowiada wyłącznie na podstawie danych
     liczbowych przekazanych w zapytaniu. Nie ma dostępu do internetu, nie zna aktualnych
     wiadomości ani raportów prasowych. Wszelkie sformułowania w rodzaju „spółka ogłosiła..."
-    byłyby halucynacją — guardrail w systemie promptu to uniemożliwia.
+    byłyby halucynacją — guardrail w systemie promptu to uniemożliwia. Ten limit <em>nie</em>
+    dotyczy etapu 2 (Recenzja krytyczna) opisanego niżej.
+</div>
+
+<h3>Etap 2 — Recenzja krytyczna AI</h3>
+<p>
+    Po wygenerowaniu świeżej analizy etapu 1 dostępny jest drugi, opcjonalny przycisk
+    „Recenzja krytyczna". W odróżnieniu od etapu 1, ten przebieg <strong>ma dostęp do
+    wyszukiwarki internetowej</strong> (Claude z narzędziem web search) — może więc
+    zderzyć wnioski modelu i etapu 1 ze świeżymi wiadomościami o spółce z ostatnich
+    dwóch tygodni. Generowanie trwa dłużej (zwykle 1,5–2,5 minuty, działa w tle) i
+    wymaga wcześniej wygenerowanej, aktualnej analizy etapu 1.
+</p>
+<p>Recenzja krytyczna ma cztery sekcje:</p>
+<ol>
+    <li><strong>Świeże katalizatory</strong> — konkretne wydarzenia/newsy z ostatnich ~14 dni znalezione w sieci</li>
+    <li><strong>Czego model nie widzi</strong> — luki interpretacyjne wynikające z tego, że CVS liczy tylko na liczbach</li>
+    <li><strong>Krytyka naszej analizy</strong> — punktowe wskazanie miejsc, gdzie etap 1 był zbyt optymistyczny, zbyt pochopny albo pominął coś istotnego</li>
+    <li><strong>Dwa scenariusze</strong> — optymistyczny i pesymistyczny wariant rozwoju sytuacji, oba osadzone w konkretnych poziomach cenowych i datach</li>
+</ol>
+<div class="callout callout--info">
+    <strong>Po co dwa etapy zamiast jednego dłuższego promptu?</strong>
+    Etap 1 jest szybki, tani i w pełni deterministyczny względem danych CVS — dobry punkt
+    startowy przy każdej analizie. Etap 2 jest wolniejszy i droższy (web search), więc jest
+    opcjonalny — sięgaj po niego, gdy headline'owy sygnał wygląda zbyt dobrze, żeby był
+    prawdziwy, i chcesz sprawdzić, czy coś świeżego temu przeczy.
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════════ -->
@@ -878,11 +936,11 @@
     <dt>Capex (Capital Expenditure — Nakłady inwestycyjne)</dt>
     <dd>Pieniądze wydane na aktywa trwałe (maszyny, infrastruktura, budynki). Wysokie capex obniżają FCF, ale mogą być produktywne w przyszłości.</dd>
 
-    <dt>SPY</dt>
-    <dd>ETF śledzący indeks S&amp;P 500, używany jako punkt odniesienia dla Momentum. Spółka, która rośnie szybciej niż SPY, ma dodatni excess return.</dd>
+    <dt>Benchmark momentum</dt>
+    <dd>Indeks, do którego porównywany jest kurs akcji w filarze Momentum. Domyślnie SPY (ETF na S&amp;P 500), ale dla spółek notowanych na innych giełdach model dobiera lokalny odpowiednik po sufiksie tickera: WIG20TR (.WA), KOSPI 200 (.KS), DAX (.DE), FTSE 100 (.L) lub CAC 40 (.PA). Spółka, która rośnie szybciej niż jej benchmark, ma dodatni excess return.</dd>
 
     <dt>Excess return (Nadwyżkowy zwrot)</dt>
-    <dd>Różnica między kompozytową stopą zwrotu spółki a analogicznym wskaźnikiem SPY. Pozytywna wartość = spółka bije rynek.</dd>
+    <dd>Różnica między kompozytową stopą zwrotu spółki a analogicznym wskaźnikiem właściwego dla niej benchmarku. Pozytywna wartość = spółka bije swój rynek.</dd>
 
     <dt>Bramka Jakości (Quality Gate)</dt>
     <dd>Binarny filtr wstępny. Spółki niespełniające minimum (przychody, marża, zadłużenie, płynność) nie są oceniane przez CVS.</dd>

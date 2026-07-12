@@ -94,6 +94,12 @@ $palette = [
     poglądowo — to inny mechanizm decyzyjny, poza tym eksperymentem.
 </p>
 
+<p style="color:var(--c-muted);margin-bottom:1.25rem;max-width:70ch;font-size:var(--text-sm);">
+    Pełny przegląd badań stojących za regułami P0–P6 (premia overnight, stop-lossy
+    a momentum, równe wagi, rebalance timing luck) — na blogu:
+    <a href="https://blog.timeflow.fun/post/udokumentowane-strategie-egzekucji-co-naprawde-mowia-badania-2026-07-05" target="_blank">Udokumentowane strategie egzekucji: co naprawdę mówią badania</a>.
+</p>
+
 <?php if ($d0 === null): ?>
 <div class="card" style="text-align:center;padding:2rem;">
     <p style="color:var(--c-muted);">Brak jeszcze danych — portfele nie zostały zaseedowane.</p>
