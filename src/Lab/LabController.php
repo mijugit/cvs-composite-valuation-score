@@ -77,6 +77,11 @@ class LabController
             ];
         }
 
+        $positions = [];
+        foreach ($codes as $code) {
+            $positions[$code] = $repo->getPositions($code);
+        }
+
         $metrics = [];
         foreach ($codes as $code) {
             $series      = $navSeries[$code] ?? [];
@@ -98,6 +103,7 @@ class LabController
             'portfolios'          => $portfolios,
             'chartSeries'         => $chartSeries,
             'metrics'             => $metrics,
+            'positions'           => $positions,
             'd0'                  => $d0,
             'hypothesisStatuses'  => $hypothesisStatuses,
         ]);

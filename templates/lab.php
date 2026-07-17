@@ -3,6 +3,7 @@
 /** @var array<string, array<string, mixed>> $portfolios code => DB row (started_at, cash, ...) */
 /** @var array<string, list<array{date: string, value: float}>> $chartSeries code (+ 'LLM') => normalised series */
 /** @var array<string, array<string, mixed>> $metrics code => computed metrics */
+/** @var array<string, array<string, array{quantity: float, avg_entry_price: float, entry_date: string}>> $positions code => ticker => position */
 /** @var string|null $d0 */
 /** @var array<string, array{status: string, ci: array{0: float, 1: float}, n: int, min_sessions: int}> $hypothesisStatuses */
 
@@ -27,6 +28,25 @@ $ciTooltipHtml = '<strong>Przedział ufności 95% (bootstrap)</strong>'
     . '<span>→ różnica raczej nie jest przypadkiem.</span>'
     . '<span>Obejmuje zero → za wcześnie wnioskować.</span>'
     . '</span>';
+
+// Holdings hint — same portal-hint pattern as the CI tooltip above, reused
+// per-portfolio to show current tickers + quantity (shares) on hover. Hover
+// tooltips don't work on touch anyway, so no separate mobile handling.
+$holdingsTooltipHtml = static function (array $positions): string {
+    if ($positions === []) {
+        return '<strong>Aktualne pozycje</strong>'
+            . '<span class="ticker-hint__tooltip-scores"><span>Brak pozycji (cała gotówka).</span></span>';
+    }
+    $tickers = array_keys($positions);
+    sort($tickers);
+    $lines = array_map(
+        static fn (string $t): string => '<span>' . htmlspecialchars($t) . ' — '
+            . number_format($positions[$t]['quantity'], 2) . ' szt.</span>',
+        $tickers
+    );
+    return '<strong>Aktualne pozycje</strong>'
+        . '<span class="ticker-hint__tooltip-scores">' . implode('', $lines) . '</span>';
+};
 
 $executionLabel = static function (string $execution): string {
     return $execution === 'open'
@@ -90,6 +110,10 @@ $palette = [
     się od bazowego P1 dokładnie jedną regułą egzekucji. Każda różnica ma
     pre-zarejestrowaną hipotezę opartą na konkretnym badaniu — sprawdzamy, czy
     dane ją potwierdzają, zamiast dopasowywać wnioski po fakcie.
+    Skład portfeli jest <strong>rebalansowany raz w miesiącu</strong> (pierwsza
+    sesja giełdowa NYSE w miesiącu, do aktualnego rankingu CVS); stopy ochronne
+    tam, gdzie występują (P3, P4), są sprawdzane <strong>codziennie</strong> i
+    mogą wyrzucić pozycję z portfela niezależnie od cyklu rebalansu.
     Linia LLM (istniejący <a href="/portfolio">Portfel</a>) pokazana wyłącznie
     poglądowo — to inny mechanizm decyzyjny, poza tym eksperymentem.
 </p>
@@ -179,7 +203,14 @@ window.addEventListener('load', function () {
         <tbody>
         <?php foreach ($portfolioDefs as $code => $def): $m = $metrics[$code] ?? []; ?>
         <tr>
-            <td><strong><?= htmlspecialchars($code) ?></strong> <span style="color:var(--c-muted);font-size:var(--text-sm);"><?= htmlspecialchars((string) $def['name']) ?></span></td>
+            <td>
+                <strong><?= htmlspecialchars($code) ?></strong>
+                <span style="color:var(--c-muted);font-size:var(--text-sm);"><?= htmlspecialchars((string) $def['name']) ?></span>
+                <span class="ticker-hint">
+                    <span style="cursor:help;color:var(--c-muted);font-size:var(--text-xs);border:1px solid var(--c-border);border-radius:999px;width:1.1rem;height:1.1rem;display:inline-flex;align-items:center;justify-content:center;">ⓘ</span>
+                    <span class="ticker-hint__tooltip"><?= $holdingsTooltipHtml($positions[$code] ?? []) ?></span>
+                </span>
+            </td>
             <td style="<?= $pctColor($m['total_return_pct'] ?? null) ?>;font-weight:600;"><?= $pct($m['total_return_pct'] ?? null) ?></td>
             <td style="<?= $pctColor($m['vs_spy_pp'] ?? null) ?>"><?= $code === 'P0' ? '—' : $pct($m['vs_spy_pp'] ?? null) ?></td>
             <td style="<?= $pctColor($m['vs_p1_pp'] ?? null) ?>"><?= $code === 'P1' ? '—' : $pct($m['vs_p1_pp'] ?? null) ?></td>
@@ -200,7 +231,13 @@ window.addEventListener('load', function () {
     $hyp   = $def['hypothesis'];
 ?>
     <div class="card">
-        <h3 style="margin-bottom:.25rem;font-size:var(--text-base);"><?= htmlspecialchars($code) ?> — <?= htmlspecialchars((string) $def['name']) ?></h3>
+        <h3 style="margin-bottom:.25rem;font-size:var(--text-base);">
+            <?= htmlspecialchars($code) ?> — <?= htmlspecialchars((string) $def['name']) ?>
+            <span class="ticker-hint">
+                <span style="cursor:help;color:var(--c-muted);font-size:var(--text-xs);border:1px solid var(--c-border);border-radius:999px;width:1.1rem;height:1.1rem;display:inline-flex;align-items:center;justify-content:center;">ⓘ</span>
+                <span class="ticker-hint__tooltip"><?= $holdingsTooltipHtml($positions[$code] ?? []) ?></span>
+            </span>
+        </h3>
         <ul style="list-style:none;padding:0;margin:.5rem 0;color:var(--c-muted);font-size:var(--text-sm);">
             <?php if (!empty($rules['benchmark_ticker'])): ?>
             <li>Benchmark 100% <?= htmlspecialchars((string) $rules['benchmark_ticker']) ?> (kontrola)</li>
@@ -252,6 +289,7 @@ window.addEventListener('load', function () {
         <li>Zwroty nie uwzględniają dywidend.</li>
         <li>Koszty transakcyjne są modelowane (0,05% na stronę) — realna egzekucja może się różnić.</li>
         <li>To eksperyment papierowy o krótkim horyzoncie zbierania danych — wnioski poniżej progu minimalnej liczby sesji (patrz sekcja statystyczna) są niewiążące.</li>
+        <li>Gotówka zwolniona ze stopu (P3/P4) nie jest doinwestowywana od razu — czeka do najbliższego rebalansu miesięcznego. To celowa część testowanej hipotezy (koszt ciasnych stopów), nie błąd.</li>
     </ul>
 </div>
 
