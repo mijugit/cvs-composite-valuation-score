@@ -145,8 +145,25 @@ jobs:
                   with open('review.md', 'w', encoding='utf-8') as out:
                       out.write(review_text)
                   print('Pomyślnie wygenerowano review.')
+          except urllib.error.HTTPError as e:
+              body = e.read().decode('utf-8', errors='replace')
+              print(f'Blad HTTP {e.code} z Gemini API:', body[:2000])
+              if e.code == 404:
+                  # Diagnostic only, on a 404 -- the model name in `url` above
+                  # may be wrong/renamed for this API key's account. List what
+                  # is actually available so the model string can be fixed
+                  # without guessing blindly across multiple CI runs.
+                  try:
+                      list_url = f'https://generativelanguage.googleapis.com/v1beta/models?key={api_key}'
+                      with urllib.request.urlopen(list_url) as lr:
+                          models = json.loads(lr.read().decode('utf-8'))
+                          names = [m.get('name') for m in models.get('models', [])]
+                          print('Dostepne modele dla tego klucza:', names)
+                  except Exception as le:
+                      print('Nie udalo sie pobrac listy modeli:', le)
+              exit(0)
           except Exception as e:
-              print('Błąd podczas komunikacji z Gemini API:', e)
+              print('Blad podczas komunikacji z Gemini API:', e)
               exit(0)
           PYEOF
           python3 gemini_review.py
