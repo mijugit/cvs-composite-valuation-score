@@ -60,13 +60,23 @@ jobs:
       # malformed response) must never redden the PR's overall CI status —
       # that would be indistinguishable from an actual test/typing failure
       # reported by ci.yml.
+      # The Python source is written via a QUOTED heredoc ('PYEOF'), not
+      # `python3 -c "..."`. The original `-c "..."` form broke bash's own
+      # double-quote parsing: an unescaped backtick inside `.replace('\`',
+      # '`')` (second argument) was read by bash as the start of a command
+      # substitution, producing "unexpected EOF while looking for matching
+      # `" and killing the step before Gemini was ever called — confirmed by
+      # running this exact step (see PR history). A quoted heredoc delimiter
+      # disables ALL shell interpretation of its body (no $, `, or \
+      # processing), so the markdown code-fence backticks below can be
+      # written plainly with no escaping and no risk of this bug class.
       - name: Run Gemini Review
         if: steps.check.outputs.run_gemini == 'true' && env.DIFF_SIZE > 0 && env.DIFF_SIZE < 1000000
         continue-on-error: true
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          python3 -c "
+          cat > gemini_review.py <<'PYEOF'
           import os, urllib.request, json
 
           api_key = os.environ.get('GEMINI_API_KEY')
@@ -111,8 +121,8 @@ jobs:
               '### 💡 Sugestie refaktoryzacji i poprawy\n'
               '### 👍 Zalety wprowadzonych zmian\n\n'
               'Bądź konkretny, zwięzły i nie rozpisuj się o oczywistościach. Jeśli nie ma rażących błędów, napisz to krótko.\n\n'
-              f'Oto git diff:\n\`\`\`diff\n{diff_content}\n\`\`\`'
-          ).replace('\`', '`')
+              f'Oto git diff:\n```diff\n{diff_content}\n```'
+          )
 
           data = {
               'contents': [{
@@ -138,7 +148,8 @@ jobs:
           except Exception as e:
               print('Błąd podczas komunikacji z Gemini API:', e)
               exit(0)
-          "
+          PYEOF
+          python3 gemini_review.py
 
       - name: Comment PR with AI Review
         if: steps.check.outputs.run_gemini == 'true' && env.DIFF_SIZE > 0
