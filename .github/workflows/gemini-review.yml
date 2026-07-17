@@ -1,0 +1,161 @@
+name: Gemini Code Review & CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, labeled]
+    branches: [main]
+
+jobs:
+  review:
+    name: CI & Gemini Review
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      # 1. Checkout repository
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 2. Setup PHP
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo, json, curl
+          coverage: none
+
+      # 3. Cache Composer dependencies
+      - name: Cache Composer Dependencies
+        uses: actions/cache@v4
+        with:
+          path: /tmp/composer-cache
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+
+      # 4. Install dependencies (including PHPUnit & PHPStan)
+      - name: Install Dependencies
+        run: composer install --no-progress --prefer-dist
+
+      # 5. Run Static Analysis (PHPStan) - Runs always
+      - name: Run PHPStan
+        run: composer run stan
+
+      # 6. Run Tests (PHPUnit) - Runs always
+      - name: Run Tests
+        run: composer run test
+
+      # 7. Check if 'run-review' (Claude) label is present to determine if we should run Gemini AI Review
+      - name: Check run-review label
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # If the PR has the 'run-review' label, we skip Gemini AI to let Claude do it (either/or)
+          if gh pr view ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --json labels -q '.labels[].name' | grep -qx 'run-review'; then
+            echo "run_gemini=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_gemini=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # 8. Generate Git Diff
+      - name: Generate Git Diff
+        if: steps.check.outputs.run_gemini == 'true'
+        id: git-diff
+        run: |
+          git diff origin/${{ github.base_ref }}...HEAD > pr_diff.txt
+          echo "DIFF_SIZE=$(wc -c < pr_diff.txt)" >> $GITHUB_ENV
+
+      # 9. Run AI Review with Gemini 2.5 Flash
+      - name: Run Gemini Review
+        if: steps.check.outputs.run_gemini == 'true' && env.DIFF_SIZE > 0 && env.DIFF_SIZE < 1000000
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python3 -c "
+          import os, urllib.request, json
+          
+          api_key = os.environ.get('GEMINI_API_KEY')
+          if not api_key:
+              print('Brak GEMINI_API_KEY. Pomijam AI Code Review.')
+              exit(0)
+          
+          try:
+              with open('pr_diff.txt', 'r', encoding='utf-8') as f:
+                  diff_content = f.read()
+          except Exception as e:
+              print('Nie można odczytać pliku diff:', e)
+              exit(0)
+          
+          # Limit do 60k znaków
+          diff_content = diff_content[:60000]
+          
+          if not diff_content.strip():
+              print('Diff jest pusty. Pomijam review.')
+              exit(0)
+          
+          url = f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}'
+          
+          # System prompt z zasadami projektu CLAUDE.md
+          prompt = (
+              'Jesteś doświadczonym programistą PHP i architektem oprogramowania. '
+              'Zrób zwięzłe, techniczne i konstruktywne Code Review dla zmian w tym Pull Request (git diff). '
+              'Twoja opinia musi być zgodna z wytycznymi projektu CVS opisanymi w CLAUDE.md. Skup się na:\n\n'
+              '- **Zasady modelu CVS:** wagi/progi muszą pochodzić z config/cvs-weights.php, nigdy zaszpachlowane/hardcoded (FR-010); '
+              'Quality Gate musi pozostać binarny (CVSResult::failed(), nigdy numeryczny wynik 0); '
+              'obliczenia CVS muszą być deterministyczne (brak losowości, brak date()/time() w logice punktacji).\n'
+              '- **Analiza statyczna:** declare(strict_types=1) i jasne typowanie parametrów i wyników funkcji; '
+              'kod musi być czysty i przechodzić PHPStan na poziomie 6.\n'
+              '- **Bezpieczeństwo:** każda trasa POST musi weryfikować token CSRF przez `$request->verifyCsrf()`; '
+              'chronione akcje kontrolerów wywołują `AuthController::requireAuth()`; komunikaty błędów logowania/rejestracji '
+              'muszą być generyczne (nigdy nie zdradzaj, czy e-mail istnieje w bazie).\n'
+              '- **Konwencje AI/mail/scheduler:** połączenia z Claude API tylko przez src/Ai/ z timeoutem i bezpieczną obsługą błędów '
+              '(żadne wyjątki nie mogą wyciec na stronę); maile tylko przez src/Mail/; nowe skrypty CLI logują do swoich plików (nie error_log).\n'
+              '- **Ogólna poprawność:** uproszczenia, czytelność i czysty kod.\n\n'
+              'Odpowiedz po polsku w formacie Markdown. Użyj nagłówków:\n'
+              '### ⚠️ Potencjalne Błędy i Naruszenia Zasad\n'
+              '### 💡 Sugestie refaktoryzacji i poprawy\n'
+              '### 👍 Zalety wprowadzonych zmian\n\n'
+              'Bądź konkretny, zwięzły i nie rozpisuj się o oczywistościach. Jeśli nie ma rażących błędów, napisz to krótko.\n\n'
+              f'Oto git diff:\n\`\`\`diff\n{diff_content}\n\`\`\`'
+          ).replace('\`', '`')
+          
+          data = {
+              'contents': [{
+                  'parts': [{
+                      'text': prompt
+                  }]
+              }]
+          }
+          
+          req = urllib.request.Request(
+              url,
+              data=json.dumps(data).encode('utf-8'),
+              headers={'Content-Type': 'application/json'}
+          )
+          
+          try:
+              with urllib.request.urlopen(req) as response:
+                  res = json.loads(response.read().decode('utf-8'))
+                  review_text = res['candidates'][0]['content']['parts'][0]['text']
+                  with open('review.md', 'w', encoding='utf-8') as out:
+                      out.write(review_text)
+                  print('Pomyślnie wygenerowano review.')
+          except Exception as e:
+              print('Błąd podczas komunikacji z Gemini API:', e)
+              exit(1)
+          "
+
+      # 10. Post comment to PR
+      - name: Comment PR with AI Review
+        if: success() && steps.check.outputs.run_gemini == 'true' && env.DIFF_SIZE > 0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -f review.md ]; then
+            gh pr comment ${{ github.event.pull_request.number }} --body-file=review.md
+          else
+            echo "Brak pliku review.md. Pomijam komentarz."
+          fi
