@@ -136,10 +136,14 @@ composer install
 # 2. Środowisko
 cp .env.example .env   # uzupełnij DB, ANTHROPIC_API_KEY, SMTP
 
-# 3. Migracje MySQL
+# 3. Lista tickerów (autocomplete) — na produkcji edytowana na żywo przez panel admina,
+# więc nieśledzona w gicie; skopiuj seed do lokalnego dev
+cp public/data/tickers.json.example public/data/tickers.json
+
+# 4. Migracje MySQL
 # wgraj kolejno database/migrations/*.sql
 
-# 4. Dev server (document root = public/)
+# 5. Dev server (document root = public/)
 php -S localhost:8000 -t public
 ```
 

@@ -25,6 +25,10 @@ Thumbs.db
 # deployment/ — never commit (db_pass in plaintext)
 deployment/
 
+# Ticker autocomplete list — admin panel edits this live on production
+# (public/data/tickers.json.example is the seed for fresh clones/deploys).
+public/data/tickers.json
+
 # E2E (Playwright) — node_modules ignored, package-lock.json committed (reproducible installs)
 node_modules/
 test-results/
