@@ -8,7 +8,6 @@ on:
 jobs:
   review:
     name: AI Code Review
-    if: "!contains(github.event.pull_request.labels.*.name, 'skip-review')"
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -17,12 +16,30 @@ jobs:
       id-token: write
 
     steps:
+      # gh pr create --label attaches the label via a follow-up API call, which
+      # lands AFTER the `opened` event (and its labels snapshot) already fired —
+      # so a static `if: !contains(github.event.pull_request.labels...)` misses
+      # a skip-review label added at PR-creation time. Query live label state
+      # instead of trusting the event snapshot.
+      - name: Check skip-review label
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh pr view ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --json labels -q '.labels[].name' | grep -qx 'skip-review'; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout
+        if: steps.check.outputs.skip == 'false'
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
       - name: Claude Code Review
+        if: steps.check.outputs.skip == 'false'
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.GHA_API_KEY }}
