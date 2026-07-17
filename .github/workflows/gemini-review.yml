@@ -98,7 +98,11 @@ jobs:
               print('Diff jest pusty. Pomijam review.')
               exit(0)
 
-          url = f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}'
+          # Rolling alias (not a dated/versioned model id) — points at whatever
+          # Google currently designates as the latest flash-tier model, so a
+          # future retirement (like gemini-2.5-flash's "no longer available to
+          # new users" 404) doesn't silently break this workflow again.
+          url = f'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={api_key}'
 
           # System prompt z zasadami projektu CLAUDE.md
           prompt = (
