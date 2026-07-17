@@ -1,4 +1,4 @@
-name: Gemini Code Review & CI
+name: Gemini Code Review
 
 on:
   pull_request:
@@ -7,97 +7,89 @@ on:
 
 jobs:
   review:
-    name: CI & Gemini Review
+    name: Gemini AI Review
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
 
     steps:
-      # 1. Checkout repository
-      - name: Checkout Code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      # 2. Setup PHP
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.2'
-          extensions: pdo, json, curl
-          coverage: none
-
-      # 3. Cache Composer dependencies
-      - name: Cache Composer Dependencies
-        uses: actions/cache@v4
-        with:
-          path: /tmp/composer-cache
-          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
-
-      # 4. Install dependencies (including PHPUnit & PHPStan)
-      - name: Install Dependencies
-        run: composer install --no-progress --prefer-dist
-
-      # 5. Run Static Analysis (PHPStan) - Runs always
-      - name: Run PHPStan
-        run: composer run stan
-
-      # 6. Run Tests (PHPUnit) - Runs always
-      - name: Run Tests
-        run: composer run test
-
-      # 7. Check if 'run-review' (Claude) label is present to determine if we should run Gemini AI Review
+      # Cheap/fast default-tier review. Runs on every PR UNLESS it carries
+      # `run-review` (reserved for the on-demand Claude Opus review — see
+      # claude-review.yml, which is the reverse: opt-in only). Live label
+      # query, not `github.event.pull_request.labels`: a label attached via
+      # `gh pr create --label` / `gh pr edit --add-label` lands via a
+      # follow-up API call, after the triggering event's labels snapshot was
+      # already captured — a static `if:` on the event context would miss a
+      # label added at creation time (same bug class fixed in claude-review.yml
+      # on 2026-07-17).
       - name: Check run-review label
         id: check
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # If the PR has the 'run-review' label, we skip Gemini AI to let Claude do it (either/or)
           if gh pr view ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --json labels -q '.labels[].name' | grep -qx 'run-review'; then
             echo "run_gemini=false" >> "$GITHUB_OUTPUT"
           else
             echo "run_gemini=true" >> "$GITHUB_OUTPUT"
           fi
 
-      # 8. Generate Git Diff
+      # Deliberately does NOT run PHPUnit/PHPStan — ci.yml already does that
+      # on every PR. Duplicating it here (as the original version of this
+      # file did) doubled CI minutes and was missing the `pdo_sqlite`
+      # extension ci.yml explicitly requires (32 test files use SQLite
+      # in-memory), so the duplicate run would very likely have failed
+      # outright before ever reaching the Gemini step. This job only needs
+      # the diff text, not a working PHP/Composer environment.
+      - name: Checkout
+        if: steps.check.outputs.run_gemini == 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Generate Git Diff
         if: steps.check.outputs.run_gemini == 'true'
         id: git-diff
+        continue-on-error: true
         run: |
           git diff origin/${{ github.base_ref }}...HEAD > pr_diff.txt
-          echo "DIFF_SIZE=$(wc -c < pr_diff.txt)" >> $GITHUB_ENV
+          echo "DIFF_SIZE=$(wc -c < pr_diff.txt)" >> "$GITHUB_ENV"
 
-      # 9. Run AI Review with Gemini 2.5 Flash
+      # continue-on-error: Gemini is a best-effort, optional filter tier, not
+      # a required check. A transient failure here (rate limit, network,
+      # malformed response) must never redden the PR's overall CI status —
+      # that would be indistinguishable from an actual test/typing failure
+      # reported by ci.yml.
       - name: Run Gemini Review
         if: steps.check.outputs.run_gemini == 'true' && env.DIFF_SIZE > 0 && env.DIFF_SIZE < 1000000
+        continue-on-error: true
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           python3 -c "
           import os, urllib.request, json
-          
+
           api_key = os.environ.get('GEMINI_API_KEY')
           if not api_key:
               print('Brak GEMINI_API_KEY. Pomijam AI Code Review.')
               exit(0)
-          
+
           try:
               with open('pr_diff.txt', 'r', encoding='utf-8') as f:
                   diff_content = f.read()
           except Exception as e:
               print('Nie można odczytać pliku diff:', e)
               exit(0)
-          
+
           # Limit do 60k znaków
           diff_content = diff_content[:60000]
-          
+
           if not diff_content.strip():
               print('Diff jest pusty. Pomijam review.')
               exit(0)
-          
+
           url = f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}'
-          
+
           # System prompt z zasadami projektu CLAUDE.md
           prompt = (
               'Jesteś doświadczonym programistą PHP i architektem oprogramowania. '
@@ -121,7 +113,7 @@ jobs:
               'Bądź konkretny, zwięzły i nie rozpisuj się o oczywistościach. Jeśli nie ma rażących błędów, napisz to krótko.\n\n'
               f'Oto git diff:\n\`\`\`diff\n{diff_content}\n\`\`\`'
           ).replace('\`', '`')
-          
+
           data = {
               'contents': [{
                   'parts': [{
@@ -129,13 +121,13 @@ jobs:
                   }]
               }]
           }
-          
+
           req = urllib.request.Request(
               url,
               data=json.dumps(data).encode('utf-8'),
               headers={'Content-Type': 'application/json'}
           )
-          
+
           try:
               with urllib.request.urlopen(req) as response:
                   res = json.loads(response.read().decode('utf-8'))
@@ -145,12 +137,12 @@ jobs:
                   print('Pomyślnie wygenerowano review.')
           except Exception as e:
               print('Błąd podczas komunikacji z Gemini API:', e)
-              exit(1)
+              exit(0)
           "
 
-      # 10. Post comment to PR
       - name: Comment PR with AI Review
-        if: success() && steps.check.outputs.run_gemini == 'true' && env.DIFF_SIZE > 0
+        if: steps.check.outputs.run_gemini == 'true' && env.DIFF_SIZE > 0
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
