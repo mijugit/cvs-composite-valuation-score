@@ -80,8 +80,9 @@ class AiAnalysisController
 
     public function generate(Request $req): void
     {
-        // AI generation can take up to 60s — extend PHP execution limit.
-        @set_time_limit(120);
+        // AI generation can take up to AI_TOTAL_TIMEOUT (.env, currently ~100s)
+        // — extend PHP execution limit with margin under the panel's 180s cap.
+        @set_time_limit(150);
 
         AuthController::requireAuth();
 
