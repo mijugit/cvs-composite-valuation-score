@@ -48,6 +48,16 @@ $holdingsTooltipHtml = static function (array $positions): string {
         . '<span class="ticker-hint__tooltip-scores">' . implode('', $lines) . '</span>';
 };
 
+// Shared (i) trigger + portal wrapper — same markup used for the metrics-table
+// row and the portfolio card header, kept in one place to avoid duplicating
+// the inline-style badge.
+$holdingsHintIcon = static function (string $code) use ($positions, $holdingsTooltipHtml): string {
+    return '<span class="ticker-hint">'
+        . '<span style="cursor:help;color:var(--c-muted);font-size:var(--text-xs);border:1px solid var(--c-border);border-radius:999px;width:1.1rem;height:1.1rem;display:inline-flex;align-items:center;justify-content:center;">ⓘ</span>'
+        . '<span class="ticker-hint__tooltip">' . $holdingsTooltipHtml($positions[$code] ?? []) . '</span>'
+        . '</span>';
+};
+
 $executionLabel = static function (string $execution): string {
     return $execution === 'open'
         ? 'Egzekucja na otwarciu (D+1, cena open)'
@@ -206,10 +216,7 @@ window.addEventListener('load', function () {
             <td>
                 <strong><?= htmlspecialchars($code) ?></strong>
                 <span style="color:var(--c-muted);font-size:var(--text-sm);"><?= htmlspecialchars((string) $def['name']) ?></span>
-                <span class="ticker-hint">
-                    <span style="cursor:help;color:var(--c-muted);font-size:var(--text-xs);border:1px solid var(--c-border);border-radius:999px;width:1.1rem;height:1.1rem;display:inline-flex;align-items:center;justify-content:center;">ⓘ</span>
-                    <span class="ticker-hint__tooltip"><?= $holdingsTooltipHtml($positions[$code] ?? []) ?></span>
-                </span>
+                <?= $holdingsHintIcon($code) ?>
             </td>
             <td style="<?= $pctColor($m['total_return_pct'] ?? null) ?>;font-weight:600;"><?= $pct($m['total_return_pct'] ?? null) ?></td>
             <td style="<?= $pctColor($m['vs_spy_pp'] ?? null) ?>"><?= $code === 'P0' ? '—' : $pct($m['vs_spy_pp'] ?? null) ?></td>
@@ -233,10 +240,7 @@ window.addEventListener('load', function () {
     <div class="card">
         <h3 style="margin-bottom:.25rem;font-size:var(--text-base);">
             <?= htmlspecialchars($code) ?> — <?= htmlspecialchars((string) $def['name']) ?>
-            <span class="ticker-hint">
-                <span style="cursor:help;color:var(--c-muted);font-size:var(--text-xs);border:1px solid var(--c-border);border-radius:999px;width:1.1rem;height:1.1rem;display:inline-flex;align-items:center;justify-content:center;">ⓘ</span>
-                <span class="ticker-hint__tooltip"><?= $holdingsTooltipHtml($positions[$code] ?? []) ?></span>
-            </span>
+            <?= $holdingsHintIcon($code) ?>
         </h3>
         <ul style="list-style:none;padding:0;margin:.5rem 0;color:var(--c-muted);font-size:var(--text-sm);">
             <?php if (!empty($rules['benchmark_ticker'])): ?>
