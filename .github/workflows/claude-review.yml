@@ -2,7 +2,7 @@ name: Claude Code Review
 
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [opened, synchronize, labeled]
     branches: [main]
 
 jobs:
@@ -16,30 +16,39 @@ jobs:
       id-token: write
 
     steps:
-      # gh pr create --label attaches the label via a follow-up API call, which
-      # lands AFTER the `opened` event (and its labels snapshot) already fired —
-      # so a static `if: !contains(github.event.pull_request.labels...)` misses
-      # a skip-review label added at PR-creation time. Query live label state
-      # instead of trusting the event snapshot.
-      - name: Check skip-review label
+      # OPT-IN ONLY. This review never runs unless the PR carries the
+      # `run-review` label — default is OFF, not "on unless skipped". A
+      # forgotten label now costs nothing instead of triggering a paid run
+      # against the owner's wishes (incident 2026-07-17: a `--label
+      # skip-review` flag was simply omitted from `gh pr create`, and the
+      # review ran anyway).
+      #
+      # Live label query, not `github.event.pull_request.labels`: a label
+      # attached via `gh pr create --label` / `gh pr edit --add-label` lands
+      # via a follow-up API call, after the triggering event's labels
+      # snapshot was already captured — a static `if:` on the event context
+      # would miss a label added at creation time. `labeled` is also in the
+      # trigger types above so adding `run-review` to an already-open PR
+      # fires this workflow and actually starts the review.
+      - name: Check run-review label
         id: check
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if gh pr view ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --json labels -q '.labels[].name' | grep -qx 'skip-review'; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
+          if gh pr view ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --json labels -q '.labels[].name' | grep -qx 'run-review'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
           else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "run=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Checkout
-        if: steps.check.outputs.skip == 'false'
+        if: steps.check.outputs.run == 'true'
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
       - name: Claude Code Review
-        if: steps.check.outputs.skip == 'false'
+        if: steps.check.outputs.run == 'true'
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.GHA_API_KEY }}
