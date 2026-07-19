@@ -100,9 +100,36 @@ class UserRepository
     public function setVerifyToken(int $id, string $token, string $expiresAt): void
     {
         $stmt = $this->db->prepare(
-            'UPDATE users SET email_verify_token = ?, email_verify_expires_at = ? WHERE id = ?'
+            'UPDATE users SET email_verify_token = ?, email_verify_expires_at = ?, email_verify_last_sent_at = ? WHERE id = ?'
         );
-        $stmt->execute([$token, $expiresAt, $id]);
+        $stmt->execute([$token, $expiresAt, (new \DateTimeImmutable())->format('Y-m-d H:i:s'), $id]);
+    }
+
+    /**
+     * Guards against the resend-verification email-bombing vector: without
+     * this, an attacker who registers once with a victim's address (or
+     * repeatedly triggers the unverified-login resend) could spam that
+     * inbox indefinitely with no rate limit. PHP-computed comparison (not
+     * `NOW() - INTERVAL` in SQL) for MySQL/SQLite test compatibility, same
+     * pattern as TrackRecordCalculator.
+     */
+    public function canResendVerification(int $id, int $cooldownSeconds): bool
+    {
+        $stmt = $this->db->prepare(
+            'SELECT email_verify_last_sent_at FROM users WHERE id = ? LIMIT 1'
+        );
+        $stmt->execute([$id]);
+        $row = $stmt->fetch();
+        if ($row === false || $row['email_verify_last_sent_at'] === null) {
+            return true;
+        }
+
+        $lastSent = \DateTimeImmutable::createFromFormat('Y-m-d H:i:s', (string) $row['email_verify_last_sent_at']);
+        if ($lastSent === false) {
+            return true;
+        }
+
+        return (new \DateTimeImmutable())->getTimestamp() - $lastSent->getTimestamp() >= $cooldownSeconds;
     }
 
     /** @return array{id:int, email:string}|null — null gdy token nieznany lub wygasł */
