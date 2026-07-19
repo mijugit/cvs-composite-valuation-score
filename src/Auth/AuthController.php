@@ -154,7 +154,16 @@ class AuthController
             return;
         }
         if ($this->users->emailExists($email)) {
-            $this->renderRegister('Ten adres e-mail jest już zajęty.');
+            // Do not reveal whether the address is already registered
+            // (enumeration — same CLAUDE.md rule as the login flow, pointed
+            // out by review while auditing this exact registration path).
+            // Behave identically to a successful registration from the
+            // requester's point of view: no new account, no email sent,
+            // same redirect. A real owner of that address already has
+            // their password and isn't affected.
+            $this->captcha->clear();
+            $_SESSION['pending_verification_email'] = $email;
+            Response::redirect('/auth/check-email');
             return;
         }
 
