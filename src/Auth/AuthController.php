@@ -21,11 +21,29 @@ class AuthController
 {
     private UserRepository $users;
     private MailService    $mail;
+    private PillarCaptcha  $captcha;
+    /** @var array<string, mixed> */
+    private array $authConfig;
 
     public function __construct()
     {
-        $this->users = new UserRepository();
-        $this->mail  = new MailService();
+        $this->users      = new UserRepository();
+        $this->mail       = new MailService();
+        $this->authConfig = require dirname(__DIR__, 2) . '/config/auth.php';
+
+        // Swing-mode weights reused verbatim from the real CVS model config
+        // (FR-010 spirit — one source of truth, no duplicated magic numbers)
+        // purely to theme the anti-bot arithmetic challenge; never used for
+        // any actual CVS scoring.
+        $cvsWeights = require dirname(__DIR__, 2) . '/config/cvs-weights.php';
+        $swing      = $cvsWeights['modes']['swing'];
+
+        $this->captcha = new PillarCaptcha(
+            (float) $swing['valuation_weight'],
+            (float) $swing['quality_weight'],
+            (int) $this->authConfig['captcha']['min_form_age_seconds'],
+            (string) $this->authConfig['captcha']['honeypot_field'],
+        );
     }
 
     // ------------------------------------------------------------------
@@ -71,17 +89,10 @@ class AuthController
             return;
         }
 
-        // Block unverified accounts — send fresh link and redirect to check-email.
+        // Block unverified accounts — send fresh link (cooldown-gated, see
+        // sendVerificationEmail()) and redirect to check-email.
         if (!$this->users->isEmailVerified((int) $user['id'])) {
-            $token   = bin2hex(random_bytes(32));
-            $expires = (new \DateTime('+48 hours'))->format('Y-m-d H:i:s');
-            $this->users->setVerifyToken((int) $user['id'], $token, $expires);
-            $verifyUrl = ($_ENV['APP_URL'] ?? 'https://cvs.timeflow.fun') . '/auth/verify?token=' . $token;
-            $this->mail->send(
-                (string) $user['email'],
-                'CVS — potwierdź adres e-mail',
-                $this->buildVerificationHtml((string) $user['email'], $verifyUrl)
-            );
+            $this->sendVerificationEmail((int) $user['id'], (string) $user['email']);
             $_SESSION['pending_verification_email'] = $user['email'];
             Response::redirect('/auth/check-email');
             return;
@@ -106,13 +117,22 @@ class AuthController
             Response::redirect('/dashboard');
         }
         $this->refreshCsrf();
-        Response::view('register', ['error' => null]);
+        $this->renderRegister(null);
     }
 
     public function register(Request $req): void
     {
         if (!$req->verifyCsrf()) {
-            Response::view('register', ['error' => 'Nieprawidłowy token CSRF. Odśwież stronę.']);
+            $this->renderRegister('Nieprawidłowy token CSRF. Odśwież stronę.');
+            return;
+        }
+
+        // Anti-bot check first — before touching the DB at all. Generic
+        // failure message on purpose (see PillarCaptcha::verify() docblock):
+        // does not reveal which of the three layers (honeypot / timing /
+        // arithmetic) tripped, giving a probing bot nothing to iterate on.
+        if (!$this->captcha->verify($req)) {
+            $this->renderRegister('Nie udało się zweryfikować formularza. Spróbuj ponownie.');
             return;
         }
 
@@ -122,32 +142,38 @@ class AuthController
 
         // --- Validation ---
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            Response::view('register', ['error' => 'Podaj prawidłowy adres e-mail.']);
+            $this->renderRegister('Podaj prawidłowy adres e-mail.');
             return;
         }
         if (strlen($password) < 8) {
-            Response::view('register', ['error' => 'Hasło musi mieć co najmniej 8 znaków.']);
+            $this->renderRegister('Hasło musi mieć co najmniej 8 znaków.');
             return;
         }
         if ($password !== $confirm) {
-            Response::view('register', ['error' => 'Hasła nie są identyczne.']);
+            $this->renderRegister('Hasła nie są identyczne.');
             return;
         }
         if ($this->users->emailExists($email)) {
-            Response::view('register', ['error' => 'Ten adres e-mail jest już zajęty.']);
+            $this->renderRegister('Ten adres e-mail jest już zajęty.');
             return;
         }
 
         $hash = password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
         $id   = $this->users->create($email, $hash);
 
-        $token   = bin2hex(random_bytes(32));
-        $expires = (new \DateTime('+48 hours'))->format('Y-m-d H:i:s');
-        $this->users->setVerifyToken($id, $token, $expires);
-        $verifyUrl = ($_ENV['APP_URL'] ?? 'https://cvs.timeflow.fun') . '/auth/verify?token=' . $token;
-        $this->mail->send($email, 'CVS — potwierdź adres e-mail', $this->buildVerificationHtml($email, $verifyUrl));
+        $this->captcha->clear();
+        $this->sendVerificationEmail($id, $email);
         $_SESSION['pending_verification_email'] = $email;
         Response::redirect('/auth/check-email');
+    }
+
+    /** Re-render the register form with a fresh CSRF-independent CVS Pillar Check challenge. */
+    private function renderRegister(?string $error): void
+    {
+        Response::view('register', [
+            'error'   => $error,
+            'captcha' => $this->captcha->generate(),
+        ]);
     }
 
     // ------------------------------------------------------------------
@@ -177,13 +203,33 @@ class AuthController
             Response::redirect('/login');
             return;
         }
+
+        $_SESSION['_flash'] = $this->sendVerificationEmail((int) $user['id'], $email)
+            ? 'Nowy link weryfikacyjny został wysłany.'
+            : 'Link weryfikacyjny już wysłany — spróbuj ponownie za chwilę.';
+        Response::redirect('/auth/check-email');
+    }
+
+    /**
+     * Generate a fresh verification token and email it, IF the per-account
+     * resend cooldown allows it. This is the single choke point every call
+     * site (register / login-unverified / resendVerification) goes
+     * through, so the email-bombing guard can't be forgotten at a future
+     * call site. Returns whether it actually sent.
+     */
+    private function sendVerificationEmail(int $userId, string $email): bool
+    {
+        $cooldown = (int) $this->authConfig['verify_resend_cooldown_seconds'];
+        if (!$this->users->canResendVerification($userId, $cooldown)) {
+            return false;
+        }
+
         $token   = bin2hex(random_bytes(32));
         $expires = (new \DateTime('+48 hours'))->format('Y-m-d H:i:s');
-        $this->users->setVerifyToken((int) $user['id'], $token, $expires);
+        $this->users->setVerifyToken($userId, $token, $expires);
         $verifyUrl = ($_ENV['APP_URL'] ?? 'https://cvs.timeflow.fun') . '/auth/verify?token=' . $token;
         $this->mail->send($email, 'CVS — potwierdź adres e-mail', $this->buildVerificationHtml($email, $verifyUrl));
-        $_SESSION['_flash'] = 'Nowy link weryfikacyjny został wysłany.';
-        Response::redirect('/auth/check-email');
+        return true;
     }
 
     public function verify(Request $req): void
