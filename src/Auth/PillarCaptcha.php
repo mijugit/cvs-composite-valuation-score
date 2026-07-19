@@ -88,7 +88,11 @@ final class PillarCaptcha
             return false;
         }
 
-        $answer = trim((string) $req->input('pillar_answer', ''));
+        // Accept a Polish-style decimal comma ("30,5") as well as a period —
+        // (float) casting a comma-containing string silently truncates at
+        // the comma, which would reject a correct answer from any user who
+        // types the number the way they normally would.
+        $answer = str_replace(',', '.', trim((string) $req->input('pillar_answer', '')));
         if ($answer === '' || !is_numeric($answer)) {
             return false;
         }

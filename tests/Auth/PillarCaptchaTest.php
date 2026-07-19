@@ -53,6 +53,21 @@ class PillarCaptchaTest extends TestCase
         $this->assertTrue($captcha->verify($req));
     }
 
+    public function test_verify_accepts_polish_decimal_comma(): void
+    {
+        // Directly seed a fractional expected value (rather than relying on
+        // generate()'s random operands, which could by chance land on a
+        // whole number and never exercise the comma-replacement path at
+        // all) — a Polish user typing "42,5" rather than "42.5" must still
+        // be accepted.
+        $captcha = $this->makeCaptcha(minFormAgeSeconds: 0);
+        $_SESSION['pillar_captcha'] = ['expected' => 42.5, 'rendered_at' => time()];
+
+        $req = $this->makeRequest(['pillar_answer' => '42,5']);
+
+        $this->assertTrue($captcha->verify($req));
+    }
+
     public function test_verify_rejects_wrong_answer(): void
     {
         $captcha = $this->makeCaptcha(minFormAgeSeconds: 0);
