@@ -891,7 +891,10 @@
         titleEl.textContent = 'Historia: ' + bucket;
         emptyEl.hidden = true;
         canvas.style.display = 'none';
-        if (companyLegend) companyLegend.hidden = true;
+        if (companyLegend) {
+            companyLegend.hidden = true;
+            companyLegend.style.display = 'none';
+        }
         modal.hidden = false;
         destroyChart();
 
@@ -959,6 +962,7 @@
                     });
                     if (companyLegend) {
                         companyLegend.hidden = false;
+                        companyLegend.style.display = 'inline-flex';
                         const labelSpan = companyLegend.querySelector('[data-company-legend-text]');
                         if (labelSpan) {
                             labelSpan.textContent = (companyLabel || 'Spółka')
