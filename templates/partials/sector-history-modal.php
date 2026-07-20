@@ -38,6 +38,16 @@ $sectorHint = static fn (string $text): string =>
                 <span style="width:10px;height:10px;border-radius:2px;background:rgba(52,211,153,.9);display:inline-block;"></span>
                 GM%<?= $sectorHint('Mediana marży brutto (zysk brutto / przychody) w grupie — benchmark filaru Jakości.') ?>
             </span>
+            <!-- Company overlay legend entry — hidden by default, shown only when
+                 opened from the /analysis/{ticker} valuation badge (public/js/app.js
+                 sets .hidden=false + fills the text when a company value is present).
+                 Never shown on /admin/sectors or /sectors, which have no single
+                 company in context. -->
+            <span id="sector-history-legend-company" style="display:inline-flex;align-items:center;gap:.4rem;" hidden>
+                <span style="width:14px;height:0;border-top:2px dashed rgba(239,68,68,.95);display:inline-block;"></span>
+                <span data-company-legend-text>Spółka</span>
+                <?= $sectorHint('Aktualny mnożnik analizowanej spółki — linia przerywana, stały poziom (mamy tylko bieżącą wartość, nie historię spółki), na tle historycznej mediany sektora/podsektora.') ?>
+            </span>
         </div>
         <canvas id="sector-history-chart" style="display:none;"></canvas>
     </div>

@@ -686,10 +686,24 @@
                     <tbody>
                         <?php
                         // Valuation reference badge (FR-005) — shows which benchmark was used
-                        $valRef    = $result['valuation_reference'] ?? [];
-                        $valSource = $valRef['source'] ?? '';
-                        $valBucket = $valRef['bucket'] ?? '';
-                        $valBadge  = '';
+                        $valRef     = $result['valuation_reference'] ?? [];
+                        $valSource  = $valRef['source'] ?? '';
+                        $valBucket  = $valRef['bucket'] ?? '';
+                        $valValue   = $valRef['value'] ?? null;
+                        $valVariant = $valRef['variant'] ?? null;
+                        $valBadge   = '';
+                        // Company-value attributes (only meaningful when $valValue is a
+                        // real number): openModal() in app.js overlays this as a dashed
+                        // reference line on the peer-median history chart — variant A
+                        // (ev_fcf) plots on the EV/FCF axis, variant B (ev_sales_adj) on
+                        // the EV/Sales axis. Omitted entirely when null so the JS falls
+                        // back to the plain sector/industry chart with no overlay.
+                        $companyAttrs = '';
+                        if (is_numeric($valValue) && in_array($valVariant, ['A', 'B'], true)) {
+                            $companyAttrs = ' data-company-value="' . htmlspecialchars((string) $valValue) . '"'
+                                . ' data-company-variant="' . htmlspecialchars((string) $valVariant) . '"'
+                                . ' data-company-label="' . htmlspecialchars($ticker) . '"';
+                        }
                         // Badge is clickable (.js-sector-chart, shared with admin/sectors.php —
                         // public/js/app.js) to open the peer-median history chart for whichever
                         // bucket the Valuation pillar actually benchmarked against. level must
@@ -698,12 +712,14 @@
                         if ($valSource === 'subsector' && $valBucket !== '') {
                             $valBadge = ' <span title="Benchmark: podsektor ' . htmlspecialchars($valBucket) . ' — kliknij, aby zobaczyć historię"'
                                 . ' class="js-sector-chart" data-level="industry" data-bucket="' . htmlspecialchars($valBucket) . '"'
+                                . $companyAttrs
                                 . ' style="font-size:.7rem;background:rgba(64,144,224,.15);color:var(--c-primary);'
                                 . 'border-radius:3px;padding:1px 5px;margin-left:.3rem;cursor:pointer;">'
                                 . '⊂ ' . htmlspecialchars($valBucket) . '</span>';
                         } elseif (in_array($valSource, ['sector_fallback', 'cold_start'], true) && $valBucket !== '') {
                             $valBadge = ' <span title="Benchmark: sektor ' . htmlspecialchars($valBucket) . ' — kliknij, aby zobaczyć historię"'
                                 . ' class="js-sector-chart" data-level="sector" data-bucket="' . htmlspecialchars($valBucket) . '"'
+                                . $companyAttrs
                                 . ' style="font-size:.7rem;background:rgba(255,255,255,.06);color:var(--c-muted);'
                                 . 'border-radius:3px;padding:1px 5px;margin-left:.3rem;cursor:pointer;">'
                                 . '≈ ' . htmlspecialchars($valBucket) . '</span>';

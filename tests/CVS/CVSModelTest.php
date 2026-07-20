@@ -126,6 +126,24 @@ class CVSModelTest extends TestCase
         $this->assertArrayHasKey('quality',        $result->pillarScores);
     }
 
+    /**
+     * value/variant power the sector-history-modal overlay on the /analysis
+     * valuation badge (analysis.php) — the company's own EV/FCF (variant A)
+     * or EV/Sales (variant B) multiple plotted against the peer-group's
+     * historical median. Both must come from the SAME resolution as
+     * source/bucket, never a stale/mismatched value.
+     */
+    public function test_valuation_reference_contains_value_and_variant(): void
+    {
+        $model  = $this->model();
+        $result = $model->calculate('TEST', $this->baseFinancials());
+
+        $this->assertArrayHasKey('value',   $result->valuationReference);
+        $this->assertArrayHasKey('variant', $result->valuationReference);
+        $this->assertContains($result->valuationReference['variant'], ['A', 'B']);
+        $this->assertIsFloat($result->valuationReference['value']);
+    }
+
     // ------------------------------------------------------------------
     // Determinism guarantee
     // ------------------------------------------------------------------
