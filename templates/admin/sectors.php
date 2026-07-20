@@ -149,30 +149,7 @@ $hintGm = 'Mediana marży brutto (zysk brutto / przychody) w grupie — benchmar
 
 <div id="sectors-toast" class="sectors-toast" hidden></div>
 
-<div id="sector-history-modal" class="ai-modal" hidden
-     data-history-base="<?= htmlspecialchars($historyEndpoint ?? '/admin/sectors/history') ?>">
-    <div class="ai-modal__inner" style="max-width:700px;text-align:left;width:calc(100% - 2rem);">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:1rem;">
-            <h3 id="sector-history-title" style="font-size:var(--text-lg);margin:0;">Historia: —</h3>
-            <button id="sector-history-close" class="btn btn--ghost btn--sm">✕</button>
-        </div>
-        <p id="sector-history-empty" style="color:var(--c-text-muted);text-align:center;padding:2rem 0;" hidden>
-            Brak danych historycznych. Dane zaczną się gromadzić od następnego odświeżenia.
-        </p>
-        <div id="sector-history-legend" style="display:flex;gap:1.25rem;flex-wrap:wrap;margin-bottom:.75rem;font-size:var(--text-sm);">
-            <span style="display:inline-flex;align-items:center;gap:.4rem;">
-                <span style="width:10px;height:10px;border-radius:2px;background:rgba(64,144,224,.9);display:inline-block;"></span>
-                EV/FCF<?= $hint($hintEvFcf) ?>
-            </span>
-            <span style="display:inline-flex;align-items:center;gap:.4rem;">
-                <span style="width:10px;height:10px;border-radius:2px;background:rgba(250,204,21,.9);display:inline-block;"></span>
-                EV/Sales<?= $hint($hintEvSales) ?>
-            </span>
-            <span style="display:inline-flex;align-items:center;gap:.4rem;">
-                <span style="width:10px;height:10px;border-radius:2px;background:rgba(52,211,153,.9);display:inline-block;"></span>
-                GM%<?= $hint($hintGm) ?>
-            </span>
-        </div>
-        <canvas id="sector-history-chart" style="display:none;"></canvas>
-    </div>
-</div>
+<?php
+$historyEndpoint = $historyEndpoint ?? '/admin/sectors/history';
+require __DIR__ . '/../partials/sector-history-modal.php';
+?>

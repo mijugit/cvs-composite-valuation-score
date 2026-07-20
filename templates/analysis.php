@@ -690,15 +690,22 @@
                         $valSource = $valRef['source'] ?? '';
                         $valBucket = $valRef['bucket'] ?? '';
                         $valBadge  = '';
+                        // Badge is clickable (.js-sector-chart, shared with admin/sectors.php —
+                        // public/js/app.js) to open the peer-median history chart for whichever
+                        // bucket the Valuation pillar actually benchmarked against. level must
+                        // match $valSource: 'subsector' benchmarks against an industry bucket,
+                        // 'sector_fallback'/'cold_start' against the sector itself.
                         if ($valSource === 'subsector' && $valBucket !== '') {
-                            $valBadge = ' <span title="Benchmark: podsektor ' . htmlspecialchars($valBucket) . '"'
+                            $valBadge = ' <span title="Benchmark: podsektor ' . htmlspecialchars($valBucket) . ' — kliknij, aby zobaczyć historię"'
+                                . ' class="js-sector-chart" data-level="industry" data-bucket="' . htmlspecialchars($valBucket) . '"'
                                 . ' style="font-size:.7rem;background:rgba(64,144,224,.15);color:var(--c-primary);'
-                                . 'border-radius:3px;padding:1px 5px;margin-left:.3rem;cursor:default;">'
+                                . 'border-radius:3px;padding:1px 5px;margin-left:.3rem;cursor:pointer;">'
                                 . '⊂ ' . htmlspecialchars($valBucket) . '</span>';
                         } elseif (in_array($valSource, ['sector_fallback', 'cold_start'], true) && $valBucket !== '') {
-                            $valBadge = ' <span title="Benchmark: sektor ' . htmlspecialchars($valBucket) . '"'
+                            $valBadge = ' <span title="Benchmark: sektor ' . htmlspecialchars($valBucket) . ' — kliknij, aby zobaczyć historię"'
+                                . ' class="js-sector-chart" data-level="sector" data-bucket="' . htmlspecialchars($valBucket) . '"'
                                 . ' style="font-size:.7rem;background:rgba(255,255,255,.06);color:var(--c-muted);'
-                                . 'border-radius:3px;padding:1px 5px;margin-left:.3rem;cursor:default;">'
+                                . 'border-radius:3px;padding:1px 5px;margin-left:.3rem;cursor:pointer;">'
                                 . '≈ ' . htmlspecialchars($valBucket) . '</span>';
                         }
                         ?>
@@ -2121,6 +2128,14 @@
         <?php endif; ?>
 
     <?php endif; ?>
+
+    <?php
+    // Peer-median history modal — opened by the sector/subsector badge in
+    // the pillar table above (.js-sector-chart). Public endpoint (any
+    // logged-in user), not the admin one.
+    $historyEndpoint = '/sectors/history';
+    require __DIR__ . '/partials/sector-history-modal.php';
+    ?>
 
     <p><a href="/dashboard">&larr; Powrót do panelu</a></p>
 </section>

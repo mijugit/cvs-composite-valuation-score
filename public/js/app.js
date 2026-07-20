@@ -851,7 +851,10 @@
 }());
 
 // ------------------------------------------------------------------
-// Admin Sectors — history modal + Chart.js
+// Sector/industry peer-median history modal + Chart.js. Page-agnostic —
+// triggered by any .js-sector-chart element (data-level, data-bucket);
+// used on /admin/sectors and /analysis/{ticker}, both sharing
+// templates/partials/sector-history-modal.php.
 // ------------------------------------------------------------------
 
 (function () {
