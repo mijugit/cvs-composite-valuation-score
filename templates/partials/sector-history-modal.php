@@ -43,7 +43,7 @@ $sectorHint = static fn (string $text): string =>
                  sets .hidden=false + fills the text when a company value is present).
                  Never shown on /admin/sectors or /sectors, which have no single
                  company in context. -->
-            <span id="sector-history-legend-company" style="display:inline-flex;align-items:center;gap:.4rem;" hidden>
+            <span id="sector-history-legend-company" style="align-items:center;gap:.4rem;" hidden>
                 <span style="width:14px;height:0;border-top:2px dashed rgba(239,68,68,.95);display:inline-block;"></span>
                 <span data-company-legend-text>Spółka</span>
                 <?= $sectorHint('Aktualny mnożnik analizowanej spółki — linia przerywana, stały poziom (mamy tylko bieżącą wartość, nie historię spółki), na tle historycznej mediany sektora/podsektora.') ?>
