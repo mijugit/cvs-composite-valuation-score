@@ -863,11 +863,12 @@
     const chartBtns = document.querySelectorAll('.js-sector-chart');
     if (!chartBtns.length) return;
 
-    const modal    = document.getElementById('sector-history-modal');
-    const titleEl  = document.getElementById('sector-history-title');
-    const emptyEl  = document.getElementById('sector-history-empty');
-    const canvas   = document.getElementById('sector-history-chart');
-    const closeBtn = document.getElementById('sector-history-close');
+    const modal        = document.getElementById('sector-history-modal');
+    const titleEl      = document.getElementById('sector-history-title');
+    const emptyEl      = document.getElementById('sector-history-empty');
+    const canvas       = document.getElementById('sector-history-chart');
+    const closeBtn     = document.getElementById('sector-history-close');
+    const companyLegend = document.getElementById('sector-history-legend-company');
 
     if (!modal || !canvas) return;
 
@@ -880,12 +881,22 @@
         if (existing) existing.destroy();
     }
 
-    function openModal(level, bucket) {
+    // companyValue/companyVariant/companyLabel are optional — set only by the
+    // valuation badge on /analysis/{ticker} (templates/analysis.php), never
+    // by the plain sector/industry rows on /admin/sectors or /sectors. When
+    // present, overlay the analysed company's own multiple as a flat dashed
+    // reference line so its position against the sector's historical median
+    // is visible at a glance ("this company through the lens of its sector").
+    function openModal(level, bucket, companyValue, companyVariant, companyLabel) {
         titleEl.textContent = 'Historia: ' + bucket;
         emptyEl.hidden = true;
         canvas.style.display = 'none';
+        if (companyLegend) companyLegend.hidden = true;
         modal.hidden = false;
         destroyChart();
+
+        const companyNum = parseFloat(companyValue);
+        const hasCompany = Number.isFinite(companyNum) && (companyVariant === 'A' || companyVariant === 'B');
 
         fetch(historyBase + '?level=' + encodeURIComponent(level) + '&bucket_key=' + encodeURIComponent(bucket), {
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
@@ -898,39 +909,69 @@
                 }
                 const d = json.data;
                 canvas.style.display = 'block';
+
+                const datasets = [
+                    {
+                        label: 'EV/FCF',
+                        data: d.ev_fcf,
+                        yAxisID: 'y',
+                        borderColor: 'rgba(64, 144, 224, 0.9)',
+                        backgroundColor: 'rgba(64, 144, 224, 0.1)',
+                        tension: 0.3,
+                        spanGaps: true,
+                    },
+                    {
+                        label: 'EV/Sales',
+                        data: d.ev_sales,
+                        yAxisID: 'y2',
+                        borderColor: 'rgba(250, 204, 21, 0.9)',
+                        backgroundColor: 'rgba(250, 204, 21, 0.1)',
+                        tension: 0.3,
+                        spanGaps: true,
+                    },
+                    {
+                        label: 'GM%',
+                        data: d.gm,
+                        yAxisID: 'y1',
+                        borderColor: 'rgba(52, 211, 153, 0.9)',
+                        backgroundColor: 'rgba(52, 211, 153, 0.1)',
+                        tension: 0.3,
+                        spanGaps: true,
+                    },
+                ];
+
+                if (hasCompany) {
+                    // Flat line at the company's own multiple across the same date
+                    // axis as the sector history — we only have ONE current value
+                    // for the company (not a historical series), so a constant
+                    // dashed reference line is the correct comparison, not a curve.
+                    datasets.push({
+                        label: (companyLabel || 'Spółka') + (companyVariant === 'A' ? ' — EV/FCF' : ' — EV/Sales'),
+                        data: d.labels.map(() => companyNum),
+                        yAxisID: companyVariant === 'A' ? 'y' : 'y2',
+                        borderColor: 'rgba(239, 68, 68, 0.95)',
+                        backgroundColor: 'transparent',
+                        borderDash: [6, 4],
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0,
+                        spanGaps: true,
+                    });
+                    if (companyLegend) {
+                        companyLegend.hidden = false;
+                        const labelSpan = companyLegend.querySelector('[data-company-legend-text]');
+                        if (labelSpan) {
+                            labelSpan.textContent = (companyLabel || 'Spółka')
+                                + (companyVariant === 'A' ? ' (EV/FCF, aktualnie)' : ' (EV/Sales, aktualnie)');
+                        }
+                    }
+                }
+
                 activeChart = new Chart(canvas, {
                     type: 'line',
                     data: {
                         labels: d.labels,
-                        datasets: [
-                            {
-                                label: 'EV/FCF',
-                                data: d.ev_fcf,
-                                yAxisID: 'y',
-                                borderColor: 'rgba(64, 144, 224, 0.9)',
-                                backgroundColor: 'rgba(64, 144, 224, 0.1)',
-                                tension: 0.3,
-                                spanGaps: true,
-                            },
-                            {
-                                label: 'EV/Sales',
-                                data: d.ev_sales,
-                                yAxisID: 'y2',
-                                borderColor: 'rgba(250, 204, 21, 0.9)',
-                                backgroundColor: 'rgba(250, 204, 21, 0.1)',
-                                tension: 0.3,
-                                spanGaps: true,
-                            },
-                            {
-                                label: 'GM%',
-                                data: d.gm,
-                                yAxisID: 'y1',
-                                borderColor: 'rgba(52, 211, 153, 0.9)',
-                                backgroundColor: 'rgba(52, 211, 153, 0.1)',
-                                tension: 0.3,
-                                spanGaps: true,
-                            },
-                        ],
+                        datasets: datasets,
                     },
                     options: {
                         responsive: true,
@@ -978,7 +1019,9 @@
             e.stopPropagation();
             const level  = btn.dataset.level;
             const bucket = btn.dataset.bucket;
-            if (level && bucket) openModal(level, bucket);
+            if (level && bucket) {
+                openModal(level, bucket, btn.dataset.companyValue, btn.dataset.companyVariant, btn.dataset.companyLabel);
+            }
         });
     });
 

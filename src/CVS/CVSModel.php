@@ -135,9 +135,18 @@ class CVSModel
         $fundReco  = $this->mapToLabel((int) round($fundCvs));
 
         // Step 5 — Valuation reference (source + bucket used, for FR-005 transparency).
+        // 'value'/'variant' added for the sector-history-modal overlay (analysis.php's
+        // clickable valuation badge) — the company's own EV/FCF (variant A) or
+        // EV/Sales (variant B) multiple, plotted as a dashed reference line against
+        // the peer-group's historical median. Both keys come from the same
+        // steps() snapshot that produced source/bucket above, so they're always
+        // consistent with each other (see ValuationPillar::scoreVariantA/B).
+        $valuationSteps     = $this->valuation->steps();
         $valuationReference = [
             'source'       => $this->valuation->lastSource(),
             'bucket'       => $this->valuation->lastBucketKey(),
+            'value'        => $valuationSteps['ev_fcf'] ?? $valuationSteps['ev_sales_adj'] ?? null,
+            'variant'      => $valuationSteps['variant'] ?? null,
         ];
 
         // Step 6 — Overlay penalties (Phase 5, slice 1): SHADOW model_version (3.1).
