@@ -144,8 +144,102 @@ button, a { -webkit-tap-highlight-color: rgba(64, 144, 224, .2); }
 
 /* Same fix, /screener: the search autocomplete dropdown lives in the
    filter card, which must outrank the results card below it. */
-.screener-filter-card  { position: relative; z-index: 2; }
+.screener-filter-card  { position: relative; z-index: 2; margin-bottom: 1.5rem; padding: 1.25rem 1.5rem; }
 .screener-results-card { position: relative; z-index: 1; }
+
+/* --- Screener filter panel ---------------------------------
+   Search on its own row (primary action), a grid of dropdown filters
+   below it (consistent label/control height, no baseline mismatch),
+   then a footer separating boolean toggles from Filtruj/Reset — mirrors
+   the layout convention of screener panels in trading apps (grouped by
+   filter type, not one long flex-wrap row). */
+.screener-filters {
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+}
+
+.screener-filters__search { max-width: 360px; }
+
+.screener-filters__search label,
+.screener-filters__fields .form-group label {
+    display: flex;
+    align-items: center;
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--c-muted);
+    margin-bottom: .35rem;
+}
+
+.screener-filters__fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: .85rem 1rem;
+}
+.screener-filters__fields .form-group { margin: 0; gap: 0; }
+.screener-filters__fields select,
+.screener-filters__fields input { width: 100%; }
+
+.screener-filters__footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    padding-top: .95rem;
+    border-top: 1px solid var(--c-border);
+}
+
+.screener-filters__toggles {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .5rem 1rem;
+}
+
+/* Checkbox restyled as a pill/chip toggle — sibling-selector pattern
+   (no JS, no :has() dependency): the real checkbox is visually hidden
+   but stays in the tab order and keyboard-operable; its :checked state
+   styles the adjacent pill via the CSS + combinator. */
+.filter-toggle { display: inline-flex; align-items: center; gap: .3rem; }
+
+.filter-toggle__control {
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+}
+.filter-toggle__control input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+.filter-toggle__pill {
+    display: inline-flex;
+    align-items: center;
+    padding: .45rem .9rem;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--c-border);
+    background: var(--c-bg);
+    color: var(--c-muted);
+    font-size: var(--text-xs);
+    white-space: nowrap;
+    transition: border-color .15s, color .15s, background .15s;
+}
+.filter-toggle__control:hover .filter-toggle__pill { border-color: var(--c-primary); }
+.filter-toggle__control input:focus-visible + .filter-toggle__pill {
+    outline: 2px solid var(--c-primary);
+    outline-offset: 2px;
+}
+.filter-toggle__control input:checked + .filter-toggle__pill {
+    border-color: var(--c-primary);
+    background: rgba(64, 144, 224, .15);
+    color: var(--c-text);
+}
+
+.screener-filters__actions { display: flex; gap: .4rem; flex-shrink: 0; }
 
 /* --- Forms ------------------------------------------------ */
 .form { display: flex; flex-direction: column; gap: 1rem; }
@@ -1126,14 +1220,11 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
     .consensus-bar__label { flex: 0 0 84px; font-size: .75rem; }
     .consensus-bar__count { flex: 0 0 24px; }
 
-    /* Screener / filter forms: each control takes a full row, easy to tap */
-    form[action="/screener"] .form-group,
-    form[action="/screener"] > div {
-        flex: 1 1 100% !important;
-        min-width: 0 !important;
-    }
-    form[action="/screener"] select,
-    form[action="/screener"] input { width: 100%; }
+    /* Screener filter panel: one field per row, easy to tap */
+    .screener-filters__search { max-width: none; }
+    .screener-filters__fields { grid-template-columns: 1fr; }
+    .screener-filters__footer { flex-direction: column; align-items: stretch; }
+    .screener-filters__actions { justify-content: flex-end; }
 }
 
 /* --- Phones --------------------------------------------------- */

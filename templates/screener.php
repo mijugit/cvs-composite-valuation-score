@@ -185,92 +185,102 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
     <?php endif; ?>
 </div>
 
-<!-- Filter form -->
-<div class="card screener-filter-card" style="margin-bottom:1.5rem;padding:1rem 1.25rem;">
-    <form method="GET" action="/screener" style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;">
+<!-- Filter panel -->
+<div class="card screener-filter-card">
+    <form method="GET" action="/screener" class="screener-filters">
 
-        <div class="form-group" style="margin:0;min-width:220px;">
-            <label for="screener-search" style="font-size:var(--text-xs);">Szukaj</label>
+        <div class="screener-filters__search">
+            <label for="screener-search">
+                Szukaj<?= $hint('Filtruje widoczną listę po tickerze lub nazwie spółki — tylko wśród spółek już obecnych na liście, nie w całym uniwersum.') ?>
+            </label>
             <div class="ac-wrapper">
                 <input type="text" id="screener-search" placeholder="Ticker lub nazwa spółki…" autocomplete="off">
                 <div class="ac-dropdown" id="screener-search-dropdown" hidden></div>
             </div>
         </div>
 
-        <div class="form-group" style="margin:0;min-width:160px;">
-            <label style="font-size:var(--text-xs);">Rekomendacja</label>
-            <select name="reco">
-                <option value="">— Wszystkie —</option>
-                <?php foreach ($recoOptions as $opt): ?>
-                <option value="<?= htmlspecialchars($opt) ?>" <?= $filter_reco === $opt ? 'selected' : '' ?>>
-                    <?= htmlspecialchars($opt) ?>
-                </option>
-                <?php endforeach; ?>
-            </select>
+        <div class="screener-filters__fields">
+            <div class="form-group">
+                <label>Rekomendacja<?= $hint('Etykieta wynikająca z CVS Swing: od SILNE KUPUJ do UNIKAJ.') ?></label>
+                <select name="reco">
+                    <option value="">— Wszystkie —</option>
+                    <?php foreach ($recoOptions as $opt): ?>
+                    <option value="<?= htmlspecialchars($opt) ?>" <?= $filter_reco === $opt ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($opt) ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Złoty sygnał<?= $hint('⭐⭐ wartość + momentum, ⭐ obserwuj (setup fundamentalny), ↑ momentum. Puste = brak filtra.') ?></label>
+                <select name="signal">
+                    <option value="">— Wszystkie —</option>
+                    <?php foreach ($signalLabels as $val => $label): ?>
+                    <option value="<?= htmlspecialchars($val) ?>" <?= $filter_signal === $val ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($label) ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <?php if (!empty($sectors)): ?>
+            <div class="form-group">
+                <label>Sektor<?= $hint('Ogranicza listę do jednego sektora GICS.') ?></label>
+                <select name="sector">
+                    <option value="">— Wszystkie —</option>
+                    <?php foreach ($sectors as $sec): ?>
+                    <option value="<?= htmlspecialchars($sec) ?>" <?= $filter_sector === $sec ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($sec) ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <?php endif; ?>
+
+            <div class="form-group">
+                <label>Strefa ATR<?= $hint('Pozycja ceny względem strefy akumulacji wyliczonej z ATR: w strefie kupna, powyżej (czekaj na cofnięcie) lub poniżej (pod wsparciem).') ?></label>
+                <select name="atr">
+                    <option value="">— Wszystkie —</option>
+                    <option value="in_zone" <?= $filter_atr === 'in_zone' ? 'selected' : '' ?>>✓ W strefie kupna</option>
+                    <option value="above"   <?= $filter_atr === 'above'   ? 'selected' : '' ?>>↑ Powyżej strefy</option>
+                    <option value="below"   <?= $filter_atr === 'below'   ? 'selected' : '' ?>>↓ Poniżej strefy</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="filter-min-swing">Min CVS Swing<?= $hint('Pokazuje tylko spółki z wynikiem CVS Swing co najmniej tak wysokim (skala 0–100).') ?></label>
+                <input type="number" id="filter-min-swing" name="min_swing" min="0" max="100"
+                       value="<?= $filter_min_swing > 0 ? $filter_min_swing : '' ?>"
+                       placeholder="0–100">
+            </div>
         </div>
 
-        <div class="form-group" style="margin:0;min-width:160px;">
-            <label style="font-size:var(--text-xs);">Złoty sygnał</label>
-            <select name="signal">
-                <option value="">— Wszystkie —</option>
-                <?php foreach ($signalLabels as $val => $label): ?>
-                <option value="<?= htmlspecialchars($val) ?>" <?= $filter_signal === $val ? 'selected' : '' ?>>
-                    <?= htmlspecialchars($label) ?>
-                </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
+        <div class="screener-filters__footer">
+            <div class="screener-filters__toggles">
+                <div class="filter-toggle">
+                    <label class="filter-toggle__control">
+                        <input type="checkbox" name="near_boundary" value="1" <?= $filter_near_boundary ? 'checked' : '' ?>>
+                        <span class="filter-toggle__pill">Tylko pogranicze (±5 pkt)</span>
+                    </label>
+                    <?= $hint('Tylko spółki, których CVS Swing leży blisko progu rekomendacji — mały ruch wystarczy, by etykieta się zmieniła, więc warto je obserwować.') ?>
+                </div>
 
-        <div class="form-group" style="margin:0;min-width:120px;">
-            <label style="font-size:var(--text-xs);">Min CVS Swing</label>
-            <input type="number" name="min_swing" min="0" max="100"
-                   value="<?= $filter_min_swing > 0 ? $filter_min_swing : '' ?>"
-                   placeholder="0–100" style="width:100%;">
-        </div>
+                <div class="filter-toggle">
+                    <label class="filter-toggle__control">
+                        <input type="checkbox" name="fv_only" value="1" <?= $filter_fv_only ? 'checked' : '' ?>>
+                        <span class="filter-toggle__pill">Tylko FV &gt; cena</span>
+                    </label>
+                    <?= $hint('Tylko spółki, dla których model widzi margines bezpieczeństwa: implikowana wartość godziwa CVS (Fair Value) jest powyżej bieżącej ceny.') ?>
+                </div>
+            </div>
 
-        <?php if (!empty($sectors)): ?>
-        <div class="form-group" style="margin:0;min-width:160px;">
-            <label style="font-size:var(--text-xs);">Sektor</label>
-            <select name="sector">
-                <option value="">— Wszystkie —</option>
-                <?php foreach ($sectors as $sec): ?>
-                <option value="<?= htmlspecialchars($sec) ?>" <?= $filter_sector === $sec ? 'selected' : '' ?>>
-                    <?= htmlspecialchars($sec) ?>
-                </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <?php endif; ?>
+            <input type="hidden" name="sort" value="<?= htmlspecialchars($sort) ?>">
 
-        <div class="form-group" style="margin:0;min-width:160px;">
-            <label style="font-size:var(--text-xs);">Strefa ATR</label>
-            <select name="atr">
-                <option value="">— Wszystkie —</option>
-                <option value="in_zone" <?= $filter_atr === 'in_zone' ? 'selected' : '' ?>>✓ W strefie kupna</option>
-                <option value="above"   <?= $filter_atr === 'above'   ? 'selected' : '' ?>>↑ Powyżej strefy</option>
-                <option value="below"   <?= $filter_atr === 'below'   ? 'selected' : '' ?>>↓ Poniżej strefy</option>
-            </select>
-        </div>
-
-        <div class="form-group" style="margin:0;display:flex;align-items:center;gap:.4rem;">
-            <label style="font-size:var(--text-xs);display:flex;align-items:center;gap:.35rem;cursor:pointer;">
-                <input type="checkbox" name="near_boundary" value="1" <?= $filter_near_boundary ? 'checked' : '' ?>>
-                Tylko pogranicze (±5 pkt)
-            </label>
-        </div>
-
-        <div class="form-group" style="margin:0;display:flex;align-items:center;gap:.4rem;">
-            <label style="font-size:var(--text-xs);display:flex;align-items:center;gap:.35rem;cursor:pointer;">
-                <input type="checkbox" name="fv_only" value="1" <?= $filter_fv_only ? 'checked' : '' ?>>
-                Tylko FV &gt; cena
-            </label>
-        </div>
-
-        <input type="hidden" name="sort" value="<?= htmlspecialchars($sort) ?>">
-
-        <div style="display:flex;gap:.4rem;">
-            <button type="submit" class="btn btn--primary btn--sm">Filtruj</button>
-            <a href="/screener" class="btn btn--ghost btn--sm">Reset</a>
+            <div class="screener-filters__actions">
+                <button type="submit" class="btn btn--primary btn--sm">Filtruj</button>
+                <a href="/screener" class="btn btn--ghost btn--sm">Reset</a>
+            </div>
         </div>
     </form>
 </div>
