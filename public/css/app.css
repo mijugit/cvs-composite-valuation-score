@@ -178,8 +178,6 @@ button, a { -webkit-tap-highlight-color: rgba(64, 144, 224, .2); }
     gap: .85rem 1rem;
 }
 .screener-filters__fields .form-group { margin: 0; gap: 0; }
-.screener-filters__fields select,
-.screener-filters__fields input { width: 100%; }
 
 .screener-filters__footer {
     display: flex;
@@ -245,21 +243,50 @@ button, a { -webkit-tap-highlight-color: rgba(64, 144, 224, .2); }
 .form { display: flex; flex-direction: column; gap: 1rem; }
 .form-group { display: flex; flex-direction: column; gap: .35rem; }
 .form-group label { font-size: .875rem; color: var(--c-muted); }
+/* Same colours/shadow/radius as the app's tooltips (.chart-hint-portal,
+   .ticker-hint-portal — var(--c-surface-2) + var(--shadow)) so fields read
+   as part of the same "elevated dark surface" language instead of a flat
+   recessed well. */
 .form-group input,
+.form-group select,
 .form-group textarea {
-    background: var(--c-bg);
+    background: var(--c-surface-2);
     border: 1px solid var(--c-border);
     border-radius: var(--radius);
     color: var(--c-text);
     padding: .6rem .85rem;
     font-size: 1rem;
     width: 100%;
-    transition: border-color .15s;
+    box-shadow: var(--shadow);
+    transition: border-color .15s, box-shadow .15s;
 }
 .form-group input:focus,
+.form-group select:focus,
 .form-group textarea:focus {
     outline: none;
     border-color: var(--c-primary);
+    box-shadow: var(--shadow-lg);
+}
+
+/* Selects had no styling at all before this rule, so they fell back to
+   native OS/browser chrome (stark white popup) regardless of the app's
+   dark theme. appearance:none + a hand-drawn chevron replace the native
+   arrow; colouring <option> keeps Chromium's popup dark too — Firefox/
+   Safari fall back to their own native dark palette via color-scheme
+   (see :root in tokens.css), not this exact navy, but never white. */
+.form-group select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    padding-right: 2.25rem;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%235a7595' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right .85rem center;
+    cursor: pointer;
+}
+.form-group select option {
+    background: var(--c-surface-2);
+    color: var(--c-text);
 }
 
 /* --- Buttons ---------------------------------------------- */
