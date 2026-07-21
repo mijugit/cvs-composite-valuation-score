@@ -189,6 +189,14 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
 <div class="card" style="margin-bottom:1.5rem;padding:1rem 1.25rem;">
     <form method="GET" action="/screener" style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;">
 
+        <div class="form-group" style="margin:0;min-width:220px;">
+            <label for="screener-search" style="font-size:var(--text-xs);">Szukaj</label>
+            <div class="ac-wrapper">
+                <input type="text" id="screener-search" placeholder="Ticker lub nazwa spółki…" autocomplete="off">
+                <div class="ac-dropdown" id="screener-search-dropdown" hidden></div>
+            </div>
+        </div>
+
         <div class="form-group" style="margin:0;min-width:160px;">
             <label style="font-size:var(--text-xs);">Rekomendacja</label>
             <select name="reco">
@@ -281,10 +289,10 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
 </div>
 <?php else: ?>
 <div class="card" style="overflow-x:auto;">
-    <p style="color:var(--c-muted);font-size:var(--text-xs);margin-bottom:.75rem;">
+    <p id="screener-count" style="color:var(--c-muted);font-size:var(--text-xs);margin-bottom:.75rem;" data-total="<?= count($rows) ?>">
         <?= count($rows) ?> spółek
     </p>
-    <table class="pillar-table" style="width:100%;">
+    <table class="pillar-table" id="screener-table" style="width:100%;">
         <thead>
             <tr>
                 <th><?= $sortLink('ticker', 'Ticker') ?></th>
@@ -317,7 +325,9 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
                 default                               => 'color:var(--c-muted);',
             };
         ?>
-        <tr class="<?= isset($heldTickersMap[(string) $row['ticker']]) ? 'tr--held' : '' ?>">
+        <tr class="<?= isset($heldTickersMap[(string) $row['ticker']]) ? 'tr--held' : '' ?>"
+            data-ticker="<?= htmlspecialchars((string) $row['ticker']) ?>"
+            data-company="<?= htmlspecialchars((string) ($row['company_name'] ?? '')) ?>">
             <td>
                 <span class="ticker-hint">
                     <a href="/analysis/<?= urlencode((string) $row['ticker']) ?>"
@@ -351,6 +361,11 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
             <td style="font-size:var(--text-sm);"><?= $price ?></td>
         </tr>
         <?php endforeach; ?>
+        <tr id="screener-search-empty" hidden>
+            <td colspan="11" style="text-align:center;color:var(--c-muted);padding:1.5rem 0;">
+                Brak spółek na liście pasujących do wyszukiwania.
+            </td>
+        </tr>
         </tbody>
     </table>
 </div>
