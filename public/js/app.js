@@ -1291,3 +1291,154 @@
 }());
 
 })();
+
+// ============================================================
+// Screener search — filters the already-rendered /screener table
+// client-side, scoped to whatever ticker set the GET filters produced
+// (never the full ~500-ticker universe like the dashboard autocomplete
+// pulls from public/data/tickers.json). No extra fetch: the ticker +
+// company name are already in the DOM via data-ticker/data-company on
+// each <tr> (templates/screener.php).
+// ============================================================
+
+(function () {
+    'use strict';
+
+    const input = document.getElementById('screener-search');
+    const table = document.getElementById('screener-table');
+    if (!input || !table) return;
+
+    const dropdown  = document.getElementById('screener-search-dropdown');
+    const emptyRow  = document.getElementById('screener-search-empty');
+    const countEl   = document.getElementById('screener-count');
+    const countTotal = countEl ? parseInt(countEl.dataset.total || '0', 10) : 0;
+
+    const rows = Array.from(table.querySelectorAll('tbody tr[data-ticker]')).map(row => ({
+        row,
+        ticker: (row.dataset.ticker || '').toUpperCase(),
+        company: (row.dataset.company || '').toUpperCase(),
+    }));
+
+    let activeIndex = -1;
+
+    function matches(entry, q) {
+        return entry.ticker.startsWith(q) || (entry.company !== '' && entry.company.includes(q));
+    }
+
+    // Same priority as the dashboard autocomplete: ticker-prefix hits first,
+    // then company-name substring hits.
+    function rank(q) {
+        const prefix = [];
+        const substr = [];
+        for (const entry of rows) {
+            if (entry.ticker.startsWith(q)) prefix.push(entry);
+            else if (entry.company !== '' && entry.company.includes(q)) substr.push(entry);
+        }
+        return [...prefix, ...substr];
+    }
+
+    function applyFilter(q) {
+        if (q === '') {
+            rows.forEach(entry => { entry.row.hidden = false; });
+            if (emptyRow) emptyRow.hidden = true;
+            if (countEl) countEl.textContent = countTotal + ' spółek';
+            return;
+        }
+
+        let visible = 0;
+        rows.forEach(entry => {
+            const show = matches(entry, q);
+            entry.row.hidden = !show;
+            if (show) visible++;
+        });
+        if (emptyRow) emptyRow.hidden = visible > 0;
+        if (countEl) countEl.textContent = visible + ' z ' + countTotal + ' spółek';
+    }
+
+    function renderDropdown(matched) {
+        activeIndex = -1;
+        dropdown.innerHTML = '';
+        if (matched.length === 0) { hideDropdown(); return; }
+
+        matched.slice(0, 8).forEach(entry => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'ac-item';
+            btn.dataset.ticker = entry.ticker;
+            btn.textContent = entry.company !== '' ? entry.ticker + ' — ' + entry.company : entry.ticker;
+
+            btn.addEventListener('mousedown', (e) => {
+                e.preventDefault(); // fires before blur — keep focus flow predictable
+                selectSuggestion(entry.ticker);
+            });
+            btn.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); selectSuggestion(entry.ticker); }
+            });
+
+            dropdown.appendChild(btn);
+        });
+
+        dropdown.hidden = false;
+    }
+
+    function hideDropdown() {
+        dropdown.hidden = true;
+        dropdown.innerHTML = '';
+        activeIndex = -1;
+    }
+
+    function selectSuggestion(ticker) {
+        input.value = ticker;
+        applyFilter(ticker);
+        hideDropdown();
+        input.focus();
+        const hit = rows.find(entry => entry.ticker === ticker);
+        hit?.row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+
+    input.addEventListener('input', () => {
+        const q = input.value.trim().toUpperCase();
+        applyFilter(q);
+        if (q === '') { hideDropdown(); return; }
+        renderDropdown(rank(q));
+    });
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            input.value = '';
+            applyFilter('');
+            hideDropdown();
+        } else if (e.key === 'Enter') {
+            // Never submit the surrounding filter form — this field has no
+            // `name` and is purely a client-side live filter.
+            e.preventDefault();
+        } else if (!dropdown.hidden && e.key === 'ArrowDown') {
+            e.preventDefault();
+            const items = dropdown.querySelectorAll('.ac-item');
+            if (items.length) { activeIndex = 0; items[activeIndex].focus(); }
+        }
+    });
+
+    dropdown.addEventListener('keydown', (e) => {
+        const items = dropdown.querySelectorAll('.ac-item');
+        if (items.length === 0) return;
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            activeIndex = Math.min(activeIndex + 1, items.length - 1);
+            items[activeIndex].focus();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (activeIndex <= 0) { activeIndex = -1; input.focus(); }
+            else { activeIndex -= 1; items[activeIndex].focus(); }
+        } else if (e.key === 'Escape') {
+            hideDropdown();
+            input.focus();
+        }
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!input.closest('.ac-wrapper')?.contains(e.target)) {
+            hideDropdown();
+        }
+    });
+})();
