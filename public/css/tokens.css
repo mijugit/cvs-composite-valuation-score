@@ -5,6 +5,12 @@
    ============================================================ */
 
 :root {
+    /* Tells the browser to use its native dark UI for form controls we
+       don't fully theme ourselves (select popups on Firefox/Safari,
+       scrollbars, date pickers) — without this, unstyled native chrome
+       defaults to light regardless of the page's own dark palette. */
+    color-scheme: dark;
+
     /* --- Backgrounds (navy dark) --- */
     --c-bg:        #07101e;
     --c-surface:   #0e1b2f;
