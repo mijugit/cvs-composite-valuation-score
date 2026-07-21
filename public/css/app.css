@@ -161,6 +161,28 @@ button, a { -webkit-tap-highlight-color: rgba(64, 144, 224, .2); }
 
 .screener-filters__search { max-width: 360px; }
 
+/* Not a .form-group, so it never inherited that rule's field styling —
+   was falling back to a bare unstyled native input (the stray grey box).
+   Deliberately --c-bg here rather than --c-surface-2 like other fields —
+   this is the search box sitting directly on the card, not inside the
+   dropdown-filter grid, and --c-bg reads cleaner against it. */
+.screener-filters__search input {
+    background: var(--c-bg);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius);
+    color: var(--c-text);
+    padding: .6rem .85rem;
+    font-size: 1rem;
+    width: 100%;
+    box-shadow: var(--shadow);
+    transition: border-color .15s, box-shadow .15s;
+}
+.screener-filters__search input:focus {
+    outline: none;
+    border-color: var(--c-primary);
+    box-shadow: var(--shadow-lg);
+}
+
 .screener-filters__search label,
 .screener-filters__fields .form-group label {
     display: flex;
