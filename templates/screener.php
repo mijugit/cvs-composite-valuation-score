@@ -186,7 +186,7 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
 </div>
 
 <!-- Filter form -->
-<div class="card" style="margin-bottom:1.5rem;padding:1rem 1.25rem;">
+<div class="card screener-filter-card" style="margin-bottom:1.5rem;padding:1rem 1.25rem;">
     <form method="GET" action="/screener" style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;">
 
         <div class="form-group" style="margin:0;min-width:220px;">
@@ -288,7 +288,7 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
     <a href="/screener" class="btn btn--ghost btn--sm" style="margin-top:.75rem;">Wyczyść filtry</a>
 </div>
 <?php else: ?>
-<div class="card" style="overflow-x:auto;">
+<div class="card screener-results-card" style="overflow-x:auto;">
     <p id="screener-count" style="color:var(--c-muted);font-size:var(--text-xs);margin-bottom:.75rem;" data-total="<?= count($rows) ?>">
         <?= count($rows) ?> spółek
     </p>

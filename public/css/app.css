@@ -142,6 +142,11 @@ button, a { -webkit-tap-highlight-color: rgba(64, 144, 224, .2); }
 .analysis-form-wrapper { position: relative; z-index: 2; }
 .history-section       { position: relative; z-index: 1; }
 
+/* Same fix, /screener: the search autocomplete dropdown lives in the
+   filter card, which must outrank the results card below it. */
+.screener-filter-card  { position: relative; z-index: 2; }
+.screener-results-card { position: relative; z-index: 1; }
+
 /* --- Forms ------------------------------------------------ */
 .form { display: flex; flex-direction: column; gap: 1rem; }
 .form-group { display: flex; flex-direction: column; gap: .35rem; }
