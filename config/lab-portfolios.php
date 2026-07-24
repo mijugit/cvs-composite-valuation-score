@@ -5,22 +5,29 @@ declare(strict_types=1);
 /**
  * Lab — Experimental Portfolios Configuration (change: cvs-experimental-portfolios).
  *
- * Seven deterministic, paper-only portfolios (P0-P6) testing documented
- * execution-policy research. Each variant differs from the P1 baseline by
- * exactly ONE rule — see context/changes/cvs-experimental-portfolios/koncepcja.md
- * for the full research catalogue and rationale.
+ * Nine deterministic, paper-only portfolios (P0-P8) testing documented
+ * execution-policy research. P0-P6 each differ from the P1 baseline by
+ * exactly ONE rule; P7/P8 (added under experiment_version '2', research
+ * axis 5 — rebalance frequency) instead mirror P6's rules (sector cap 30%)
+ * and differ from P6 by exactly ONE rule — the rebalance cadence — to
+ * isolate the effect of the rebalance cycle itself. See
+ * context/changes/cvs-experimental-portfolios/koncepcja.md for the full
+ * research catalogue and rationale.
  *
- * The variant list is CLOSED for experiment_version '1': this defends against
+ * The variant list is CLOSED per experiment_version: this defends against
  * the multiple-comparisons problem (with enough variants, one "wins" by pure
  * chance). Adding, removing, or changing a variant's rules requires bumping
  * experiment_version (mirrors model_version's semantics for CVS scoring) —
- * never edit a live variant's rules in place.
+ * never edit a live variant's rules in place. Because LabRepository::initPortfolio
+ * only stamps experiment_version on a portfolio's FIRST-ever registration
+ * (idempotent insert, duplicate = no-op), bumping this value here only tags
+ * newly-added codes (P7, P8) — P0-P6's already-persisted rows keep '1'.
  *
  * FR-010 spirit: every knob lives here, never hardcoded in src/Lab/*.
  */
 return [
 
-    'experiment_version'  => '1',
+    'experiment_version'  => '2',
     'initial_capital_usd' => 100000.0,
     'cost_per_side_frac'  => 0.0005, // 0.05% fee on each BUY/SELL notional (both sides)
 
@@ -31,7 +38,9 @@ return [
         'rank_by' => 'cvs_swing', // ties broken by cvs_fund desc (LabEngine::selectTargets)
     ],
     'rebalance' => [
-        'frequency' => 'monthly', // first NYSE trading session of the calendar month
+        'frequency' => 'monthly', // default cadence: first NYSE trading session of the calendar month.
+        // A portfolio can override this via rules.rebalance_frequency ('daily' | 'weekly' | 'monthly') —
+        // see P7/P8 below. LabTickService::shouldRebalanceToday() resolves the per-portfolio value.
     ],
 
     // Statistical inference knobs (Phase 4 — LabStats). Fixed bootstrap seed keeps
@@ -42,8 +51,10 @@ return [
         'min_sessions'         => 40, // below this, hypothesis status is always 'too_early'
     ],
 
-    // --- Portfolio variants (P0-P6) ---
+    // --- Portfolio variants (P0-P8) ---
     // rules.stops shape: null | ['type' => 'atr_swing'] | ['type' => 'fixed_pct', 'pct' => float]
+    // rules.rebalance_frequency: optional override of the global rebalance.frequency above
+    //   ('daily' | 'weekly' | 'monthly'); omitted = inherit the global default.
     // hypothesis shape:  null | ['claim', 'source', 'versus' => <portfolio code>, 'direction' => 'above'|'below']
     //   direction: 'above' means THIS portfolio is hypothesized to outperform `versus`;
     //              'below' means THIS portfolio is hypothesized to underperform `versus`.
@@ -155,6 +166,47 @@ return [
                 'source'    => 'Moskowitz, Grinblatt — Do Industries Explain Momentum? (Journal of Finance, 1999)',
                 'versus'    => 'P1',
                 'direction' => 'above',
+            ],
+        ],
+
+        // P7/P8 — research axis 5 (rebalance frequency). Both mirror P6's rules
+        // (execution close, equal weights, no stops, sector cap 30%) verbatim and
+        // change ONLY the rebalance cadence, so any difference in outcome vs P6
+        // isolates the effect of the rebalance cycle itself rather than mixing
+        // it with a second changed rule.
+        'P7' => [
+            'name'  => 'Cap sektorowy — rebalans dzienny',
+            'rules' => [
+                'execution'           => 'close',
+                'weighting'           => 'equal',
+                'stops'               => null,
+                'sector_cap_pct'      => 30.0,
+                'benchmark_ticker'    => null,
+                'rebalance_frequency' => 'daily',
+            ],
+            'hypothesis' => [
+                'claim'     => 'Rebalans dzienny nie pobije rebalansu miesięcznego (P6) po uwzględnieniu kosztów — codzienna rewizja składu mnoży liczbę transakcji i opłaty, a sam moment rebalansu ("rebalance timing luck") nie niesie dodatkowej informacji ponad już comiesięczny ranking CVS.',
+                'source'    => 'Hoffstein i in. — Rebalance Timing Luck: The Difference Between Hired and Fired (Journal of Index Investing, badania praktyków)',
+                'versus'    => 'P6',
+                'direction' => 'below',
+            ],
+        ],
+
+        'P8' => [
+            'name'  => 'Cap sektorowy — rebalans tygodniowy',
+            'rules' => [
+                'execution'           => 'close',
+                'weighting'           => 'equal',
+                'stops'               => null,
+                'sector_cap_pct'      => 30.0,
+                'benchmark_ticker'    => null,
+                'rebalance_frequency' => 'weekly',
+            ],
+            'hypothesis' => [
+                'claim'     => 'Rebalans tygodniowy nie pobije rebalansu miesięcznego (P6) po uwzględnieniu kosztów — z tych samych powodów co wariant dzienny (P7), choć w mniejszej skali (niższa częstotliwość transakcji).',
+                'source'    => 'Hoffstein i in. — Rebalance Timing Luck: The Difference Between Hired and Fired (Journal of Index Investing, badania praktyków)',
+                'versus'    => 'P6',
+                'direction' => 'below',
             ],
         ],
 

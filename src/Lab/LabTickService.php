@@ -22,8 +22,10 @@ use Throwable;
  *   2. Fill any pending open-execution (P2) trades decided on a prior day,
  *      using today's open.
  *   3. Apply stop-losses against today's low (ATR-based for P3, fixed % for P4).
- *   4. On the first NYSE session of the calendar month, rebalance to the
- *      current ranking (tagged reason='rebalance').
+ *   4. On this portfolio's rebalance day (default: the first NYSE session of the
+ *      calendar month; a portfolio may override via rules.rebalance_frequency —
+ *      see shouldRebalanceToday()), rebalance to the current ranking (tagged
+ *      reason='rebalance').
  *   5. Persist today's NAV (cash + positions at today's close, with a light
  *      fallback fetch for any held ticker missing from today's snapshot).
  *
@@ -61,8 +63,7 @@ final class LabTickService
         }
 
         $dateStr            = $today->format('Y-m-d');
-        $candidatesByTicker  = $this->candidatesByTicker($dateStr);
-        $isFirstSessionMonth = $this->isFirstSessionOfMonth($today);
+        $candidatesByTicker = $this->candidatesByTicker($dateStr);
 
         foreach ($this->labConfig['portfolios'] as $code => $def) {
             try {
@@ -90,7 +91,8 @@ final class LabTickService
                         $summary['stops']++;
                     }
 
-                    if ($isFirstSessionMonth
+                    $frequency = (string) ($rules['rebalance_frequency'] ?? $this->labConfig['rebalance']['frequency'] ?? 'monthly');
+                    if ($this->shouldRebalanceToday($frequency, $today)
                         && $this->doRebalance($code, $rules, $today, $candidatesByTicker, 'rebalance') > 0
                     ) {
                         $summary['rebalanced']++;
@@ -112,7 +114,7 @@ final class LabTickService
     // ------------------------------------------------------------------
 
     /**
-     * @param array{execution?: string, weighting?: string, stops?: array<string, mixed>|null, sector_cap_pct?: float|null, benchmark_ticker?: string|null} $rules
+     * @param array{execution?: string, weighting?: string, stops?: array<string, mixed>|null, sector_cap_pct?: float|null, benchmark_ticker?: string|null, rebalance_frequency?: string} $rules
      * @param array<string, array{ticker: string, cvs_swing: float, cvs_fund: float|null, price: float, sector: string|null}> $candidatesByTicker
      * @return int number of trades generated (0 = nothing to do, retried next tick)
      */
@@ -381,18 +383,37 @@ final class LabTickService
     // Calendar
     // ------------------------------------------------------------------
 
-    private function isFirstSessionOfMonth(DateTimeImmutable $today): bool
+    /**
+     * Resolves whether $code's rebalance rule fires today, per its cadence
+     * ('daily' | 'weekly' | 'monthly', from rules.rebalance_frequency or the
+     * global default — see run()). 'daily' always fires (the caller already
+     * gated on isMarketDay()); 'weekly'/'monthly' fire on the first NYSE
+     * session of the ISO week / calendar month respectively, walking backward
+     * from today to the period start to skip market holidays (mirrors the
+     * original monthly-only logic, generalised over the period boundary).
+     */
+    private function shouldRebalanceToday(string $frequency, DateTimeImmutable $today): bool
     {
-        $frequency = $this->labConfig['rebalance']['frequency'] ?? 'monthly';
-        if ($frequency !== 'monthly') {
-            return false; // only 'monthly' is implemented for experiment_version '1'
+        $eastern = $today->setTimezone($this->marketTz);
+
+        $periodStart = match ($frequency) {
+            'daily'   => null,
+            'weekly'  => 'monday this week',
+            'monthly' => 'first day of this month',
+            default   => false, // unknown frequency — never implemented, never fires
+        };
+
+        if ($periodStart === false) {
+            return false;
+        }
+        if ($periodStart === null) {
+            return true; // daily — every market day is a rebalance day
         }
 
-        $eastern = $today->setTimezone($this->marketTz);
-        $cursor  = $eastern->modify('first day of this month');
+        $cursor = $eastern->modify($periodStart);
         while ($cursor->format('Y-m-d') < $eastern->format('Y-m-d')) {
             if ($this->calendar->isMarketDay($cursor)) {
-                return false; // an earlier day this month already traded
+                return false; // an earlier day this period already traded
             }
             $cursor = $cursor->modify('+1 day');
         }

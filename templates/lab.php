@@ -85,6 +85,14 @@ $sectorCapLabel = static function (?float $cap): string {
     return $cap !== null ? sprintf('Cap sektorowy %s%%', number_format($cap, 0)) : 'Brak capu sektorowego';
 };
 
+$rebalanceLabel = static function (string $frequency): string {
+    return match ($frequency) {
+        'daily'  => 'Rebalans dzienny (każda sesja)',
+        'weekly' => 'Rebalans tygodniowy (pierwsza sesja tygodnia)',
+        default  => 'Rebalans miesięczny (pierwsza sesja miesiąca)',
+    };
+};
+
 $pct = static function (?float $v, int $decimals = 2): string {
     if ($v === null) {
         return '—';
@@ -107,6 +115,8 @@ $palette = [
     'P4' => 'rgba(239,68,68,0.9)',
     'P5' => 'rgba(167,139,250,0.9)',
     'P6' => 'rgba(251,146,60,0.9)',
+    'P7' => 'rgba(34,211,238,0.9)',
+    'P8' => 'rgba(244,114,182,0.9)',
     'LLM' => 'rgba(255,255,255,0.55)',
 ];
 ?>
@@ -116,14 +126,18 @@ $palette = [
 </div>
 
 <p style="color:var(--c-muted);margin-bottom:1.25rem;max-width:70ch;">
-    Siedem deterministycznych portfeli papierowych (P0–P6), z których każdy różni
-    się od bazowego P1 dokładnie jedną regułą egzekucji. Każda różnica ma
+    Dziewięć deterministycznych portfeli papierowych (P0–P8). P0–P6 różnią się
+    od bazowego P1 dokładnie jedną regułą egzekucji; P7 i P8 powtarzają reguły
+    P6 (cap sektorowy 30%) i różnią się od niego wyłącznie częstotliwością
+    rebalansu — izolują sam efekt cyklu rebalansu. Każda różnica ma
     pre-zarejestrowaną hipotezę opartą na konkretnym badaniu — sprawdzamy, czy
     dane ją potwierdzają, zamiast dopasowywać wnioski po fakcie.
-    Skład portfeli jest <strong>rebalansowany raz w miesiącu</strong> (pierwsza
-    sesja giełdowa NYSE w miesiącu, do aktualnego rankingu CVS); stopy ochronne
-    tam, gdzie występują (P3, P4), są sprawdzane <strong>codziennie</strong> i
-    mogą wyrzucić pozycję z portfela niezależnie od cyklu rebalansu.
+    Skład portfeli P0–P6 jest <strong>rebalansowany raz w miesiącu</strong>
+    (pierwsza sesja giełdowa NYSE w miesiącu, do aktualnego rankingu CVS); P7
+    rebalansuje się <strong>codziennie</strong>, a P8 <strong>raz w tygodniu</strong>
+    (pierwsza sesja tygodnia). Stopy ochronne tam, gdzie występują (P3, P4), są
+    sprawdzane <strong>codziennie</strong> i mogą wyrzucić pozycję z portfela
+    niezależnie od cyklu rebalansu.
     Linia LLM (istniejący <a href="/portfolio">Portfel</a>) pokazana wyłącznie
     poglądowo — to inny mechanizm decyzyjny, poza tym eksperymentem.
 </p>
@@ -250,6 +264,7 @@ window.addEventListener('load', function () {
             <li><?= htmlspecialchars($weightingLabel((string) $rules['weighting'])) ?></li>
             <li><?= htmlspecialchars($stopsLabel($rules['stops'])) ?></li>
             <li><?= htmlspecialchars($sectorCapLabel($rules['sector_cap_pct'] !== null ? (float) $rules['sector_cap_pct'] : null)) ?></li>
+            <li><?= htmlspecialchars($rebalanceLabel((string) ($rules['rebalance_frequency'] ?? 'monthly'))) ?></li>
             <?php endif; ?>
         </ul>
         <?php if ($hyp !== null): $hs = $hypothesisStatuses[$code] ?? null; $meta = $chipMeta[$hs['status'] ?? 'too_early']; ?>

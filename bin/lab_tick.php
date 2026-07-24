@@ -5,9 +5,10 @@ declare(strict_types=1);
 /**
  * Lab — daily tick for the experimental portfolios (change: cvs-experimental-portfolios).
  *
- * Runs all 7 (P0-P6) deterministic paper portfolios one calendar day forward:
+ * Runs all 9 (P0-P8) deterministic paper portfolios one calendar day forward:
  * seed on first run, fill pending open-execution (P2) trades, apply stop-losses,
- * rebalance on the first NYSE session of the month, persist NAV. Must run AFTER
+ * rebalance per each portfolio's cadence (default: first NYSE session of the
+ * month; P7 daily, P8 weekly — see config/lab-portfolios.php), persist NAV. Must run AFTER
  * the evening rescore (22:00 UTC) so today's cvs_snapshots row carries a
  * close-ish price. Idempotent — safe to re-run the same day (see LabTickService).
  *

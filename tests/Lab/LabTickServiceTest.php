@@ -141,12 +141,12 @@ class LabTickServiceTest extends TestCase
         $this->service = new LabTickService($this->repo, $fetcher, new PriceAlertRepository($this->db), $calendar, $labConfig, '4.0');
     }
 
-    private function seedSnapshot(string $ticker, string $date, float $price): void
+    private function seedSnapshot(string $ticker, string $date, float $price, float $swing = 90.0): void
     {
         $this->db->prepare(
             'INSERT INTO cvs_snapshots (ticker, sector, model_version, origin, cvs_swing, cvs_fund, price_at_snapshot, quality_gate, score_date)
              VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)'
-        )->execute([$ticker, 'Technology', '4.0', 'rescore', 90.0, 88.0, $price, $date]);
+        )->execute([$ticker, 'Technology', '4.0', 'rescore', $swing, 88.0, $price, $date]);
     }
 
     private function et(string $dateTime): DateTimeImmutable
@@ -243,5 +243,66 @@ class LabTickServiceTest extends TestCase
         $this->assertEqualsWithDelta(1092.0, $navD3['P2'][array_key_last($navD3['P2'])]['nav'], 1e-9);
 
         $this->assertSame([], $d3['errors']);
+    }
+
+    /**
+     * Per-portfolio rebalance cadence (change: cvs-experimental-portfolios P7/P8,
+     * rules.rebalance_frequency) — two portfolios, identical rules except cadence
+     * ('daily' vs 'weekly'), fed a top-ranked ticker that flips every session.
+     * A daily portfolio must chase every flip; a weekly one must only re-decide
+     * on the first NYSE session of the ISO week (Monday), holding its position
+     * on every other day even though the ranking underneath it keeps changing.
+     *
+     * Calendar: D0=2026-07-06 (Mon, seed, CCC tops) -> D1=2026-07-07 (Tue, DDD
+     * tops) -> D2=2026-07-08 (Wed, CCC tops again) -> D3=2026-07-13 (Mon, next
+     * week, DDD tops). top_n=1, equal weight, no stops, no sector cap, zero cost
+     * -> every rebalance-that-fires is a full SELL+BUY switch (2 trades).
+     */
+    public function testDailyAndWeeklyRebalanceCadenceDivergeOnTheSameRankingFlips(): void
+    {
+        foreach ([
+            ['CCC', '2026-07-06', 90.0, 10.0], ['DDD', '2026-07-06', 50.0, 20.0],
+            ['CCC', '2026-07-07', 50.0, 10.0], ['DDD', '2026-07-07', 90.0, 20.0],
+            ['CCC', '2026-07-08', 90.0, 10.0], ['DDD', '2026-07-08', 50.0, 20.0],
+            ['CCC', '2026-07-13', 50.0, 10.0], ['DDD', '2026-07-13', 90.0, 20.0],
+        ] as [$ticker, $date, $swing, $price]) {
+            $this->seedSnapshot($ticker, $date, $price, $swing);
+        }
+
+        $fetcher = new FakeLabFetcher(ohlcByTicker: []); // not exercised: close-execution, no stops
+        $calendar = new MarketCalendar(['market' => ['timezone' => 'America/New_York'], 'holidays' => []]);
+        $labConfig = [
+            'experiment_version'  => '2',
+            'initial_capital_usd' => 1000.0,
+            'cost_per_side_frac'  => 0.0,
+            'selection'           => ['top_n' => 1, 'rank_by' => 'cvs_swing'],
+            'rebalance'           => ['frequency' => 'monthly'],
+            'portfolios' => [
+                'PD' => ['name' => 'Daily cadence',  'rules' => ['execution' => 'close', 'weighting' => 'equal', 'stops' => null, 'sector_cap_pct' => null, 'benchmark_ticker' => null, 'rebalance_frequency' => 'daily']],
+                'PW' => ['name' => 'Weekly cadence', 'rules' => ['execution' => 'close', 'weighting' => 'equal', 'stops' => null, 'sector_cap_pct' => null, 'benchmark_ticker' => null, 'rebalance_frequency' => 'weekly']],
+            ],
+        ];
+        $service = new LabTickService($this->repo, $fetcher, new PriceAlertRepository($this->db), $calendar, $labConfig, '4.0');
+
+        $service->run($this->et('2026-07-06 20:00:00')); // seed both on CCC
+        $service->run($this->et('2026-07-07 20:00:00')); // DDD tops — PD chases, PW holds
+        $service->run($this->et('2026-07-08 20:00:00')); // CCC tops — PD chases back, PW still holds
+        $service->run($this->et('2026-07-13 20:00:00')); // next Monday, DDD tops — PW finally re-decides
+
+        $pd = $this->repo->getPositions('PD');
+        $pw = $this->repo->getPositions('PW');
+        $this->assertArrayHasKey('DDD', $pd, 'daily portfolio ends on the last flip (DDD)');
+        $this->assertArrayNotHasKey('CCC', $pd);
+        $this->assertArrayHasKey('DDD', $pw, 'weekly portfolio catches up only on the next Monday');
+        $this->assertArrayNotHasKey('CCC', $pw);
+
+        $pdRebalanceTrades = (int) $this->db->query(
+            "SELECT COUNT(*) AS c FROM lab_trade WHERE portfolio_code='PD' AND reason='rebalance'"
+        )->fetch()['c'];
+        $pwRebalanceTrades = (int) $this->db->query(
+            "SELECT COUNT(*) AS c FROM lab_trade WHERE portfolio_code='PW' AND reason='rebalance'"
+        )->fetch()['c'];
+        $this->assertSame(6, $pdRebalanceTrades, 'daily portfolio switches on D1, D2, D3 — 3 x (SELL+BUY)');
+        $this->assertSame(2, $pwRebalanceTrades, 'weekly portfolio switches only on D3 (next Monday) — 1 x (SELL+BUY)');
     }
 }
