@@ -39,15 +39,20 @@ class ScreenerRepository
     /** @var array<string, float> */
     private array $thresholds;
 
+    /** @var array{default_label?: string, labels?: array<string, string>} */
+    private array $marketsConfig;
+
     /**
      * @param array{window_days?: int, min_points?: int, boundary_margin?: float} $trajectoryConfig
      * @param array<string, float> $thresholds config/cvs-weights.php → thresholds
+     * @param array{default_label?: string, labels?: array<string, string>} $marketsConfig config/cvs-weights.php → markets
      */
     public function __construct(
         ?PDO $db = null,
         ?string $liveModelVersion = null,
         array $trajectoryConfig = [],
-        array $thresholds = []
+        array $thresholds = [],
+        array $marketsConfig = []
     ) {
         $this->db               = $db ?? Database::connection();
         $this->liveModelVersion = $liveModelVersion;
@@ -56,7 +61,8 @@ class ScreenerRepository
             'min_points'      => (int) ($trajectoryConfig['min_points'] ?? 2),
             'boundary_margin' => (float) ($trajectoryConfig['boundary_margin'] ?? 5),
         ];
-        $this->thresholds = $thresholds;
+        $this->thresholds    = $thresholds;
+        $this->marketsConfig = $marketsConfig;
     }
 
     // ------------------------------------------------------------------
@@ -73,6 +79,7 @@ class ScreenerRepository
      * @param string      $sort     'swing'|'fund'|'date'
      * @param bool        $nearBoundary Only rows within trajectory.boundary_margin of a recommendation threshold
      * @param bool        $fvOnly   Only rows where fair_value_price > price_at_snapshot (both non-null)
+     * @param string|null $market   Ticker suffix (e.g. '.WA'), or the 'US' sentinel for no-suffix tickers (null = all)
      * @return array<int, array<string, mixed>>
      */
     public function getFiltered(
@@ -83,7 +90,8 @@ class ScreenerRepository
         string  $sort        = 'swing',
         ?string $atr         = null,
         bool    $nearBoundary = false,
-        bool    $fvOnly      = false
+        bool    $fvOnly      = false,
+        ?string $market      = null
     ): array {
         $rows = $this->findAllLatest();
 
@@ -105,6 +113,7 @@ class ScreenerRepository
         foreach ($rows as &$row) {
             $ticker = strtoupper((string) ($row['ticker'] ?? ''));
             $price  = $row['price_at_snapshot'] ?? null;
+            $row['market_suffix'] = MarketResolver::suffixForTicker($ticker);
             $row['atr_state'] = ($price !== null && isset($zones[$ticker]))
                 ? $this->classifyAtrState((float) $price, $zones[$ticker]['low'], $zones[$ticker]['high'])
                 : null;
@@ -152,6 +161,13 @@ class ScreenerRepository
         // Filter: sector.
         if ($sector !== null && $sector !== '') {
             $rows = array_filter($rows, fn($r) => ($r['sector'] ?? null) === $sector);
+        }
+
+        // Filter: market (ticker suffix). 'US' is the sentinel for "no suffix" —
+        // an actual suffix always starts with '.', so it can never collide.
+        if ($market !== null && $market !== '') {
+            $wantedSuffix = $market === 'US' ? null : $market;
+            $rows = array_filter($rows, fn($r) => ($r['market_suffix'] ?? null) === $wantedSuffix);
         }
 
         // Filter: ATR zone state (in_zone / above / below).
@@ -318,6 +334,45 @@ class ScreenerRepository
             return [];
         }
         return $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    }
+
+    /**
+     * Distinct markets (by ticker suffix) present in the live population, for
+     * the "Rynek" filter dropdown. Same "compute live from data, don't persist
+     * a redundant registry" pattern as getDistinctSectors() — a newly-added
+     * ticker's market shows up here as soon as it's scored, no separate
+     * registration step. 'US' is the value/sentinel for the no-suffix group.
+     *
+     * @return list<array{value: string, label: string}>
+     */
+    public function getDistinctMarkets(): array
+    {
+        $o    = CvsSnapshotRepository::ORIGIN_RESCORE;
+        $stmt = $this->db->query("SELECT DISTINCT ticker FROM cvs_snapshots WHERE origin = '{$o}'");
+        if ($stmt === false) {
+            return [];
+        }
+
+        $suffixes = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) ?: [] as $ticker) {
+            $suffixes[MarketResolver::suffixForTicker((string) $ticker) ?? ''] = true;
+        }
+
+        $out = [];
+        foreach (array_keys($suffixes) as $suffix) {
+            $suffix = $suffix === '' ? null : $suffix;
+            $out[] = [
+                'value' => $suffix ?? 'US',
+                'label' => MarketResolver::labelForSuffix($suffix, $this->marketsConfig),
+            ];
+        }
+
+        // US first (if present), then alphabetically by label.
+        usort($out, static fn(array $a, array $b): int =>
+            ($a['value'] === 'US' ? 0 : 1) <=> ($b['value'] === 'US' ? 0 : 1)
+                ?: strcmp($a['label'], $b['label']));
+
+        return $out;
     }
 
     // ------------------------------------------------------------------

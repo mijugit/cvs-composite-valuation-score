@@ -9,6 +9,7 @@ use CVS\Auth\AuthController;
 use CVS\Auth\UserRepository;
 use CVS\Core\Request;
 use CVS\Core\Response;
+use CVS\Screener\MarketResolver;
 
 /**
  * Admin panel: add tickers to the screener universe (public/data/tickers.json)
@@ -25,11 +26,15 @@ class TickersController
     private UserRepository       $users;
     private FinancialDataFetcher $fetcher;
 
+    /** @var array{default_label?: string, labels?: array<string, string>} */
+    private array $marketsConfig;
+
     public function __construct()
     {
         $this->users  = new UserRepository();
         $config       = require dirname(__DIR__, 2) . '/config/cvs-weights.php';
         $this->fetcher = new FinancialDataFetcher($config['data_source']);
+        $this->marketsConfig = $config['markets'] ?? [];
     }
 
     public function index(Request $req): void
@@ -42,8 +47,9 @@ class TickersController
         unset($_SESSION['_flash']);
 
         Response::view('admin/tickers', [
-            'tickers' => $tickers,
-            'flash'   => $flash,
+            'tickers'      => $tickers,
+            'flash'        => $flash,
+            'marketsConfig' => $this->marketsConfig,
         ]);
     }
 
@@ -90,7 +96,8 @@ class TickersController
         $tickers = self::appendTicker($tickers, $symbol, $name);
         $this->saveTickers($tickers);
 
-        $_SESSION['_flash'] = "Dodano $symbol ($name) do listy.";
+        $marketLabel = MarketResolver::labelForTicker($symbol, $this->marketsConfig);
+        $_SESSION['_flash'] = self::formatAddedFlash($symbol, $name, $marketLabel);
         Response::redirect('/admin/tickers');
     }
 
@@ -118,6 +125,17 @@ class TickersController
         }
 
         return null;
+    }
+
+    /**
+     * Confirmation flash shown after a successful add — names the resolved
+     * market (via MarketResolver) so a brand-new suffix (e.g. the first ever
+     * .WA ticker) is visible immediately, not just later on /screener once
+     * the rescore cron has run.
+     */
+    public static function formatAddedFlash(string $symbol, string $name, string $marketLabel): string
+    {
+        return "Dodano $symbol ($name) do listy — rynek: $marketLabel.";
     }
 
     /**

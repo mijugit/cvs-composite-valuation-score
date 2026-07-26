@@ -31,7 +31,8 @@ class ScreenerController
             null,
             $liveVersion !== null ? (string) $liveVersion : null,
             $config['trajectory'] ?? [],
-            $config['thresholds'] ?? []
+            $config['thresholds'] ?? [],
+            $config['markets'] ?? []
         );
     }
 
@@ -44,6 +45,7 @@ class ScreenerController
         $signal   = $req->query('signal') !== null ? trim((string) $req->query('signal')) : null;
         $minSwing = max(0, min(100, (int) ($req->query('min_swing') ?? 0)));
         $sector   = $req->query('sector') !== null ? trim((string) $req->query('sector')) : null;
+        $market   = $req->query('market') !== null ? trim((string) $req->query('market')) : null;
         $atr      = in_array($req->query('atr'), self::VALID_ATR, true)
             ? (string) $req->query('atr')
             : null;
@@ -57,10 +59,12 @@ class ScreenerController
         $reco   = $reco   !== '' ? $reco   : null;
         $signal = $signal !== '' ? $signal : null;
         $sector = $sector !== '' ? $sector : null;
+        $market = $market !== '' ? $market : null;
 
-        $rows      = $this->repo->getFiltered($reco, $signal, $minSwing, $sector, $sort, $atr, $nearBoundary, $fvOnly);
+        $rows      = $this->repo->getFiltered($reco, $signal, $minSwing, $sector, $sort, $atr, $nearBoundary, $fvOnly, $market);
         $lastScored = $this->repo->getLastScoredAt();
         $sectors   = $this->repo->getDistinctSectors();
+        $markets   = $this->repo->getDistinctMarkets();
 
         // Build held-ticker map for screener badge enrichment (S-04).
         $portfolioRepo  = new PortfolioRepository(Database::connection());
@@ -71,10 +75,12 @@ class ScreenerController
             'rows'        => $rows,
             'lastScored'  => $lastScored,
             'sectors'     => $sectors,
+            'markets'     => $markets,
             'filter_reco'      => $reco,
             'filter_signal'    => $signal,
             'filter_min_swing' => $minSwing,
             'filter_sector'    => $sector,
+            'filter_market'    => $market,
             'filter_atr'       => $atr,
             'filter_near_boundary' => $nearBoundary,
             'filter_fv_only'   => $fvOnly,

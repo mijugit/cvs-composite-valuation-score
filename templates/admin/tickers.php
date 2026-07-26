@@ -1,10 +1,13 @@
 <?php declare(strict_types=1);
 
+use CVS\Screener\MarketResolver;
+
 /**
  * Admin: add tickers to the screener universe (public/data/tickers.json).
  * Variables injected by TickersController::index():
- *   $tickers — array<int, array{symbol: string, name: string}>
- *   $flash   — string|null
+ *   $tickers       — array<int, array{symbol: string, name: string}>
+ *   $flash         — string|null
+ *   $marketsConfig — array{default_label?: string, labels?: array<string, string>} (config/cvs-weights.php -> markets)
  */
 ?>
 
@@ -52,6 +55,7 @@
             <tr>
                 <th style="width:15%;">Ticker</th>
                 <th>Nazwa</th>
+                <th style="width:20%;">Rynek</th>
             </tr>
         </thead>
         <tbody>
@@ -59,6 +63,9 @@
             <tr>
                 <td><code><?= htmlspecialchars((string) $t['symbol']) ?></code></td>
                 <td><?= htmlspecialchars((string) $t['name']) ?></td>
+                <td style="color:var(--c-muted);font-size:var(--text-sm);">
+                    <?= htmlspecialchars(MarketResolver::labelForTicker((string) $t['symbol'], $marketsConfig)) ?>
+                </td>
             </tr>
             <?php endforeach; ?>
         </tbody>

@@ -47,4 +47,20 @@ class TickersControllerTest extends TestCase
 
         $this->assertSame([['symbol' => 'PKN.WA', 'name' => 'Polski Koncern Naftowy ORLEN']], $result);
     }
+
+    public function test_format_added_flash_names_the_resolved_market(): void
+    {
+        $this->assertSame(
+            'Dodano PKN.WA (PKN Orlen) do listy — rynek: GPW (Warszawa).',
+            TickersController::formatAddedFlash('PKN.WA', 'PKN Orlen', 'GPW (Warszawa)')
+        );
+    }
+
+    public function test_format_added_flash_for_a_plain_us_ticker(): void
+    {
+        $this->assertSame(
+            'Dodano AAPL (Apple Inc.) do listy — rynek: USA (NYSE/NASDAQ).',
+            TickersController::formatAddedFlash('AAPL', 'Apple Inc.', 'USA (NYSE/NASDAQ)')
+        );
+    }
 }

@@ -320,4 +320,24 @@ return [
         ],
     ],
 
+    // Human-readable market/exchange name per ticker suffix — screener "Rynek"
+    // filter (CVS\Screener\MarketResolver) and the admin/tickers add confirmation.
+    // Deliberately separate from data_source.momentum_benchmark above: that config
+    // picks a benchmark ETF (a research decision), this one is purely a display
+    // label keyed directly by suffix. 'default_label' covers US tickers (no
+    // suffix); an unmapped suffix falls back to the raw suffix itself (see
+    // MarketResolver::labelForSuffix) so a brand-new market still renders
+    // something sensible the moment a ticker from it is added, before anyone
+    // gets around to naming it here.
+    'markets' => [
+        'default_label' => 'USA (NYSE/NASDAQ)',
+        'labels' => [
+            '.WA' => 'GPW (Warszawa)',
+            '.KS' => 'Giełda Korei (KOSPI)',
+            '.DE' => 'Niemcy (Xetra)',
+            '.L'  => 'Wielka Brytania (LSE)',
+            '.PA' => 'Francja (Euronext)',
+        ],
+    ],
+
 ];

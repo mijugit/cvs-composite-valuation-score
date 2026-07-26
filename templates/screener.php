@@ -2,10 +2,12 @@
 /** @var array<int, array<string, mixed>> $rows */
 /** @var string|null $lastScored */
 /** @var string[] $sectors */
+/** @var list<array{value: string, label: string}> $markets */
 /** @var string|null $filter_reco */
 /** @var string|null $filter_signal */
 /** @var int $filter_min_swing */
 /** @var string|null $filter_sector */
+/** @var string|null $filter_market */
 /** @var string|null $filter_atr */
 /** @var bool $filter_near_boundary */
 /** @var bool $filter_fv_only */
@@ -28,13 +30,14 @@ $signalLabels = [
 ];
 
 // Helper: sort link with arrow indicator
-$sortLink = static function (string $col, string $label) use ($sort, $filter_reco, $filter_signal, $filter_min_swing, $filter_sector, $filter_atr, $filter_near_boundary, $filter_fv_only): string {
+$sortLink = static function (string $col, string $label) use ($sort, $filter_reco, $filter_signal, $filter_min_swing, $filter_sector, $filter_market, $filter_atr, $filter_near_boundary, $filter_fv_only): string {
     $arrow = $col === $sort ? ' ↓' : '';
     $params = http_build_query(array_filter([
         'reco'          => $filter_reco,
         'signal'        => $filter_signal,
         'min_swing'     => $filter_min_swing > 0 ? $filter_min_swing : null,
         'sector'        => $filter_sector,
+        'market'        => $filter_market,
         'atr'           => $filter_atr,
         'near_boundary' => $filter_near_boundary ? '1' : null,
         'fv_only'       => $filter_fv_only ? '1' : null,
@@ -232,6 +235,20 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
                     <?php foreach ($sectors as $sec): ?>
                     <option value="<?= htmlspecialchars($sec) ?>" <?= $filter_sector === $sec ? 'selected' : '' ?>>
                         <?= htmlspecialchars($sec) ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <?php endif; ?>
+
+            <?php if (!empty($markets)): ?>
+            <div class="form-group">
+                <label>Rynek<?= $hint('Ogranicza listę do jednego rynku/giełdy, wyznaczonego sufiksem tickera (np. .WA = GPW Warszawa).') ?></label>
+                <select name="market">
+                    <option value="">— Wszystkie —</option>
+                    <?php foreach ($markets as $m): ?>
+                    <option value="<?= htmlspecialchars($m['value']) ?>" <?= $filter_market === $m['value'] ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($m['label']) ?>
                     </option>
                     <?php endforeach; ?>
                 </select>

@@ -13,8 +13,9 @@ class ScreenerRepositoryTest extends TestCase
     /**
      * @param array{window_days?: int, min_points?: int, boundary_margin?: float} $trajectoryConfig
      * @param array<string, float> $thresholds
+     * @param array{default_label?: string, labels?: array<string, string>} $marketsConfig
      */
-    private function makeRepo(array $trajectoryConfig = [], array $thresholds = []): ScreenerRepository
+    private function makeRepo(array $trajectoryConfig = [], array $thresholds = [], array $marketsConfig = []): ScreenerRepository
     {
         $pdo = new PDO('sqlite::memory:');
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -35,7 +36,7 @@ class ScreenerRepositoryTest extends TestCase
                 UNIQUE (ticker, score_date, model_version, origin)
             )
         ');
-        return new ScreenerRepository($pdo, null, $trajectoryConfig, $thresholds);
+        return new ScreenerRepository($pdo, null, $trajectoryConfig, $thresholds, $marketsConfig);
     }
 
     private function insertSnapshot(PDO $pdo, string $ticker, float $swing, float $fund,
@@ -181,6 +182,65 @@ class ScreenerRepositoryTest extends TestCase
         $this->insertSnapshot($db, 'XOM',  60.0, 55.0, '⬆ AKUMULUJ', null, 'Energy', 1, 'corpus');
 
         $this->assertSame(['Technology'], $repo->getDistinctSectors(), 'corpus-only sectors must not flood the dropdown');
+    }
+
+    // ------------------------------------------------------------------
+    // Market filter (ticker suffix)
+    // ------------------------------------------------------------------
+
+    public function test_get_filtered_by_market_suffix(): void
+    {
+        $repo = $this->makeRepo();
+        $db   = $this->dbOf($repo);
+        $this->insertSnapshot($db, 'AAPL',  80.0, 70.0, '⬆⬆ SILNE KUPUJ', null);
+        $this->insertSnapshot($db, 'PKN.WA', 60.0, 55.0, '⬆ AKUMULUJ', null);
+
+        $result = $repo->getFiltered(null, null, 0, null, 'swing', null, false, false, '.WA');
+        $this->assertCount(1, $result);
+        $this->assertSame('PKN.WA', $result[0]['ticker']);
+    }
+
+    public function test_get_filtered_by_market_us_sentinel_matches_no_suffix_tickers(): void
+    {
+        $repo = $this->makeRepo();
+        $db   = $this->dbOf($repo);
+        $this->insertSnapshot($db, 'AAPL',  80.0, 70.0, '⬆⬆ SILNE KUPUJ', null);
+        $this->insertSnapshot($db, 'PKN.WA', 60.0, 55.0, '⬆ AKUMULUJ', null);
+
+        $result = $repo->getFiltered(null, null, 0, null, 'swing', null, false, false, 'US');
+        $this->assertCount(1, $result);
+        $this->assertSame('AAPL', $result[0]['ticker']);
+    }
+
+    public function test_get_distinct_markets_labels_and_sorts_us_first(): void
+    {
+        $repo = $this->makeRepo(marketsConfig: [
+            'default_label' => 'USA (NYSE/NASDAQ)',
+            'labels'        => ['.WA' => 'GPW (Warszawa)', '.KS' => 'Giełda Korei (KOSPI)'],
+        ]);
+        $db = $this->dbOf($repo);
+        $this->insertSnapshot($db, 'PKN.WA', 60.0, 55.0, '⬆ AKUMULUJ', null);
+        $this->insertSnapshot($db, 'AAPL',   80.0, 70.0, '⬆⬆ SILNE KUPUJ', null);
+        $this->insertSnapshot($db, '005930.KS', 65.0, 60.0, '⬆ AKUMULUJ', null);
+
+        $this->assertSame(
+            [
+                ['value' => 'US',  'label' => 'USA (NYSE/NASDAQ)'],
+                ['value' => '.WA', 'label' => 'GPW (Warszawa)'],
+                ['value' => '.KS', 'label' => 'Giełda Korei (KOSPI)'],
+            ],
+            $repo->getDistinctMarkets()
+        );
+    }
+
+    public function test_get_distinct_markets_excludes_corpus_rows(): void
+    {
+        $repo = $this->makeRepo();
+        $db   = $this->dbOf($repo);
+        $this->insertSnapshot($db, 'AAPL', 80.0, 70.0, '⬆⬆ SILNE KUPUJ', null);
+        $this->insertSnapshot($db, 'PKN.WA', 60.0, 55.0, '⬆ AKUMULUJ', null, null, 1, 'corpus');
+
+        $this->assertSame([['value' => 'US', 'label' => 'USA']], $repo->getDistinctMarkets());
     }
 
     // ------------------------------------------------------------------
