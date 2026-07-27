@@ -66,6 +66,13 @@ class ScreenerController
         $sectors   = $this->repo->getDistinctSectors();
         $markets   = $this->repo->getDistinctMarkets();
 
+        // Display-only hint for the right-click "favourite links" menu (change:
+        // cvs-screener-ticker-links) — whether to show admin controls (add/remove)
+        // vs. a plain read-only link list. NOT a security boundary: the actual
+        // add/delete AJAX endpoints (TickerLinkController) re-verify admin status
+        // against the DB on every request, same as every other admin action here.
+        $isAdmin = (bool) ($_SESSION['is_admin'] ?? false);
+
         // Build held-ticker map for screener badge enrichment (S-04).
         $portfolioRepo  = new PortfolioRepository(Database::connection());
         $holdings       = $portfolioRepo->getCurrentHoldings();
@@ -86,6 +93,7 @@ class ScreenerController
             'filter_fv_only'   => $fvOnly,
             'sort'             => $sort,
             'heldTickersMap'   => $heldTickersMap,
+            'isAdmin'          => $isAdmin,
         ]);
     }
 }

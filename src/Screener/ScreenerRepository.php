@@ -110,10 +110,17 @@ class ScreenerRepository
         $minPoints      = $this->trajectoryConfig['min_points'];
         $boundaryMargin = $this->trajectoryConfig['boundary_margin'];
 
+        // change: cvs-screener-ticker-links — same bulk-query-then-enrich pattern
+        // as zones/trajectories above; the right-click menu needs every listed
+        // ticker's links up front, not fetched lazily per row.
+        $tickers      = array_map(fn($r) => strtoupper((string) ($r['ticker'] ?? '')), $rows);
+        $tickerLinks  = $this->findTickerLinksMap($tickers);
+
         foreach ($rows as &$row) {
             $ticker = strtoupper((string) ($row['ticker'] ?? ''));
             $price  = $row['price_at_snapshot'] ?? null;
             $row['market_suffix'] = MarketResolver::suffixForTicker($ticker);
+            $row['ticker_links']  = $tickerLinks[$ticker] ?? [];
             $row['atr_state'] = ($price !== null && isset($zones[$ticker]))
                 ? $this->classifyAtrState((float) $price, $zones[$ticker]['low'], $zones[$ticker]['high'])
                 : null;
@@ -230,6 +237,47 @@ class ScreenerRepository
                 'low'  => (float) $z['zone_low'],
                 'high' => (float) $z['zone_high'],
             ];
+        }
+        return $map;
+    }
+
+    /**
+     * Bulk-loads admin-curated favourite links (change: cvs-screener-ticker-links)
+     * for every ticker in $tickers, keyed by ticker — same "one query, no N+1"
+     * shape as findZoneMap()/findTrajectoryMap() above. Own direct SQL against
+     * ticker_links rather than delegating to TickerLinkRepository (that
+     * repository is CRUD for TickerLinkController's writes; this is a
+     * read-only enrichment map, same split as the screener's own
+     * findAllLatest() self-join not delegating to CvsSnapshotRepository).
+     * Returns an empty map (no error) if the table doesn't exist yet
+     * (pre-migration schema, mirrors findZoneMap()'s degrade-gracefully guard).
+     *
+     * @param list<string> $tickers
+     * @return array<string, list<array{id: int, label: string, url: string}>>
+     */
+    private function findTickerLinksMap(array $tickers): array
+    {
+        $tickers = array_values(array_unique(array_filter($tickers, fn($t) => $t !== '')));
+        if ($tickers === []) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($tickers), '?'));
+        try {
+            $stmt = $this->db->prepare(
+                "SELECT ticker, id, label, url FROM ticker_links
+                 WHERE ticker IN ({$placeholders})
+                 ORDER BY ticker ASC, created_at ASC, id ASC"
+            );
+            $stmt->execute($tickers);
+        } catch (\PDOException) {
+            return [];
+        }
+
+        $map = [];
+        foreach ($stmt->fetchAll() as $r) {
+            $ticker = strtoupper((string) $r['ticker']);
+            $map[$ticker][] = ['id' => (int) $r['id'], 'label' => (string) $r['label'], 'url' => (string) $r['url']];
         }
         return $map;
     }

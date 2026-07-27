@@ -111,6 +111,71 @@ button, a { -webkit-tap-highlight-color: rgba(64, 144, 224, .2); }
 .admin-menu:hover .admin-menu__dropdown,
 .admin-menu:focus-within .admin-menu__dropdown { display: block; }
 
+/* --- Screener: ticker "favourite links" right-click menu (desktop only) ---
+   Portal element (direct child of <body>, appended by app.js) — same
+   overflow-x:auto clipping fix as .ticker-hint-portal/.chart-hint-portal,
+   since the screener table lives inside a scrolling card. */
+.ticker-link-menu {
+    display: none;
+    position: fixed;
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: .4rem;
+    padding: .3rem 0;
+    min-width: 190px;
+    max-width: 280px;
+    box-shadow: 0 6px 20px rgba(0,0,0,.45);
+    z-index: 300;
+}
+.ticker-link-menu--visible { display: block; }
+.ticker-link-menu__item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    padding: .4rem 1rem;
+}
+.ticker-link-menu__item:hover { background: rgba(255,255,255,.06); }
+.ticker-link-menu__link {
+    color: var(--c-text);
+    text-decoration: none;
+    font-size: .875rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ticker-link-menu__link:hover { color: var(--c-primary); }
+.ticker-link-menu__remove {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--c-muted);
+    font-size: 1rem;
+    line-height: 1;
+    padding: 0 .15rem;
+}
+.ticker-link-menu__remove:hover { color: var(--c-danger); }
+.ticker-link-menu__add {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    border-top: 1px solid var(--c-border);
+    cursor: pointer;
+    padding: .45rem 1rem;
+    font-size: .875rem;
+    color: var(--c-primary);
+    margin-top: .3rem;
+}
+.ticker-link-menu__add:hover { background: rgba(255,255,255,.06); }
+.ticker-link-menu__empty {
+    padding: .5rem 1rem;
+    font-size: .8rem;
+    color: var(--c-muted);
+}
+
 .site-main { flex: 1; padding: 2rem 0; }
 
 .site-footer {

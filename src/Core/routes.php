@@ -22,6 +22,7 @@ use CVS\Pro\ProController;
 use CVS\Translation\TranslationController;
 use CVS\Portfolio\PortfolioController;
 use CVS\Lab\LabController;
+use CVS\Links\TickerLinkController;
 
 $auth        = new AuthController();
 $analysis    = new AnalysisController();
@@ -140,6 +141,11 @@ $router->get('/track-record/{ticker}', fn($req) => $trackRecord->show($req));
 // ------------------------------------------------------------------
 
 $router->get('/screener', fn($req) => $screener->index($req));
+
+// Right-click "favourite links" context menu (change: cvs-screener-ticker-links)
+$tickerLinks = new TickerLinkController();
+$router->post('/screener/links/add',    fn($req) => $tickerLinks->add($req));
+$router->post('/screener/links/delete', fn($req) => $tickerLinks->delete($req));
 
 // ------------------------------------------------------------------
 // Virtual Portfolio (S-01)

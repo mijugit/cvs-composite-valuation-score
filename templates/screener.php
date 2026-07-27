@@ -13,6 +13,7 @@
 /** @var bool $filter_fv_only */
 /** @var string $sort */
 /** @var array<string, true> $heldTickersMap */
+/** @var bool $isAdmin */
 
 $recoOptions = [
     '⬆⬆ SILNE KUPUJ',
@@ -319,7 +320,7 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
     <p id="screener-count" style="color:var(--c-muted);font-size:var(--text-xs);margin-bottom:.75rem;" data-total="<?= count($rows) ?>">
         <?= count($rows) ?> spółek
     </p>
-    <table class="pillar-table" id="screener-table" style="width:100%;">
+    <table class="pillar-table" id="screener-table" style="width:100%;" data-is-admin="<?= $isAdmin ? '1' : '0' ?>">
         <thead>
             <tr>
                 <th><?= $sortLink('ticker', 'Ticker') ?></th>
@@ -354,7 +355,8 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
         ?>
         <tr class="<?= isset($heldTickersMap[(string) $row['ticker']]) ? 'tr--held' : '' ?>"
             data-ticker="<?= htmlspecialchars((string) $row['ticker']) ?>"
-            data-company="<?= htmlspecialchars((string) ($row['company_name'] ?? '')) ?>">
+            data-company="<?= htmlspecialchars((string) ($row['company_name'] ?? '')) ?>"
+            data-links="<?= htmlspecialchars(json_encode($row['ticker_links'] ?? [], JSON_UNESCAPED_UNICODE) ?: '[]', ENT_QUOTES) ?>">
             <td>
                 <span class="ticker-hint">
                     <a href="/analysis/<?= urlencode((string) $row['ticker']) ?>"
@@ -395,6 +397,35 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
         </tr>
         </tbody>
     </table>
+</div>
+<?php endif; ?>
+
+<!-- Ticker "favourite links" right-click menu (desktop only) — markup is
+     empty on load, filled/positioned by app.js on contextmenu; moved to a
+     direct <body> child there too (see .ticker-link-menu CSS comment). -->
+<div id="ticker-link-menu" class="ticker-link-menu" hidden></div>
+
+<?php if ($isAdmin): ?>
+<!-- Add-link modal (admin only) -->
+<div id="ticker-link-add-modal" class="ai-modal" hidden>
+    <div class="ai-modal__inner" style="max-width:360px;">
+        <h3 style="margin-bottom:1rem;font-size:var(--text-base);">
+            Dodaj link — <span id="ticker-link-add-ticker"></span>
+        </h3>
+        <div class="form-group" style="margin-bottom:.75rem;text-align:left;">
+            <label for="ticker-link-label-input">Etykieta</label>
+            <input id="ticker-link-label-input" type="text" placeholder="np. TradingView" maxlength="80" autocomplete="off">
+        </div>
+        <div class="form-group" style="margin-bottom:.75rem;text-align:left;">
+            <label for="ticker-link-url-input">Adres URL</label>
+            <input id="ticker-link-url-input" type="text" placeholder="https://…" maxlength="500" autocomplete="off">
+        </div>
+        <div id="ticker-link-add-error" class="alert alert--error" style="display:none;margin-bottom:.75rem;"></div>
+        <div style="display:flex;gap:.5rem;justify-content:center;">
+            <button id="ticker-link-add-submit" type="button" class="btn btn--primary btn--sm">Dodaj</button>
+            <button id="ticker-link-add-cancel" type="button" class="btn btn--ghost btn--sm">Anuluj</button>
+        </div>
+    </div>
 </div>
 <?php endif; ?>
 

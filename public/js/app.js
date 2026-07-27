@@ -1442,3 +1442,239 @@
         }
     });
 })();
+
+// ============================================================
+// Screener — "favourite links" right-click menu (change:
+// cvs-screener-ticker-links), desktop only
+// ============================================================
+// Every row's curated links are already embedded via data-links (no extra
+// fetch — same "no N+1" principle as the screener search block above).
+// Desktop only: same matchMedia(max-width:768px) gate as the analysis
+// page's chart-zoom modal — a custom context menu is a poor fit for touch
+// (no right-click gesture, and it would fight the browser's own long-press
+// menu on the ticker link). Non-admin users with zero saved links for a
+// ticker get no menu at all — preventDefault() is skipped so the native
+// browser context menu shows through instead of an empty custom one.
+
+(function () {
+    'use strict';
+
+    const table = document.getElementById('screener-table');
+    const tbody = table?.querySelector('tbody');
+    if (!table || !tbody) return;
+
+    const MAX_LINKS = 10;
+    const isAdmin    = table.dataset.isAdmin === '1';
+    const isDesktop  = () => !window.matchMedia('(max-width: 768px)').matches;
+
+    function getCsrf() {
+        return document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+    }
+
+    function esc(s) {
+        const d = document.createElement('div');
+        d.textContent = String(s ?? '');
+        return d.innerHTML;
+    }
+
+    function readLinks(row) {
+        try {
+            const parsed = JSON.parse(row.dataset.links || '[]');
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function writeLinks(row, links) {
+        row.dataset.links = JSON.stringify(links);
+    }
+
+    // Portal element (direct <body> child) — the screener table lives inside
+    // a card with overflow-x:auto, which clips position:fixed descendants
+    // the same way it clips the ticker-hint tooltip (see that portal's
+    // comment above); moving the menu itself to <body> sidesteps it too.
+    const menu = document.getElementById('ticker-link-menu');
+    if (menu) document.body.appendChild(menu);
+
+    const addModal      = document.getElementById('ticker-link-add-modal');
+    const addTickerEl   = document.getElementById('ticker-link-add-ticker');
+    const addLabelInput = document.getElementById('ticker-link-label-input');
+    const addUrlInput   = document.getElementById('ticker-link-url-input');
+    const addErrorEl    = document.getElementById('ticker-link-add-error');
+    const addSubmitBtn  = document.getElementById('ticker-link-add-submit');
+    const addCancelBtn  = document.getElementById('ticker-link-add-cancel');
+
+    let currentTicker = null;
+
+    function hideMenu() {
+        if (menu) menu.classList.remove('ticker-link-menu--visible');
+    }
+
+    function renderMenu(row) {
+        if (!menu) return;
+        currentTicker = row.dataset.ticker || '';
+        const links = readLinks(row);
+
+        let html = '';
+        if (links.length === 0) {
+            html += '<div class="ticker-link-menu__empty">Brak zapisanych linków</div>';
+        } else {
+            links.forEach(link => {
+                html += '<div class="ticker-link-menu__item">'
+                    + '<a class="ticker-link-menu__link" href="' + esc(link.url) + '" target="_blank" rel="noopener noreferrer" title="' + esc(link.url) + '">' + esc(link.label) + '</a>'
+                    + (isAdmin ? '<button type="button" class="ticker-link-menu__remove" data-id="' + esc(link.id) + '" data-label="' + esc(link.label) + '" aria-label="Usuń ' + esc(link.label) + '">&times;</button>' : '')
+                    + '</div>';
+            });
+        }
+
+        if (isAdmin) {
+            html += links.length >= MAX_LINKS
+                ? '<div class="ticker-link-menu__empty">Limit ' + MAX_LINKS + ' linków osiągnięty</div>'
+                : '<button type="button" class="ticker-link-menu__add">+ Dodaj link…</button>';
+        }
+
+        menu.innerHTML = html;
+    }
+
+    function positionMenu(x, y) {
+        if (!menu) return;
+        menu.style.left = x + 'px';
+        menu.style.top  = y + 'px';
+        menu.classList.add('ticker-link-menu--visible');
+
+        // Clamp to viewport — a menu opened near the right/bottom edge must
+        // not render partially off-screen.
+        const rect = menu.getBoundingClientRect();
+        const overflowX = rect.right  - window.innerWidth;
+        const overflowY = rect.bottom - window.innerHeight;
+        if (overflowX > 0) menu.style.left = Math.max(0, x - overflowX) + 'px';
+        if (overflowY > 0) menu.style.top  = Math.max(0, y - overflowY) + 'px';
+    }
+
+    tbody.addEventListener('contextmenu', (e) => {
+        if (!isDesktop()) return;
+        const row = e.target.closest('tr[data-ticker]');
+        if (!row) return;
+
+        const links = readLinks(row);
+        if (!isAdmin && links.length === 0) return; // let the native menu through
+
+        e.preventDefault();
+        renderMenu(row);
+        positionMenu(e.clientX, e.clientY);
+    });
+
+    menu?.addEventListener('click', (e) => {
+        const removeBtn = e.target.closest('.ticker-link-menu__remove');
+        if (removeBtn) {
+            e.preventDefault();
+            const id    = parseInt(removeBtn.dataset.id, 10);
+            const label = removeBtn.dataset.label || '';
+            if (!Number.isFinite(id) || !confirm('Usunąć link "' + label + '"?')) return;
+            deleteLink(id);
+            return;
+        }
+        if (e.target.closest('.ticker-link-menu__add')) {
+            openAddModal();
+        }
+    });
+
+    document.addEventListener('click', (e) => {
+        if (menu && !menu.contains(e.target)) hideMenu();
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') hideMenu();
+    });
+    window.addEventListener('scroll', hideMenu, true);
+
+    function openAddModal() {
+        if (!addModal) return;
+        hideMenu();
+        if (addTickerEl)   addTickerEl.textContent = currentTicker || '';
+        if (addLabelInput) addLabelInput.value = '';
+        if (addUrlInput)   addUrlInput.value = '';
+        if (addErrorEl)    { addErrorEl.style.display = 'none'; addErrorEl.textContent = ''; }
+        addModal.hidden = false;
+        setTimeout(() => addLabelInput?.focus(), 50);
+    }
+
+    function closeAddModal() {
+        if (addModal) addModal.hidden = true;
+    }
+
+    function showAddError(msg) {
+        if (!addErrorEl) return;
+        addErrorEl.textContent = msg;
+        addErrorEl.style.display = 'block';
+    }
+
+    addCancelBtn?.addEventListener('click', closeAddModal);
+    addModal?.addEventListener('click', (e) => {
+        if (e.target === addModal) closeAddModal();
+    });
+
+    addSubmitBtn?.addEventListener('click', async () => {
+        const ticker = currentTicker;
+        const label  = (addLabelInput?.value ?? '').trim();
+        const url    = (addUrlInput?.value ?? '').trim();
+        if (!ticker) return;
+        if (!label) { showAddError('Podaj etykietę.'); return; }
+        if (!/^https?:\/\//i.test(url)) { showAddError('Adres musi zaczynać się od http:// lub https://.'); return; }
+
+        const csrf = getCsrf();
+        try {
+            const resp = await fetch('/screener/links/add', {
+                method:  'POST',
+                headers: {
+                    'Content-Type':     'application/x-www-form-urlencoded',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-Token':     csrf,
+                },
+                body: new URLSearchParams({ ticker, label, url, _csrf: csrf }),
+            });
+            const data = await resp.json();
+            if (!data.ok) { showAddError(data.error || 'Nie udało się dodać linku.'); return; }
+
+            const row = tbody.querySelector('tr[data-ticker="' + CSS.escape(ticker) + '"]');
+            if (row) {
+                const links = readLinks(row);
+                links.push(data.link);
+                writeLinks(row, links);
+            }
+            closeAddModal();
+        } catch (e) {
+            showAddError('Błąd połączenia.');
+        }
+    });
+
+    [addLabelInput, addUrlInput].forEach(input => {
+        input?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') addSubmitBtn?.click();
+        });
+    });
+
+    async function deleteLink(id) {
+        const csrf   = getCsrf();
+        const ticker = currentTicker;
+        try {
+            const resp = await fetch('/screener/links/delete', {
+                method:  'POST',
+                headers: {
+                    'Content-Type':     'application/x-www-form-urlencoded',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-Token':     csrf,
+                },
+                body: new URLSearchParams({ id: String(id), _csrf: csrf }),
+            });
+            const data = await resp.json();
+            if (!data.ok) return;
+
+            const row = tbody.querySelector('tr[data-ticker="' + CSS.escape(ticker || '') + '"]');
+            if (row) writeLinks(row, readLinks(row).filter(l => l.id !== id));
+            hideMenu();
+        } catch (e) {
+            // Silent — data-links stays as-is; the next successful call reconciles it.
+        }
+    }
+}());

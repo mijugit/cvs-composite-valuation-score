@@ -244,6 +244,45 @@ class ScreenerRepositoryTest extends TestCase
     }
 
     // ------------------------------------------------------------------
+    // Ticker links enrichment (change: cvs-screener-ticker-links)
+    // ------------------------------------------------------------------
+
+    public function test_get_filtered_attaches_ticker_links_bulk_loaded(): void
+    {
+        $repo = $this->makeRepo();
+        $db   = $this->dbOf($repo);
+        $db->exec('
+            CREATE TABLE ticker_links (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, ticker TEXT NOT NULL,
+                label TEXT NOT NULL, url TEXT NOT NULL, created_by INTEGER NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime(\'now\'))
+            )
+        ');
+        $db->exec("INSERT INTO ticker_links (ticker, label, url) VALUES ('PKN.WA', 'TradingView', 'https://example.com/tv')");
+
+        $this->insertSnapshot($db, 'PKN.WA', 60.0, 55.0, '⬆ AKUMULUJ', null);
+        $this->insertSnapshot($db, 'AAPL',   80.0, 70.0, '⬆⬆ SILNE KUPUJ', null);
+
+        $result = $repo->getFiltered();
+        $byTicker = array_column($result, 'ticker_links', 'ticker');
+        $this->assertCount(1, $byTicker['PKN.WA']);
+        $this->assertSame('TradingView', $byTicker['PKN.WA'][0]['label']);
+        $this->assertSame([], $byTicker['AAPL'], 'ticker with no curated links gets an empty array, not missing key');
+    }
+
+    public function test_get_filtered_degrades_gracefully_without_ticker_links_table(): void
+    {
+        // Baseline schema (makeRepo()) never creates ticker_links — this is the
+        // pre-migration-033 shape. Must not throw.
+        $repo = $this->makeRepo();
+        $db   = $this->dbOf($repo);
+        $this->insertSnapshot($db, 'AAPL', 80.0, 70.0, '⬆⬆ SILNE KUPUJ', null);
+
+        $result = $repo->getFiltered();
+        $this->assertSame([], $result[0]['ticker_links']);
+    }
+
+    // ------------------------------------------------------------------
     // ATR zone state enrichment (Phase 8 follow-up)
     // ------------------------------------------------------------------
 
