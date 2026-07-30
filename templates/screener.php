@@ -14,6 +14,7 @@
 /** @var string $sort */
 /** @var array<string, true> $heldTickersMap */
 /** @var bool $isAdmin */
+/** @var int $currentUserId */
 
 $recoOptions = [
     '⬆⬆ SILNE KUPUJ',
@@ -320,7 +321,8 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
     <p id="screener-count" style="color:var(--c-muted);font-size:var(--text-xs);margin-bottom:.75rem;" data-total="<?= count($rows) ?>">
         <?= count($rows) ?> spółek
     </p>
-    <table class="pillar-table" id="screener-table" style="width:100%;" data-is-admin="<?= $isAdmin ? '1' : '0' ?>">
+    <table class="pillar-table" id="screener-table" style="width:100%;"
+           data-is-admin="<?= $isAdmin ? '1' : '0' ?>" data-user-id="<?= (int) $currentUserId ?>">
         <thead>
             <tr>
                 <th><?= $sortLink('ticker', 'Ticker') ?></th>
@@ -405,8 +407,9 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
      direct <body> child there too (see .ticker-link-menu CSS comment). -->
 <div id="ticker-link-menu" class="ticker-link-menu" hidden></div>
 
-<?php if ($isAdmin): ?>
-<!-- Add-link modal (admin only) -->
+<!-- Add-link modal — any authenticated user may add a link (removal is
+     ownership/admin-gated, see .ticker-link-menu__remove in app.js); /screener
+     itself already requires auth, so no extra guard is needed here. -->
 <div id="ticker-link-add-modal" class="ai-modal" hidden>
     <div class="ai-modal__inner" style="max-width:360px;">
         <h3 style="margin-bottom:1rem;font-size:var(--text-base);">
@@ -427,7 +430,6 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
         </div>
     </div>
 </div>
-<?php endif; ?>
 
 <p class="disclaimer-inline" style="margin-top:1.5rem;">
     Wyniki CVS to hipoteza modelu analitycznego, nie rekomendacja inwestycyjna.

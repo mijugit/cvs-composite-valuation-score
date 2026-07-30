@@ -10,19 +10,26 @@ use CVS\Core\Request;
 use CVS\Core\Response;
 
 /**
- * Admin-only AJAX endpoints backing the screener's right-click "favourite
- * links" context menu (change: cvs-screener-ticker-links). Reading links is
- * NOT here — they're bulk-loaded per row by ScreenerRepository and embedded
- * in the page on load (same "no N+1, no extra endpoint" pattern as ATR
+ * AJAX endpoints backing the screener's right-click "favourite links"
+ * context menu (change: cvs-screener-ticker-links). Reading links is NOT
+ * here — they're bulk-loaded per row by ScreenerRepository and embedded in
+ * the page on load (same "no N+1, no extra endpoint" pattern as ATR
  * zones/trajectories), so this controller only ever mutates.
  *
  * Routes:
- *   POST /screener/links/add    — admin only
- *   POST /screener/links/delete — admin only
+ *   POST /screener/links/add    — any authenticated user
+ *   POST /screener/links/delete — the link's owner, or an admin (any link)
  *
- * Admin check mirrors TickersController/SectorsController/ProController: a
- * fresh DB read via UserRepository, never trusting $_SESSION['is_admin']
- * alone (that flag is only used, elsewhere, as a display-only UI hint).
+ * Deliberately more permissive than the admin-only precedent set by
+ * TickersController/SectorsController: adding a link is low-risk (capped at
+ * MAX_LINKS_PER_TICKER, URL scheme-restricted) and useful to every user, not
+ * just admins. Deletion still needs an authorization check — canDelete()
+ * below — since without it any user could delete anyone's link.
+ *
+ * Admin status for the delete-any-link bypass is a fresh DB read via
+ * UserRepository, never trusting $_SESSION['is_admin'] alone (that flag is
+ * only used, elsewhere, as a display-only UI hint) — same care as the
+ * admin-only controllers this one otherwise diverges from.
  */
 class TickerLinkController
 {
@@ -40,14 +47,13 @@ class TickerLinkController
     /**
      * POST /screener/links/add
      * Body: ticker, label, url, _csrf
-     * Returns 200 {ok:true, link:{id, label, url}}
+     * Returns 200 {ok:true, link:{id, label, url, created_by}}
      * Returns 403 {ok:false, error} on auth/CSRF failure
      * Returns 422 {ok:false, error} on validation failure or the 10-link cap
      */
     public function add(Request $req): void
     {
         AuthController::requireAuth();
-        $this->requireAdmin();
 
         if (!$req->verifyCsrf()) {
             Response::json(['ok' => false, 'error' => 'Nieprawidłowy token CSRF.'], 403);
@@ -74,8 +80,7 @@ class TickerLinkController
             ], 422);
         }
 
-        $createdBy = isset($_SESSION['user_id']) ? (int) $_SESSION['user_id'] : null;
-        $link      = $this->repo->create($ticker, $label, $url, $createdBy);
+        $link = $this->repo->create($ticker, $label, $url, $this->currentUserId());
 
         Response::json(['ok' => true, 'link' => $link]);
     }
@@ -84,13 +89,13 @@ class TickerLinkController
      * POST /screener/links/delete
      * Body: id, _csrf
      * Returns 200 {ok:true, id}
-     * Returns 403 {ok:false, error} on auth/CSRF failure
+     * Returns 403 {ok:false, error} on auth/CSRF failure, or when the
+     *             requester neither owns the link nor is an admin
      * Returns 404 {ok:false, error} when the id doesn't exist
      */
     public function delete(Request $req): void
     {
         AuthController::requireAuth();
-        $this->requireAdmin();
 
         if (!$req->verifyCsrf()) {
             Response::json(['ok' => false, 'error' => 'Nieprawidłowy token CSRF.'], 403);
@@ -101,15 +106,21 @@ class TickerLinkController
             Response::json(['ok' => false, 'error' => 'Nieprawidłowe id.'], 422);
         }
 
-        if (!$this->repo->delete($id)) {
+        $link = $this->repo->findById($id);
+        if ($link === null) {
             Response::json(['ok' => false, 'error' => 'Link nie istnieje.'], 404);
         }
 
+        if (!self::canDelete($link['created_by'], $this->currentUserId(), $this->isCurrentUserAdmin())) {
+            Response::json(['ok' => false, 'error' => 'Możesz usuwać tylko własne linki.'], 403);
+        }
+
+        $this->repo->delete($id);
         Response::json(['ok' => true, 'id' => $id]);
     }
 
     // ------------------------------------------------------------------
-    // Pure validators (unit-testable, no I/O)
+    // Pure validators / authorization (unit-testable, no I/O)
     // ------------------------------------------------------------------
 
     /** Same ticker shape as WatchlistController::toggle() / TickersController. */
@@ -139,17 +150,31 @@ class TickerLinkController
         return filter_var($url, FILTER_VALIDATE_URL) !== false;
     }
 
+    /**
+     * An admin may delete any link; anyone else only their own. A null
+     * $ownerId (legacy/edge-case row with no recorded creator) fails
+     * closed — only an admin can remove it, never "anyone".
+     */
+    public static function canDelete(?int $ownerId, int $currentUserId, bool $isAdmin): bool
+    {
+        if ($isAdmin) {
+            return true;
+        }
+        return $ownerId !== null && $ownerId === $currentUserId;
+    }
+
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
 
-    private function requireAdmin(): void
+    private function currentUserId(): int
     {
-        $userId = (int) ($_SESSION['user_id'] ?? 0);
-        $user   = $this->users->findById($userId);
+        return (int) ($_SESSION['user_id'] ?? 0);
+    }
 
-        if (!$user || !(bool) $user['is_admin']) {
-            Response::json(['ok' => false, 'error' => 'Brak uprawnień.'], 403);
-        }
+    private function isCurrentUserAdmin(): bool
+    {
+        $user = $this->users->findById($this->currentUserId());
+        return $user !== null && (bool) $user['is_admin'];
     }
 }

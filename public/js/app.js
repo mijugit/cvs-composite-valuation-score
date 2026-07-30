@@ -1452,9 +1452,10 @@
 // Desktop only: same matchMedia(max-width:768px) gate as the analysis
 // page's chart-zoom modal — a custom context menu is a poor fit for touch
 // (no right-click gesture, and it would fight the browser's own long-press
-// menu on the ticker link). Non-admin users with zero saved links for a
-// ticker get no menu at all — preventDefault() is skipped so the native
-// browser context menu shows through instead of an empty custom one.
+// menu on the ticker link). Any authenticated user can add a link (up to
+// MAX_LINKS/ticker) and remove their own; an admin can remove any link —
+// see TickerLinkController::canDelete() for the server-side check this
+// mirrors (the ✕ shown here is a UI convenience, not the real gate).
 
 (function () {
     'use strict';
@@ -1463,9 +1464,10 @@
     const tbody = table?.querySelector('tbody');
     if (!table || !tbody) return;
 
-    const MAX_LINKS = 10;
-    const isAdmin    = table.dataset.isAdmin === '1';
-    const isDesktop  = () => !window.matchMedia('(max-width: 768px)').matches;
+    const MAX_LINKS     = 10;
+    const isAdmin        = table.dataset.isAdmin === '1';
+    const currentUserId  = parseInt(table.dataset.userId, 10) || 0;
+    const isDesktop      = () => !window.matchMedia('(max-width: 768px)').matches;
 
     function getCsrf() {
         return document.querySelector('meta[name="csrf-token"]')?.content ?? '';
@@ -1521,18 +1523,19 @@
             html += '<div class="ticker-link-menu__empty">Brak zapisanych linków</div>';
         } else {
             links.forEach(link => {
+                const canDelete = isAdmin || (parseInt(link.created_by, 10) === currentUserId);
                 html += '<div class="ticker-link-menu__item">'
                     + '<a class="ticker-link-menu__link" href="' + esc(link.url) + '" target="_blank" rel="noopener noreferrer" title="' + esc(link.url) + '">' + esc(link.label) + '</a>'
-                    + (isAdmin ? '<button type="button" class="ticker-link-menu__remove" data-id="' + esc(link.id) + '" data-label="' + esc(link.label) + '" aria-label="Usuń ' + esc(link.label) + '">&times;</button>' : '')
+                    + (canDelete ? '<button type="button" class="ticker-link-menu__remove" data-id="' + esc(link.id) + '" data-label="' + esc(link.label) + '" aria-label="Usuń ' + esc(link.label) + '">&times;</button>' : '')
                     + '</div>';
             });
         }
 
-        if (isAdmin) {
-            html += links.length >= MAX_LINKS
-                ? '<div class="ticker-link-menu__empty">Limit ' + MAX_LINKS + ' linków osiągnięty</div>'
-                : '<button type="button" class="ticker-link-menu__add">+ Dodaj link…</button>';
-        }
+        // Adding is open to every authenticated user (not just admins) — the
+        // 10-link cap is shared across everyone who adds to this ticker.
+        html += links.length >= MAX_LINKS
+            ? '<div class="ticker-link-menu__empty">Limit ' + MAX_LINKS + ' linków osiągnięty</div>'
+            : '<button type="button" class="ticker-link-menu__add">+ Dodaj link…</button>';
 
         menu.innerHTML = html;
     }
@@ -1557,9 +1560,10 @@
         const row = e.target.closest('tr[data-ticker]');
         if (!row) return;
 
-        const links = readLinks(row);
-        if (!isAdmin && links.length === 0) return; // let the native menu through
-
+        // Every authenticated user can add a link, so the menu is always
+        // useful (even with zero existing links, it offers "+ Dodaj link…")
+        // — unlike a strictly read-only viewer, there's no case left where
+        // letting the native browser menu through is the better choice.
         e.preventDefault();
         renderMenu(row);
         positionMenu(e.clientX, e.clientY);

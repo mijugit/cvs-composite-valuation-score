@@ -242,8 +242,8 @@ class ScreenerRepository
     }
 
     /**
-     * Bulk-loads admin-curated favourite links (change: cvs-screener-ticker-links)
-     * for every ticker in $tickers, keyed by ticker — same "one query, no N+1"
+     * Bulk-loads favourite links (change: cvs-screener-ticker-links) for
+     * every ticker in $tickers, keyed by ticker — same "one query, no N+1"
      * shape as findZoneMap()/findTrajectoryMap() above. Own direct SQL against
      * ticker_links rather than delegating to TickerLinkRepository (that
      * repository is CRUD for TickerLinkController's writes; this is a
@@ -252,8 +252,12 @@ class ScreenerRepository
      * Returns an empty map (no error) if the table doesn't exist yet
      * (pre-migration schema, mirrors findZoneMap()'s degrade-gracefully guard).
      *
+     * created_by travels all the way to the template/JS so the right-click
+     * menu can show the "✕ remove" control only on links the viewer owns
+     * (or, for an admin, on every link) — see TickerLinkController::canDelete().
+     *
      * @param list<string> $tickers
-     * @return array<string, list<array{id: int, label: string, url: string}>>
+     * @return array<string, list<array{id: int, label: string, url: string, created_by: int|null}>>
      */
     private function findTickerLinksMap(array $tickers): array
     {
@@ -265,7 +269,7 @@ class ScreenerRepository
         $placeholders = implode(',', array_fill(0, count($tickers), '?'));
         try {
             $stmt = $this->db->prepare(
-                "SELECT ticker, id, label, url FROM ticker_links
+                "SELECT ticker, id, label, url, created_by FROM ticker_links
                  WHERE ticker IN ({$placeholders})
                  ORDER BY ticker ASC, created_at ASC, id ASC"
             );
@@ -277,7 +281,12 @@ class ScreenerRepository
         $map = [];
         foreach ($stmt->fetchAll() as $r) {
             $ticker = strtoupper((string) $r['ticker']);
-            $map[$ticker][] = ['id' => (int) $r['id'], 'label' => (string) $r['label'], 'url' => (string) $r['url']];
+            $map[$ticker][] = [
+                'id'         => (int) $r['id'],
+                'label'      => (string) $r['label'],
+                'url'        => (string) $r['url'],
+                'created_by' => $r['created_by'] !== null ? (int) $r['created_by'] : null,
+            ];
         }
         return $map;
     }

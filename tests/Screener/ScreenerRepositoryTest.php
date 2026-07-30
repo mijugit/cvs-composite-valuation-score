@@ -258,7 +258,7 @@ class ScreenerRepositoryTest extends TestCase
                 created_at TEXT NOT NULL DEFAULT (datetime(\'now\'))
             )
         ');
-        $db->exec("INSERT INTO ticker_links (ticker, label, url) VALUES ('PKN.WA', 'TradingView', 'https://example.com/tv')");
+        $db->exec("INSERT INTO ticker_links (ticker, label, url, created_by) VALUES ('PKN.WA', 'TradingView', 'https://example.com/tv', 3)");
 
         $this->insertSnapshot($db, 'PKN.WA', 60.0, 55.0, '⬆ AKUMULUJ', null);
         $this->insertSnapshot($db, 'AAPL',   80.0, 70.0, '⬆⬆ SILNE KUPUJ', null);
@@ -267,6 +267,7 @@ class ScreenerRepositoryTest extends TestCase
         $byTicker = array_column($result, 'ticker_links', 'ticker');
         $this->assertCount(1, $byTicker['PKN.WA']);
         $this->assertSame('TradingView', $byTicker['PKN.WA'][0]['label']);
+        $this->assertSame(3, $byTicker['PKN.WA'][0]['created_by']);
         $this->assertSame([], $byTicker['AAPL'], 'ticker with no curated links gets an empty array, not missing key');
     }
 

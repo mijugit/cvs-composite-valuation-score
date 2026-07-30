@@ -34,7 +34,25 @@ class TickerLinkRepositoryTest extends TestCase
 
         $this->assertSame('TradingView', $link['label']);
         $this->assertSame('https://pl.tradingview.com/chart/A5nLjaVd/?symbol=GPW%3APKN', $link['url']);
+        $this->assertSame(1, $link['created_by']);
         $this->assertGreaterThan(0, $link['id']);
+    }
+
+    public function testFindByIdReturnsTheRowIncludingOwner(): void
+    {
+        $repo    = $this->makeRepo();
+        $created = $repo->create('PKN.WA', 'A', 'https://example.com/a', 3);
+
+        $found = $repo->findById($created['id']);
+        $this->assertNotNull($found);
+        $this->assertSame('A', $found['label']);
+        $this->assertSame(3, $found['created_by']);
+    }
+
+    public function testFindByIdReturnsNullForUnknownId(): void
+    {
+        $repo = $this->makeRepo();
+        $this->assertNull($repo->findById(999));
     }
 
     public function testFindByTickerReturnsOnlyThatTickersLinksInInsertionOrder(): void

@@ -53,4 +53,25 @@ class TickerLinkControllerTest extends TestCase
         $this->assertFalse(TickerLinkController::isValidUrl('not a url'));
         $this->assertFalse(TickerLinkController::isValidUrl('https://' . str_repeat('a', 500) . '.com'));
     }
+
+    public function testCanDeleteAllowsAnAdminToDeleteAnyLink(): void
+    {
+        $this->assertTrue(TickerLinkController::canDelete(5, 1, true));   // owned by someone else
+        $this->assertTrue(TickerLinkController::canDelete(null, 1, true)); // legacy row, no owner
+    }
+
+    public function testCanDeleteAllowsTheOwnerToDeleteTheirOwnLink(): void
+    {
+        $this->assertTrue(TickerLinkController::canDelete(7, 7, false));
+    }
+
+    public function testCanDeleteRejectsANonOwnerNonAdmin(): void
+    {
+        $this->assertFalse(TickerLinkController::canDelete(7, 8, false));
+    }
+
+    public function testCanDeleteFailsClosedForALegacyRowWithNoOwner(): void
+    {
+        $this->assertFalse(TickerLinkController::canDelete(null, 1, false));
+    }
 }
