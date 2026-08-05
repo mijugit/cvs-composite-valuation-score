@@ -159,10 +159,32 @@ $palette = [
     <h3 style="margin-bottom:.75rem;font-size:var(--text-base);">
         NAV, baza=100 od <?= htmlspecialchars($d0) ?>
     </h3>
-    <div style="position:relative;height:320px;">
+    <div class="chart-zoom-target" style="position:relative;height:320px;"
+         data-zoom-canvas="lab-nav-chart" data-zoom-title="NAV, baza=100 od <?= htmlspecialchars($d0) ?>">
+        <span class="chart-zoom-target__hint" aria-hidden="true">🔍</span>
         <canvas id="lab-nav-chart"></canvas>
     </div>
 </div>
+
+<!-- Chart zoom modal (desktop only — see .chart-zoom-target click handler in
+     app.js, shared with the analysis page's radar/price/trajectory charts).
+     Reuses the already-rendered Chart.js instance's data/options at a larger
+     size, with Chart.js's default reveal animation replayed on open (the
+     compact chart above disables animation — several Lab charts could in
+     principle render at once — but the zoom modal only ever builds one, on
+     a deliberate click, so the "grow in" flourish is worth it there). -->
+<div id="chart-zoom-modal" class="ai-modal" hidden>
+    <div class="ai-modal__inner chart-zoom-modal__inner">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:1rem;">
+            <h3 id="chart-zoom-title" style="margin:0;font-size:var(--text-lg);">—</h3>
+            <button id="chart-zoom-close" class="btn btn--ghost btn--sm" type="button">✕</button>
+        </div>
+        <div class="chart-zoom-modal__canvas-wrap">
+            <canvas id="chart-zoom-canvas"></canvas>
+        </div>
+    </div>
+</div>
+
 <script>
 window.addEventListener('load', function () {
     if (typeof Chart === 'undefined') return;
