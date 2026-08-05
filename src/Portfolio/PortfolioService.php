@@ -49,8 +49,12 @@ class PortfolioService
      * triggers a full rollback; the exception is re-thrown to the caller.
      *
      * @param array<int, array{ticker: string|null, action: string, quantity: int|null, price_usd: float|null, reason: string|null}> $decisions
+     * @param array<string, float> $priceMap ticker (uppercase) => today's USD snapshot price
+     *        (bin/portfolio-rebalance.php builds this from the same cvs_snapshots rows the LLM
+     *        reasoned over, before this call). Marks the cycle-end valuation to market instead
+     *        of cost basis — see computeHoldingsValue()'s docblock for why this matters.
      */
-    public function executeCycle(int $cycleId, array $decisions): void
+    public function executeCycle(int $cycleId, array $decisions, array $priceMap): void
     {
         $this->db->beginTransaction();
 
@@ -82,8 +86,8 @@ class PortfolioService
                 };
             }
 
-            // Compute portfolio value snapshot (cash + holdings at avg_entry_price).
-            $portfolioValueUsd = $cashRunning + $this->computeHoldingsValue();
+            // Compute portfolio value snapshot (cash + holdings marked to today's price).
+            $portfolioValueUsd = $cashRunning + $this->computeHoldingsValue($priceMap);
 
             $this->cycleRepo->updateCycleSummary(
                 $cycleId,
@@ -266,14 +270,40 @@ class PortfolioService
         ]);
     }
 
-    private function computeHoldingsValue(): float
+    /**
+     * Values current holdings at today's snapshot price (mark-to-market), not
+     * at cost basis (avg_entry_price). This is the fix for a bug present since
+     * the module's original implementation (2026-06-26): the plan explicitly
+     * scoped live pricing OUT of this cycle-summary snapshot ("cycle-snapshot
+     * value uses transaction prices only ... live value computed by S-01 read
+     * logic" — context/changes/virtual-portfolio-ledger/plan.md), on the
+     * assumption nothing downstream would treat it as a real value series. A
+     * week later the Lab feature's /lab NAV chart started reading this exact
+     * column read-only as the LLM portfolio's comparison line — at which
+     * point "cost basis, not live" stopped being a harmless simplification:
+     * cost basis barely moves except when a trade executes (no market-price
+     * sensitivity at all), so the chart's LLM line tracked fee drag, not
+     * performance. $priceMap (built by the caller from that day's
+     * cvs_snapshots) closes that gap; a ticker missing from it (e.g. dropped
+     * from the watchlist) falls back to avg_entry_price rather than being
+     * dropped from the sum.
+     *
+     * @param array<string, float> $priceMap ticker (uppercase) => today's USD snapshot price
+     */
+    private function computeHoldingsValue(array $priceMap): float
     {
         $stmt = $this->db->prepare(
-            'SELECT SUM(quantity * avg_entry_price) FROM portfolio_holdings WHERE quantity > 0'
+            'SELECT ticker, quantity, avg_entry_price FROM portfolio_holdings WHERE quantity > 0'
         );
         $stmt->execute();
-        $val = $stmt->fetchColumn();
 
-        return $val !== false && $val !== null ? round((float) $val, 2) : 0.0;
+        $total = 0.0;
+        foreach ($stmt->fetchAll() as $row) {
+            $ticker = strtoupper((string) $row['ticker']);
+            $price  = $priceMap[$ticker] ?? (float) $row['avg_entry_price'];
+            $total += (float) $row['quantity'] * $price;
+        }
+
+        return round($total, 2);
     }
 }

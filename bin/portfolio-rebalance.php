@@ -132,6 +132,8 @@ $log('cycle ' . $cycleDate . ' LLM OK, ' . count($result['decisions']) . ' decis
 // needs the actual snapshot price per ticker, so we attach it here from the same
 // screener rows the model reasoned over. A BUY/SELL whose ticker has no known
 // price is dropped (cannot execute without a price); HOLD/NO_ACTION pass through.
+// Also passed into executeCycle() below to mark this cycle's portfolio_value_usd
+// snapshot to today's price (not cost basis) — see PortfolioService::computeHoldingsValue().
 $priceMap  = [];
 $sectorMap = [];
 foreach ($screenerRows as $row) {
@@ -196,7 +198,7 @@ $portfolioService = new PortfolioService($writeDb, $cycleRepo);
 
 // Execute portfolio — atomic transaction inside PortfolioService.
 try {
-    $portfolioService->executeCycle($id, $pricedDecisions);
+    $portfolioService->executeCycle($id, $pricedDecisions, $priceMap);
     $log('cycle ' . $cycleDate . ' completed');
 } catch (Throwable $e) {
     $cycleRepo->updateStatus($id, 'failed');

@@ -143,7 +143,7 @@ class PortfolioServiceTest extends TestCase
         $id = $this->insertCycle();
         $this->service->executeCycle($id, [[
             'ticker' => 'AAPL', 'action' => 'BUY', 'quantity' => 10, 'price_usd' => 150.0, 'reason' => null,
-        ]]);
+        ]], []);
 
         $state = $this->fetchState();
         $this->assertEqualsWithDelta(8500.0, (float) $state['cash'], 0.01);
@@ -173,7 +173,7 @@ class PortfolioServiceTest extends TestCase
         $id = $this->insertCycle();
         $this->service->executeCycle($id, [[
             'ticker' => 'AAPL', 'action' => 'BUY', 'quantity' => 10, 'price_usd' => 150.0, 'reason' => null,
-        ]]);
+        ]], []);
 
         $state = $this->fetchState();
         $this->assertEqualsWithDelta(100.0, (float) $state['cash'], 0.01); // unchanged
@@ -198,7 +198,7 @@ class PortfolioServiceTest extends TestCase
         $id = $this->insertCycle();
         $this->service->executeCycle($id, [[
             'ticker' => 'AAPL', 'action' => 'SELL', 'quantity' => 10, 'price_usd' => 160.0, 'reason' => null,
-        ]]);
+        ]], []);
 
         $state = $this->fetchState();
         $this->assertEqualsWithDelta(11600.0, (float) $state['cash'], 0.01);
@@ -215,7 +215,7 @@ class PortfolioServiceTest extends TestCase
         $id = $this->insertCycle();
         $this->service->executeCycle($id, [[
             'ticker' => 'AAPL', 'action' => 'SELL', 'quantity' => 4, 'price_usd' => 160.0, 'reason' => null,
-        ]]);
+        ]], []);
 
         $holdings = $this->fetchHoldings();
         $this->assertCount(1, $holdings);
@@ -229,7 +229,7 @@ class PortfolioServiceTest extends TestCase
         $id = $this->insertCycle();
         $this->service->executeCycle($id, [[
             'ticker' => 'AAPL', 'action' => 'HOLD', 'quantity' => null, 'price_usd' => null, 'reason' => null,
-        ]]);
+        ]], []);
 
         $state = $this->fetchState();
         $this->assertEqualsWithDelta(10000.0, (float) $state['cash'], 0.01);
@@ -246,7 +246,7 @@ class PortfolioServiceTest extends TestCase
         $id = $this->insertCycle();
         $this->service->executeCycle($id, [[
             'ticker' => null, 'action' => 'NO_ACTION', 'quantity' => null, 'price_usd' => null, 'reason' => 'Market looks overvalued',
-        ]]);
+        ]], []);
 
         $txs = $this->fetchTransactions($id);
         $this->assertCount(1, $txs);
@@ -263,7 +263,7 @@ class PortfolioServiceTest extends TestCase
         // First BUY: 10 shares at $100 → avg = 100
         $this->service->executeCycle($id, [[
             'ticker' => 'AAPL', 'action' => 'BUY', 'quantity' => 10, 'price_usd' => 100.0, 'reason' => null,
-        ]]);
+        ]], []);
 
         // Second BUY on a different date: 10 shares at $200 → avg = (10*100 + 10*200) / 20 = 150
         $this->db->exec("INSERT INTO rebalance_cycle (cycle_date, status, started_at)
@@ -272,12 +272,42 @@ class PortfolioServiceTest extends TestCase
 
         $this->service->executeCycle($id2, [[
             'ticker' => 'AAPL', 'action' => 'BUY', 'quantity' => 10, 'price_usd' => 200.0, 'reason' => null,
-        ]]);
+        ]], []);
 
         $holdings = $this->fetchHoldings();
         $this->assertCount(1, $holdings);
         $this->assertSame(20, (int) $holdings[0]['quantity']);
         $this->assertEqualsWithDelta(150.0, (float) $holdings[0]['avg_entry_price'], 0.001);
+    }
+
+    // --- portfolio_value_usd mark-to-market (fix: computeHoldingsValue live pricing) ---
+
+    public function testPortfolioValueUsesLivePriceMapNotCostBasis(): void
+    {
+        // Bought at 100, but the price map says today's snapshot price is 150 —
+        // portfolio_value_usd must reflect the mark-to-market 150, not the 100 cost basis.
+        $id = $this->insertCycle();
+        $this->service->executeCycle($id, [[
+            'ticker' => 'AAPL', 'action' => 'BUY', 'quantity' => 10, 'price_usd' => 100.0, 'reason' => null,
+        ]], ['AAPL' => 150.0]);
+
+        $cycle = $this->fetchCycle($id);
+        // cash_after (10000 - 1000 = 9000) + 10 * 150.0 (live) = 10500.0
+        $this->assertEqualsWithDelta(10500.0, (float) $cycle['portfolio_value_usd'], 0.01);
+    }
+
+    public function testPortfolioValueFallsBackToAvgEntryPriceWhenTickerMissingFromPriceMap(): void
+    {
+        // AAPL is bought but the price map (e.g. it fell out of the watchlist that day)
+        // has no entry for it — must fall back to avg_entry_price, not silently drop it.
+        $id = $this->insertCycle();
+        $this->service->executeCycle($id, [[
+            'ticker' => 'AAPL', 'action' => 'BUY', 'quantity' => 10, 'price_usd' => 100.0, 'reason' => null,
+        ]], ['MSFT' => 300.0]); // price map covers a different ticker only
+
+        $cycle = $this->fetchCycle($id);
+        // cash_after (9000) + 10 * 100.0 (avg_entry_price fallback) = 10000.0
+        $this->assertEqualsWithDelta(10000.0, (float) $cycle['portfolio_value_usd'], 0.01);
     }
 
     // --- ROLLBACK on exception ---
@@ -294,7 +324,7 @@ class PortfolioServiceTest extends TestCase
         try {
             $this->service->executeCycle($id, [[
                 'ticker' => 'AAPL', 'action' => 'BUY', 'quantity' => 10, 'price_usd' => 150.0, 'reason' => null,
-            ]]);
+            ]], []);
             $this->fail('Expected PDOException was not thrown');
         } catch (\PDOException $e) {
             // Expected — table no longer exists
