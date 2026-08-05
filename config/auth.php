@@ -16,6 +16,11 @@ return [
     // account, across register / login-unverified-resend / resend-verification.
     'verify_resend_cooldown_seconds' => (int) ($_ENV['AUTH_VERIFY_RESEND_COOLDOWN'] ?? 90),
 
+    // Same guard, same rationale, applied to the forgot-password flow
+    // (AuthController::sendPasswordResetEmail()) — a public, unauthenticated
+    // endpoint that emails an arbitrary address is the same abuse shape.
+    'reset_resend_cooldown_seconds' => (int) ($_ENV['AUTH_RESET_RESEND_COOLDOWN'] ?? 90),
+
     // "CVS Pillar Check" — on-brand anti-bot challenge for /register.
     // See src/Auth/PillarCaptcha.php.
     'captcha' => [

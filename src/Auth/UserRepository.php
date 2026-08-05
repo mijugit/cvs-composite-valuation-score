@@ -164,4 +164,79 @@ class UserRepository
         $stmt->execute([$id]);
         return (int) $stmt->fetchColumn() > 0;
     }
+
+    // ------------------------------------------------------------------
+    // Password reset
+    // ------------------------------------------------------------------
+
+    public function setPasswordResetToken(int $id, string $token, string $expiresAt): void
+    {
+        $stmt = $this->db->prepare(
+            'UPDATE users SET password_reset_token = ?, password_reset_expires_at = ?, password_reset_last_sent_at = ? WHERE id = ?'
+        );
+        $stmt->execute([$token, $expiresAt, (new \DateTimeImmutable())->format('Y-m-d H:i:s'), $id]);
+    }
+
+    /**
+     * Same email-bombing guard as canResendVerification() — without a
+     * per-account cooldown, requesting a reset repeatedly for the same
+     * (possibly not even owned) address would spam that inbox indefinitely.
+     */
+    public function canResendPasswordReset(int $id, int $cooldownSeconds): bool
+    {
+        $stmt = $this->db->prepare(
+            'SELECT password_reset_last_sent_at FROM users WHERE id = ? LIMIT 1'
+        );
+        $stmt->execute([$id]);
+        $row = $stmt->fetch();
+        if ($row === false || $row['password_reset_last_sent_at'] === null) {
+            return true;
+        }
+
+        $lastSent = \DateTimeImmutable::createFromFormat('Y-m-d H:i:s', (string) $row['password_reset_last_sent_at']);
+        if ($lastSent === false) {
+            return true;
+        }
+
+        return (new \DateTimeImmutable())->getTimestamp() - $lastSent->getTimestamp() >= $cooldownSeconds;
+    }
+
+    /**
+     * Expiry is checked in PHP rather than SQL `NOW()` (unlike
+     * findByVerifyToken() above) so this method is testable against SQLite
+     * fixtures without a DB-specific date function — same rationale as
+     * canResendVerification()'s PHP-side comparison.
+     *
+     * @return array{id:int, email:string}|null — null gdy token nieznany lub wygasł
+     */
+    public function findByPasswordResetToken(string $token): ?array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT id, email, password_reset_expires_at FROM users WHERE password_reset_token = ? LIMIT 1'
+        );
+        $stmt->execute([$token]);
+        $row = $stmt->fetch();
+        if ($row === false || $row['password_reset_expires_at'] === null) {
+            return null;
+        }
+
+        $expires = \DateTimeImmutable::createFromFormat('Y-m-d H:i:s', (string) $row['password_reset_expires_at']);
+        if ($expires === false || $expires < new \DateTimeImmutable()) {
+            return null;
+        }
+
+        return ['id' => (int) $row['id'], 'email' => (string) $row['email']];
+    }
+
+    /** Sets the new hash and single-use-invalidates the reset token. */
+    public function resetPassword(int $id, string $passwordHash): void
+    {
+        $stmt = $this->db->prepare(
+            'UPDATE users SET password_hash = ?,
+                              password_reset_token = NULL,
+                              password_reset_expires_at = NULL
+             WHERE id = ?'
+        );
+        $stmt->execute([$passwordHash, $id]);
+    }
 }

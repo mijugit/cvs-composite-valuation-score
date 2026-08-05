@@ -21,6 +21,7 @@
         <button type="submit" class="btn btn--primary">Zaloguj</button>
     </form>
 
+    <p class="auth-switch"><a href="/auth/forgot-password">Zapomniałeś hasła?</a></p>
     <p class="auth-switch">Nie masz konta? <a href="/register">Zarejestruj się</a></p>
     <p class="auth-switch">Ciekawi Cię metodologia? <a href="/model">Jak działa model CVS →</a></p>
 </section>

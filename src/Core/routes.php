@@ -50,6 +50,14 @@ $router->get('/logout',              fn($req) => $auth->logout($req));
 $router->get('/auth/check-email',          fn($req) => $auth->showCheckEmail($req));
 $router->post('/auth/resend-verification', fn($req) => $auth->resendVerification($req));
 $router->get('/auth/verify',               fn($req) => $auth->verify($req));
+
+// Password reset
+$router->get('/auth/forgot-password',  fn($req) => $auth->forgotPasswordForm($req));
+$router->post('/auth/forgot-password', fn($req) => $auth->forgotPassword($req));
+$router->get('/auth/reset-link-sent',  fn($req) => $auth->showResetLinkSent($req));
+$router->post('/auth/resend-reset',    fn($req) => $auth->resendPasswordReset($req));
+$router->get('/auth/reset-password',   fn($req) => $auth->resetPasswordForm($req));
+$router->post('/auth/reset-password',  fn($req) => $auth->resetPassword($req));
 $router->get('/terms-of-service',    fn($req) => \CVS\Core\Response::view('terms-of-service'));
 $router->get('/privacy-policy',      fn($req) => \CVS\Core\Response::view('privacy-policy'));
 $router->get('/alerts/unsubscribe',  fn($req) => $alertCtrl->unsubscribe($req));

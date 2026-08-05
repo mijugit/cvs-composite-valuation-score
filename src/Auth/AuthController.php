@@ -266,6 +266,149 @@ class AuthController
     }
 
     // ------------------------------------------------------------------
+    // Password reset
+    // ------------------------------------------------------------------
+
+    public function forgotPasswordForm(Request $req): void
+    {
+        if ($this->loggedIn()) {
+            Response::redirect('/dashboard');
+        }
+        $this->refreshCsrf();
+        Response::view('auth/forgot-password', ['error' => null]);
+    }
+
+    public function forgotPassword(Request $req): void
+    {
+        if (!$req->verifyCsrf()) {
+            Response::view('auth/forgot-password', ['error' => 'Nieprawidłowy token CSRF. Odśwież stronę.']);
+            return;
+        }
+
+        $email = trim((string) $req->input('email', ''));
+
+        // Same anti-enumeration rule as login/register (CLAUDE.md: never
+        // reveal whether an e-mail exists) — send only if it's a real,
+        // registered address, but redirect to the exact same page either way.
+        if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $user = $this->users->findByEmail($email);
+            if ($user !== null) {
+                $this->sendPasswordResetEmail((int) $user['id'], (string) $user['email']);
+            }
+        }
+
+        $_SESSION['pending_reset_email'] = $email;
+        Response::redirect('/auth/reset-link-sent');
+    }
+
+    public function showResetLinkSent(Request $req): void
+    {
+        $this->refreshCsrf();
+        $email = (string) ($_SESSION['pending_reset_email'] ?? '');
+        Response::view('auth/reset-link-sent', ['email' => $email]);
+    }
+
+    public function resendPasswordReset(Request $req): void
+    {
+        if (!$req->verifyCsrf()) {
+            Response::redirect('/auth/reset-link-sent');
+            return;
+        }
+        $email = (string) ($_SESSION['pending_reset_email'] ?? '');
+        if ($email === '') {
+            Response::redirect('/login');
+            return;
+        }
+
+        // Same generic behaviour regardless of whether the address is registered.
+        $user = $this->users->findByEmail($email);
+        if ($user !== null) {
+            $this->sendPasswordResetEmail((int) $user['id'], $email);
+        }
+        Response::redirect('/auth/reset-link-sent');
+    }
+
+    /**
+     * Generate a fresh reset token and email it, IF the per-account resend
+     * cooldown allows it — same choke-point pattern as
+     * sendVerificationEmail(), for the same email-bombing reason. Returns
+     * whether it actually sent.
+     */
+    private function sendPasswordResetEmail(int $userId, string $email): bool
+    {
+        $cooldown = (int) $this->authConfig['reset_resend_cooldown_seconds'];
+        if (!$this->users->canResendPasswordReset($userId, $cooldown)) {
+            return false;
+        }
+
+        $token   = bin2hex(random_bytes(32));
+        // Shorter-lived than the 48h email-verify link — a reset token grants
+        // account takeover, not just email confirmation, so it should be
+        // useless well before an inbox is likely to be compromised later.
+        $expires = (new \DateTime('+1 hour'))->format('Y-m-d H:i:s');
+        $this->users->setPasswordResetToken($userId, $token, $expires);
+        $resetUrl = ($_ENV['APP_URL'] ?? 'https://cvs.timeflow.fun') . '/auth/reset-password?token=' . $token;
+        $this->mail->send($email, 'CVS — reset hasła', $this->buildPasswordResetHtml($email, $resetUrl));
+        return true;
+    }
+
+    public function resetPasswordForm(Request $req): void
+    {
+        $token = (string) ($req->query('token') ?? '');
+        $user  = $token !== '' ? $this->users->findByPasswordResetToken($token) : null;
+        if ($user === null) {
+            Response::view('auth/reset-password-error', []);
+            return;
+        }
+        $this->refreshCsrf();
+        Response::view('auth/reset-password-form', ['token' => $token, 'error' => null]);
+    }
+
+    public function resetPassword(Request $req): void
+    {
+        $token = (string) $req->input('token', '');
+
+        if (!$req->verifyCsrf()) {
+            Response::view('auth/reset-password-form', ['token' => $token, 'error' => 'Nieprawidłowy token CSRF. Odśwież stronę.']);
+            return;
+        }
+
+        // Re-validate the token here too (not just in resetPasswordForm) —
+        // it may have expired, or already been used, between the GET and this POST.
+        $user = $token !== '' ? $this->users->findByPasswordResetToken($token) : null;
+        if ($user === null) {
+            Response::view('auth/reset-password-error', []);
+            return;
+        }
+
+        $password = (string) $req->input('password', '');
+        $confirm  = (string) $req->input('password_confirm', '');
+
+        if (strlen($password) < 8) {
+            Response::view('auth/reset-password-form', ['token' => $token, 'error' => 'Hasło musi mieć co najmniej 8 znaków.']);
+            return;
+        }
+        if ($password !== $confirm) {
+            Response::view('auth/reset-password-form', ['token' => $token, 'error' => 'Hasła nie są identyczne.']);
+            return;
+        }
+
+        $hash = password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
+        $this->users->resetPassword((int) $user['id'], $hash);
+
+        // The reset link is itself proof of e-mail ownership — same trust
+        // level as clicking the verify link, so log in immediately (mirrors verify()).
+        session_regenerate_id(true);
+        $_SESSION['user_id']    = $user['id'];
+        $_SESSION['user_email'] = $user['email'];
+        $fullUser = $this->users->findById((int) $user['id']);
+        $_SESSION['is_admin']   = (bool) ($fullUser['is_admin'] ?? false);
+        unset($_SESSION['csrf_token'], $_SESSION['pending_reset_email']);
+        $_SESSION['_flash'] = 'Hasło zostało zmienione. Witaj z powrotem!';
+        Response::redirect('/dashboard');
+    }
+
+    // ------------------------------------------------------------------
     // Logout
     // ------------------------------------------------------------------
 
@@ -328,6 +471,35 @@ class AuthController
             </p>
             <p style="color:#888;font-size:12px;margin-top:12px;">
                 Link ważny przez 48 godzin. Jeśli nie rejestrowałeś/-aś się w CVS, zignoruj tę wiadomość.
+            </p>
+            <p style="color:#aaa;font-size:10px;margin-top:8px;">
+                CVS Composite Valuation Score — <a href="https://cvs.timeflow.fun" style="color:#aaa;">cvs.timeflow.fun</a>
+            </p>
+        ';
+    }
+
+    private function buildPasswordResetHtml(string $email, string $resetUrl): string
+    {
+        return '
+            <h2 style="color:#1e3a5f;">Reset hasła w CVS</h2>
+            <table style="border-collapse:collapse;width:100%;font-family:sans-serif;font-size:14px;">
+                <tr>
+                    <td style="padding:8px;background:#f0f4f8;font-weight:bold;width:140px;">Adres e-mail:</td>
+                    <td style="padding:8px;">' . htmlspecialchars($email) . '</td>
+                </tr>
+            </table>
+            <p style="margin-top:16px;">
+                Kliknij przycisk poniżej, aby ustawić nowe hasło do konta CVS:
+            </p>
+            <p>
+                <a href="' . htmlspecialchars($resetUrl) . '"
+                   style="background:#1e3a5f;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;display:inline-block;">
+                    Ustaw nowe hasło →
+                </a>
+            </p>
+            <p style="color:#888;font-size:12px;margin-top:12px;">
+                Link ważny przez 1 godzinę. Jeśli nie prosiłeś/-aś o reset hasła, zignoruj tę wiadomość —
+                Twoje obecne hasło pozostanie bez zmian.
             </p>
             <p style="color:#aaa;font-size:10px;margin-top:8px;">
                 CVS Composite Valuation Score — <a href="https://cvs.timeflow.fun" style="color:#aaa;">cvs.timeflow.fun</a>
