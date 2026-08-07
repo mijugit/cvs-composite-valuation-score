@@ -248,6 +248,38 @@ class LlmFreeDecisionServiceTest extends TestCase
         }
     }
 
+    // --- Candidate table cap (regression: unbounded 303-row prompt hung the live cron 2026-08-07) ---
+
+    public function testCandidateTableCappedAtConfiguredMaxSortedBySwingDesc(): void
+    {
+        $service = $this->makeService(new FakeTransport([$this->successResponse($this->validResponseJson())]));
+        $method  = new ReflectionMethod($service, 'buildDataBlock');
+
+        $screenerRows = [];
+        for ($i = 1; $i <= 60; $i++) {
+            $screenerRows[] = ['ticker' => "TICK{$i}", 'cvs_swing' => $i, 'cvs_fund' => 50, 'golden_signal' => 'strong'];
+        }
+
+        $block = $method->invoke($service, $this->portfolioState, $this->holdings, $screenerRows, [], []);
+
+        // walletConfig in setUp has no explicit max_candidates → default (40) applies.
+        $this->assertStringContainsString('TICK60', $block); // highest swing (60) — kept
+        $this->assertStringContainsString('TICK21', $block); // rank 40 by swing — kept
+        $this->assertStringNotContainsString('TICK20', $block); // rank 41 — dropped
+        $this->assertStringContainsString('Pokazano 40 najsilniejszych', $block);
+    }
+
+    public function testCandidateTableUnderCapIncludesAllWithNoTruncationNote(): void
+    {
+        $service = $this->makeService(new FakeTransport([$this->successResponse($this->validResponseJson())]));
+        $method  = new ReflectionMethod($service, 'buildDataBlock');
+
+        $block = $method->invoke($service, $this->portfolioState, $this->holdings, $this->screenerRows, [], []);
+
+        $this->assertStringNotContainsString('Pokazano', $block);
+        $this->assertStringContainsString('AAPL', $block);
+    }
+
     public function testDataBlockIncludesPerTickerContext(): void
     {
         $service = $this->makeService(new FakeTransport([$this->successResponse($this->validResponseJson())]));

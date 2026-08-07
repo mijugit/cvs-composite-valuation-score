@@ -150,25 +150,39 @@ $legendHistory  = $walletRepo->getLegendHistory((int) $config['legend_context_co
 
 $log('cycle ' . $cycleDate . ' gathered ' . count($screenerRows) . ' screener rows, ' . count($legendHistory) . ' legend entries');
 
-// --- Context gathering: existing analyses first, bounded fresh search for the rest ---
-$candidateTickers = array_map(
-    static fn (array $row): string => strtoupper((string) ($row['ticker'] ?? '')),
-    $screenerRows
-); // already ordered by CVS Swing per ScreenerRepository::getFiltered()'s default sort
+// --- Context gathering + LLM call ---
+// Wrapped in try/catch: unlike executeCycle() below, neither of these calls
+// had a safety net until 2026-08-07, when an uncaught Throwable (root cause:
+// the unbounded candidate table below) killed the cron mid-run, leaving the
+// cycle row stuck in status='started' forever (claimForRun() only retries
+// 'failed'/'llm_failed', never 'started' — by design, to avoid concurrent
+// execution of a possibly-still-running process). Any failure here must now
+// resolve to a logged, retry-eligible 'llm_failed' status instead of silence.
+try {
+    // Context gathering: existing analyses first, bounded fresh search for the rest.
+    $candidateTickers = array_map(
+        static fn (array $row): string => strtoupper((string) ($row['ticker'] ?? '')),
+        $screenerRows
+    ); // already ordered by CVS Swing per ScreenerRepository::getFiltered()'s default sort
 
-$contextGatherer = new LlmFreeContextGatherer(
-    new AiAnalysisRepository($db),
-    new AiCriticalReviewRepository($db),
-    $aiConfig,
-    (int) $config['context_search_cap']
-);
-$contextByTicker = $contextGatherer->gather($candidateTickers);
+    $contextGatherer = new LlmFreeContextGatherer(
+        new AiAnalysisRepository($db),
+        new AiCriticalReviewRepository($db),
+        $aiConfig,
+        (int) $config['context_search_cap']
+    );
+    $contextByTicker = $contextGatherer->gather($candidateTickers);
 
-$log('cycle ' . $cycleDate . ' gathered context for ' . count($contextByTicker) . ' tickers');
+    $log('cycle ' . $cycleDate . ' gathered context for ' . count($contextByTicker) . ' tickers');
 
-// --- Call LLM — LlmFreeDecisionService writes the audit record (incl. legend + tokens) before returning ---
-$decisionService = new LlmFreeDecisionService($cycleRepo, $mergedLlmConfig, $config);
-$result = $decisionService->generate($id, $portfolioState, $holdings, $screenerRows, $legendHistory, $contextByTicker);
+    // LlmFreeDecisionService writes the audit record (incl. legend + tokens) before returning.
+    $decisionService = new LlmFreeDecisionService($cycleRepo, $mergedLlmConfig, $config);
+    $result = $decisionService->generate($id, $portfolioState, $holdings, $screenerRows, $legendHistory, $contextByTicker);
+} catch (Throwable $e) {
+    $log('cycle ' . $cycleDate . ' DECISION ENGINE CRASHED: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+    $cycleRepo->updateStatus($id, 'llm_failed');
+    exit(1);
+}
 
 if (!$result['ok']) {
     $log('cycle ' . $cycleDate . ' LLM FAILED after ' . $result['retryCount'] . ' retry, kind=' . ($result['failureKind'] ?? 'unknown'));

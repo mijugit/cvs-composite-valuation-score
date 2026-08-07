@@ -41,6 +41,16 @@ return [
     'context_search_cap'   => 3,    // max fresh web-search sub-calls per cycle (cost-bounding lever)
     'legend_max_chars'     => 4000, // max legend length enforced by LlmFreeDecisionParser
 
+    // Bounded, sorted (CVS Swing desc) slice of the full screener shown in the
+    // decision prompt's candidate table. The sibling wallet never needs an
+    // explicit cap — its prompt only ever includes golden=strong signals
+    // (typically a few dozen rows out of the full screener). This module has
+    // no such pre-filter by design (full interpretive freedom), so without an
+    // explicit bound the prompt scales with the whole screener (300+ rows on
+    // a real run) — observed live on 2026-08-07 to blow past the ~$0.50/cycle
+    // cost guardrail and hang/crash the cron. 0 = unbounded (not recommended).
+    'max_candidates' => 40,
+
     // --- LLM configuration for the decision + legend call ---
     // Overrides config/ai.php for this module's behaviour.
     'llm' => [

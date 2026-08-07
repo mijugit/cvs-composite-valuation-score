@@ -275,15 +275,36 @@ PROMPT;
             }
         }
 
+        // Bounded, sorted slice of the full universe — an unfiltered dump (300+
+        // rows on a real screener) blows past the ~$0.50/cycle cost guardrail
+        // and was observed to hang/crash the live cron on 2026-08-07. The
+        // sibling module avoids this incidentally (its prompt only ever
+        // includes golden=strong signals, typically a few dozen); this module
+        // has no such filter by design, so the cap must be explicit.
+        $maxCandidates = (int) ($this->walletConfig['max_candidates'] ?? 40);
+        $candidates    = $screenerRows;
+        usort($candidates, static function (array $a, array $b): int {
+            $sa = isset($a['cvs_swing']) ? (float) $a['cvs_swing'] : -1.0;
+            $sb = isset($b['cvs_swing']) ? (float) $b['cvs_swing'] : -1.0;
+            return $sb <=> $sa;
+        });
+        $totalCandidates = count($candidates);
+        if ($maxCandidates > 0 && $totalCandidates > $maxCandidates) {
+            $candidates = array_slice($candidates, 0, $maxCandidates);
+        }
+
         $lines[] = '';
         $lines[] = '=== KANDYDACI (dane CVS ze screenera) ===';
+        if ($totalCandidates > count($candidates)) {
+            $lines[] = sprintf('Pokazano %d najsilniejszych wg CVS Swing z %d spółek w pełnym screenerze.', count($candidates), $totalCandidates);
+        }
         $lines[] = 'Ticker | Swing | Fund  | Reko Swing | Sygnał    | Sektor                  | Cena USD';
         $lines[] = str_repeat('-', 92);
 
-        if (empty($screenerRows)) {
+        if (empty($candidates)) {
             $lines[] = '(brak spółek w bieżącym screenerze)';
         } else {
-            foreach ($screenerRows as $row) {
+            foreach ($candidates as $row) {
                 $ticker    = str_pad((string) ($row['ticker'] ?? ''), 6);
                 $swing     = str_pad((string) ($row['cvs_swing'] ?? '-'), 5);
                 $fund      = str_pad((string) ($row['cvs_fund'] ?? '-'), 5);
