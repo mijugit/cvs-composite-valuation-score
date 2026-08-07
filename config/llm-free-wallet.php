@@ -27,10 +27,14 @@ return [
     ],
 
     // --- Rebalance window ---
-    // Full NYSE session — same window shape as the baseline wallet; the cron
-    // schedule in the CF panel controls the exact fire time (~10 min before
-    // close), this just prevents accidental off-hours execution.
-    'rebalance_window_minutes' => 390,
+    // Narrow by design — unlike the baseline wallet (390 min = the whole
+    // session, since its timing doesn't matter), this wallet's whole premise
+    // is executing near the close (~10 min before, 15:50 ET). A wide window
+    // would let an earlier-firing DST-offset cron entry claim the cycle every
+    // normal day, silently defeating the near-close intent. 20 minutes =
+    // [15:40, 16:00) ET, comfortably bracketing the 15:50 target with margin
+    // on both sides while still rejecting an accidental early/late fire.
+    'rebalance_window_minutes' => 20,
 
     // --- Memory / context knobs unique to this module ---
     'legend_context_count' => 10,   // N last legend entries read back as context (questioning round 1)

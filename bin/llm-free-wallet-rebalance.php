@@ -15,19 +15,31 @@ declare(strict_types=1);
  * State Analysis for why the change: cvs-ai-critical-review background-worker
  * pattern does not apply here).
  *
- * Targets execution near NYSE close (~10 minutes before, i.e. ~15:50 ET) —
+ * Targets execution near NYSE close (~10 minutes before, i.e. 15:50 ET) —
  * a distinct wall-clock slot from the baseline wallet's own cron, so the two
- * never contend for the same window even during the Europe/Warsaw vs
- * America/New_York DST mismatch weeks.
+ * never contend for the same window.
  *
- * Cron entries (CyberFolks panel -> "Sciezka" type, explicit PHP 8.2 path).
- * Two entries, one hour apart, cover the brief EU/US DST transition mismatch
- * windows the same way bin/portfolio-rebalance.php's own two entries do —
- * the market-calendar window check below discards whichever one fires
- * outside the rebalance window:
+ * Unlike the baseline wallet (390-minute window = the whole session, so
+ * timing precision doesn't matter), THIS wallet's config narrows
+ * rebalance_window_minutes to 20 — [15:40, 16:00) ET — because a wide window
+ * combined with only two DST-offset cron entries would let the earlier entry
+ * silently claim the cycle on every normal (non-mismatch-week) day, defeating
+ * the near-close intent entirely (the idempotent claim always goes to
+ * whichever entry fires first). With a narrow window, THREE entries — one
+ * per possible Europe/Warsaw vs America/New_York offset (5h/6h/7h, depending
+ * on which side of the DST transition each timezone is on) — are needed so
+ * that exactly one of them always lands inside the window regardless of
+ * which offset is in effect that day; the other two fire outside the window
+ * and no-op. During the rare (~1 week/year) mismatch where the offset is 7h,
+ * no entry lands in-window and the wallet simply skips that day — acceptable
+ * for a paper portfolio, and self-correcting the next day.
  *
- *   50 20 * * 1-5  /usr/local/bin/php84 /home/.../bin/llm-free-wallet-rebalance.php
- *   50 21 * * 1-5  /usr/local/bin/php84 /home/.../bin/llm-free-wallet-rebalance.php
+ * Cron entries (CyberFolks panel -> "Sciezka" type, explicit PHP 8.2 path:
+ * /usr/local/bin/php82 — confirmed via deployment/<slug>.deploy.json):
+ *
+ *   50 20 * * 1-5  /usr/local/bin/php82 /home/amjsystem/sites/cvs.timeflow.fun/bin/llm-free-wallet-rebalance.php
+ *   50 21 * * 1-5  /usr/local/bin/php82 /home/amjsystem/sites/cvs.timeflow.fun/bin/llm-free-wallet-rebalance.php
+ *   50 22 * * 1-5  /usr/local/bin/php82 /home/amjsystem/sites/cvs.timeflow.fun/bin/llm-free-wallet-rebalance.php
  */
 
 // Guard: only run from CLI, never via HTTP.
