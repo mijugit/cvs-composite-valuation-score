@@ -607,18 +607,18 @@ Non-Goals: the baseline wallet's history is explicitly left untouched).
 ### Phase 1: Data Foundation
 
 #### Automated
-- [x] 1.1 `vendor/bin/phpunit tests/LlmFree/LlmFreeRepositoryTest.php tests/LlmFree/LlmFreeCycleRepositoryTest.php` passes
-- [x] 1.2 `composer stan` clean on `src/LlmFree/`
+- [x] 1.1 `vendor/bin/phpunit tests/LlmFree/LlmFreeRepositoryTest.php tests/LlmFree/LlmFreeCycleRepositoryTest.php` passes — 8673750
+- [x] 1.2 `composer stan` clean on `src/LlmFree/` — 8673750
 
 #### Manual
-- [x] 1.3 Migration runs successfully against production DB; `SHOW CREATE TABLE llm_free_cycle` confirms columns
-- [x] 1.4 Seed row exists in `llm_free_state` with cash = 10000.00
+- [x] 1.3 Migration runs successfully against production DB; `SHOW CREATE TABLE llm_free_cycle` confirms columns — 8673750
+- [x] 1.4 Seed row exists in `llm_free_state` with cash = 10000.00 — 8673750
 
 ### Phase 2: Write Engine
 
 #### Automated
-- [ ] 2.1 `vendor/bin/phpunit tests/LlmFree/LlmFreeServiceTest.php` passes
-- [ ] 2.2 `composer stan` clean
+- [x] 2.1 `vendor/bin/phpunit tests/LlmFree/LlmFreeServiceTest.php` passes
+- [x] 2.2 `composer stan` clean
 
 ### Phase 3: Decision Engine
 
