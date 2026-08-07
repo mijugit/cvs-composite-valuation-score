@@ -617,16 +617,16 @@ Non-Goals: the baseline wallet's history is explicitly left untouched).
 ### Phase 2: Write Engine
 
 #### Automated
-- [x] 2.1 `vendor/bin/phpunit tests/LlmFree/LlmFreeServiceTest.php` passes
-- [x] 2.2 `composer stan` clean
+- [x] 2.1 `vendor/bin/phpunit tests/LlmFree/LlmFreeServiceTest.php` passes — 1c1fe93
+- [x] 2.2 `composer stan` clean — 1c1fe93
 
 ### Phase 3: Decision Engine
 
 #### Automated
-- [ ] 3.1 `vendor/bin/phpunit tests/LlmFree/LlmFreeDecisionParserTest.php` passes
-- [ ] 3.2 `vendor/bin/phpunit tests/LlmFree/LlmFreeDecisionServiceTest.php` passes
-- [ ] 3.3 `vendor/bin/phpunit tests/LlmFree/LlmFreeContextGathererTest.php` passes
-- [ ] 3.4 `composer stan` clean
+- [x] 3.1 `vendor/bin/phpunit tests/LlmFree/LlmFreeDecisionParserTest.php` passes
+- [x] 3.2 `vendor/bin/phpunit tests/LlmFree/LlmFreeDecisionServiceTest.php` passes
+- [x] 3.3 `vendor/bin/phpunit tests/LlmFree/LlmFreeContextGathererTest.php` passes
+- [x] 3.4 `composer stan` clean
 
 ### Phase 4: Scheduler
 
