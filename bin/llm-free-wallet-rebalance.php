@@ -175,12 +175,32 @@ try {
 
     $log('cycle ' . $cycleDate . ' gathered context for ' . count($contextByTicker) . ' tickers');
 
+    // Reconnect before the decision call: context gathering can run for several
+    // minutes (up to context_search_cap sequential web-search-enabled Claude
+    // calls), and the original connection sits idle the whole time. Observed
+    // live on 2026-08-07: a 6.5-minute context-gathering phase was enough to
+    // trip CF's MySQL wait_timeout ("SQLSTATE[HY000] ... Server has gone
+    // away") right when LlmFreeDecisionService tried to write the audit
+    // record. Mirrors the same reconnect() done below before executeCycle().
+    Database::reconnect();
+    $db        = Database::connection();
+    $cycleRepo = new LlmFreeCycleRepository($db);
+
     // LlmFreeDecisionService writes the audit record (incl. legend + tokens) before returning.
     $decisionService = new LlmFreeDecisionService($cycleRepo, $mergedLlmConfig, $config);
     $result = $decisionService->generate($id, $portfolioState, $holdings, $screenerRows, $legendHistory, $contextByTicker);
 } catch (Throwable $e) {
     $log('cycle ' . $cycleDate . ' DECISION ENGINE CRASHED: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
-    $cycleRepo->updateStatus($id, 'llm_failed');
+
+    // The crash itself may BE a dropped connection (as above) — the original
+    // $cycleRepo can be just as unusable for this recovery write. Reconnect
+    // before attempting it, and don't let a second failure here escape uncaught.
+    try {
+        Database::reconnect();
+        (new LlmFreeCycleRepository(Database::connection()))->updateStatus($id, 'llm_failed');
+    } catch (Throwable $e2) {
+        $log('cycle ' . $cycleDate . ' ALSO failed to record llm_failed status: ' . $e2->getMessage());
+    }
     exit(1);
 }
 
