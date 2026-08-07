@@ -42,7 +42,15 @@ $asset = static function (string $path): string {
         <nav class="site-nav" id="site-nav">
             <a href="/dashboard">Panel</a>
             <a href="/screener">Screener</a>
-            <a href="/portfolio"<?= str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/portfolio') ? ' aria-current="page"' : '' ?>>Portfel</a>
+            <div class="admin-menu">
+                <button class="admin-menu__trigger" type="button" aria-haspopup="true">
+                    Portfele <span class="admin-menu__caret">▾</span>
+                </button>
+                <ul class="admin-menu__dropdown" role="menu">
+                    <li><a href="/portfolio" role="menuitem"<?= str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/portfolio') ? ' aria-current="page"' : '' ?>>LLM Bazowy</a></li>
+                    <li><a href="/llm-free" role="menuitem"<?= str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/llm-free') ? ' aria-current="page"' : '' ?>>LLM Free</a></li>
+                </ul>
+            </div>
             <a href="/lab"<?= str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/lab') ? ' aria-current="page"' : '' ?>>Lab</a>
             <a href="/track-record">Track Record</a>
             <a href="/model">Model</a>

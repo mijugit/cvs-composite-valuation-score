@@ -642,9 +642,9 @@ Non-Goals: the baseline wallet's history is explicitly left untouched).
 ### Phase 5: UI
 
 #### Automated
-- [ ] 5.1 `php -l templates/llm-free.php`
-- [ ] 5.2 `composer stan` clean
-- [ ] 5.3 Full `vendor/bin/phpunit` suite green
+- [x] 5.1 `php -l templates/llm-free.php`
+- [x] 5.2 `composer stan` clean
+- [x] 5.3 Full `vendor/bin/phpunit` suite green
 
 #### Manual
 - [ ] 5.4 `/llm-free` renders positions/return/legend correctly

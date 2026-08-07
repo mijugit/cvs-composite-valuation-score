@@ -21,6 +21,7 @@ use CVS\Admin\TickersController;
 use CVS\Pro\ProController;
 use CVS\Translation\TranslationController;
 use CVS\Portfolio\PortfolioController;
+use CVS\LlmFree\LlmFreeController;
 use CVS\Lab\LabController;
 use CVS\Links\TickerLinkController;
 
@@ -162,6 +163,13 @@ $router->post('/screener/links/delete', fn($req) => $tickerLinks->delete($req));
 $portfolio = new PortfolioController();
 $router->get('/portfolio',         fn($req) => $portfolio->index($req));
 $router->get('/portfolio/history', fn($req) => $portfolio->history($req));
+
+// ------------------------------------------------------------------
+// LLM_Free_Wallet — second, unconstrained LLM-driven portfolio (change: llm-free-wallet)
+// ------------------------------------------------------------------
+
+$llmFree = new LlmFreeController();
+$router->get('/llm-free', fn($req) => $llmFree->index($req));
 
 // ------------------------------------------------------------------
 // Lab — experimental paper portfolios (change: cvs-experimental-portfolios)
