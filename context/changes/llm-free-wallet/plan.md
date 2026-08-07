@@ -623,16 +623,16 @@ Non-Goals: the baseline wallet's history is explicitly left untouched).
 ### Phase 3: Decision Engine
 
 #### Automated
-- [x] 3.1 `vendor/bin/phpunit tests/LlmFree/LlmFreeDecisionParserTest.php` passes
-- [x] 3.2 `vendor/bin/phpunit tests/LlmFree/LlmFreeDecisionServiceTest.php` passes
-- [x] 3.3 `vendor/bin/phpunit tests/LlmFree/LlmFreeContextGathererTest.php` passes
-- [x] 3.4 `composer stan` clean
+- [x] 3.1 `vendor/bin/phpunit tests/LlmFree/LlmFreeDecisionParserTest.php` passes — 88a318b
+- [x] 3.2 `vendor/bin/phpunit tests/LlmFree/LlmFreeDecisionServiceTest.php` passes — 88a318b
+- [x] 3.3 `vendor/bin/phpunit tests/LlmFree/LlmFreeContextGathererTest.php` passes — 88a318b
+- [x] 3.4 `composer stan` clean — 88a318b
 
 ### Phase 4: Scheduler
 
 #### Automated
-- [ ] 4.1 `php -l bin/llm-free-wallet-rebalance.php`
-- [ ] 4.2 `composer stan` clean
+- [x] 4.1 `php -l bin/llm-free-wallet-rebalance.php`
+- [x] 4.2 `composer stan` clean
 
 #### Manual
 - [ ] 4.3 Manual SSH CLI run seeds the wallet; one `llm_free_cycle` row, `status='completed'`, non-null `legend`
