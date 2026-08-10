@@ -60,10 +60,23 @@ return [
     'max_candidates' => 40,
 
     // --- LLM configuration for the decision + legend call ---
-    // Overrides config/ai.php for this module's behaviour.
+    // Overrides config/ai.php for this module's behaviour. 'model' here is a
+    // deliberate override of the global AI_MODEL env var — this wallet runs
+    // on a different model than the baseline "LLM Bazowy" portfolio and the
+    // stage-1/stage-2 AI analysis features, which all inherit AI_MODEL
+    // unmodified. Changing AI_MODEL itself would have silently switched the
+    // baseline wallet's model too, breaking the "everything else equal"
+    // comparison the whole experiment depends on (caught before deploy,
+    // 2026-08-10). NOTE: LlmFreeContextGatherer's web-search sub-calls are
+    // NOT covered by this override — they're constructed from the raw,
+    // unmerged config/ai.php in bin/llm-free-wallet-rebalance.php, so they
+    // still run on whatever AI_MODEL is set globally. That's intentional:
+    // context pre-fetch is a cheaper, secondary concern, not the flagship
+    // decision call this override exists for.
     'llm' => [
+        'model'               => 'claude-sonnet-5',
         'max_retries'         => 0,     // service-level retry owns the policy (LlmFreeDecisionService)
-        'max_tokens'          => 6144,  // higher than the baseline wallet's — affords the legend text
+        'max_tokens'          => 8192,  // headroom for adaptive thinking (on by default on Sonnet 5) + legend text
         'timeout'             => 45,
         'total_timeout'       => 55,
         'retry_base_delay_ms' => 0,     // irrelevant at max_retries=0
