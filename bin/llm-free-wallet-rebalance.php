@@ -19,25 +19,36 @@ declare(strict_types=1);
  * a distinct wall-clock slot from the baseline wallet's own cron, so the two
  * never contend for the same window.
  *
- * Unlike the baseline wallet (390-minute window = the whole session, so
- * timing precision doesn't matter), THIS wallet's config narrows
- * rebalance_window_minutes to 20 — [15:40, 16:00) ET — because a wide window
- * combined with only two DST-offset cron entries would let the earlier entry
- * silently claim the cycle on every normal (non-mismatch-week) day, defeating
- * the near-close intent entirely (the idempotent claim always goes to
- * whichever entry fires first). With a narrow window, THREE entries — one
- * per possible Europe/Warsaw vs America/New_York offset (5h/6h/7h, depending
- * on which side of the DST transition each timezone is on) — are needed so
- * that exactly one of them always lands inside the window regardless of
- * which offset is in effect that day; the other two fire outside the window
- * and no-op. During the rare (~1 week/year) mismatch where the offset is 7h,
- * no entry lands in-window and the wallet simply skips that day — acceptable
- * for a paper portfolio, and self-correcting the next day.
+ * OPERATOR'S CHOSEN SCHEDULE DESIGN (2026-08-10): two cron entries — 21:50
+ * Warsaw (primary) and 22:50 Warsaw (backup, catches it if the primary
+ * doesn't fire or fails) — rather than three entries auto-covering every
+ * possible Europe/Warsaw vs America/New_York DST offset. This trades full
+ * automatic DST coverage for operational simplicity: the operator watches
+ * the two brief EU/US DST-mismatch windows each year (mid-March, when the US
+ * has already sprung forward but the EU hasn't yet; late-Oct/early-Nov, the
+ * reverse) and hand-adjusts the cron times if needed, rather than relying on
+ * a third always-on entry.
+ *
+ * config/llm-free-wallet.php sets rebalance_window_minutes=90 with
+ * market.close_time='17:00' (NOT the real NYSE close, which is always
+ * 16:00 ET — this is the window's practical outer bound) → window
+ * [15:30, 17:00) ET. Walking through what each entry maps to per offset:
+ *   - offset 6h (nominal, most of the year): 21:50→15:50 ET (ideal target,
+ *     executes here every normal day) — 22:50→16:50 ET, but the cycle is
+ *     already 'completed' by then, so it's a silent no-op (dormant backup).
+ *   - offset 5h (mid-March mismatch): 21:50→16:50 ET (still in-window —
+ *     executes about an hour later than ideal, but same session) — 22:50→
+ *     17:50 ET, outside the window, no-op.
+ *   - offset 7h (late-Oct/early-Nov mismatch): 21:50→14:50 ET, BEFORE the
+ *     window opens (15:30) — no-op — 22:50→15:50 ET, exactly the ideal
+ *     target, so the backup entry becomes the effective primary that week.
+ * Net effect: every trading day gets exactly one execution, always within
+ * the practical window, without a third entry — at the cost of firing ~1h
+ * later than ideal during the 5h-offset mismatch week.
  *
  * Cron entries (CyberFolks panel -> "Sciezka" type, explicit PHP 8.2 path:
  * /usr/local/bin/php82 — confirmed via deployment/<slug>.deploy.json):
  *
- *   50 20 * * 1-5  /usr/local/bin/php82 /home/amjsystem/sites/cvs.timeflow.fun/bin/llm-free-wallet-rebalance.php
  *   50 21 * * 1-5  /usr/local/bin/php82 /home/amjsystem/sites/cvs.timeflow.fun/bin/llm-free-wallet-rebalance.php
  *   50 22 * * 1-5  /usr/local/bin/php82 /home/amjsystem/sites/cvs.timeflow.fun/bin/llm-free-wallet-rebalance.php
  */

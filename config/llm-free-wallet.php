@@ -20,21 +20,29 @@ return [
     'initial_capital_usd' => 10000.0,
 
     // --- NYSE market hours (America/New_York timezone) ---
+    // NOTE: 'close_time' below is 17:00, not the real NYSE close (still
+    // 16:00 ET always) — it's the outer bound of the rebalance window's
+    // deliberately widened practical execution deadline. See the window
+    // comment below for why.
     'market' => [
         'open_time'  => '09:30',
-        'close_time' => '16:00',
+        'close_time' => '17:00',
         'timezone'   => 'America/New_York',
     ],
 
     // --- Rebalance window ---
-    // Narrow by design — unlike the baseline wallet (390 min = the whole
-    // session, since its timing doesn't matter), this wallet's whole premise
-    // is executing near the close (~10 min before, 15:50 ET). A wide window
-    // would let an earlier-firing DST-offset cron entry claim the cycle every
-    // normal day, silently defeating the near-close intent. 20 minutes =
-    // [15:40, 16:00) ET, comfortably bracketing the 15:50 target with margin
-    // on both sides while still rejecting an accidental early/late fire.
-    'rebalance_window_minutes' => 20,
+    // Operator's chosen design (2026-08-10): two cron entries only —
+    // 21:50 Warsaw (primary) and 22:50 Warsaw (backup, catches it if the
+    // primary doesn't fire or fails) — instead of three DST-offset-covering
+    // entries. This trades full automatic DST coverage for simplicity; the
+    // operator watches the EU/US DST transition weeks (mid-March,
+    // late-Oct/early-Nov) and adjusts the cron times by hand if needed.
+    // 90 minutes = [15:30, 17:00) ET, chosen so BOTH entries land inside the
+    // window at the nominal 6h offset (21:50→15:50 ET ideal target,
+    // 22:50→16:50 ET dormant backup) and at least one still lands in-window
+    // during either DST mismatch (5h or 7h offset) — see bin/llm-free-wallet-
+    // rebalance.php's docblock for the full walk-through per offset.
+    'rebalance_window_minutes' => 90,
 
     // --- Memory / context knobs unique to this module ---
     'legend_context_count' => 10,   // N last legend entries read back as context (questioning round 1)

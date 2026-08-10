@@ -635,7 +635,7 @@ Non-Goals: the baseline wallet's history is explicitly left untouched).
 - [x] 4.2 `composer stan` clean
 
 #### Manual
-- [ ] 4.3 Manual SSH CLI run seeds the wallet; one `llm_free_cycle` row, `status='completed'`, non-null `legend`
+- [x] 4.3 Manual SSH CLI run seeds the wallet; one `llm_free_cycle` row, `status='completed'`, non-null `legend` — confirmed live 2026-08-10 22:39 (cycle id=2, 4 BUYs executed, legend written)
 - [ ] 4.4 Re-run same day is a no-op (idempotency)
 - [ ] 4.5 Cron entries added in Cyber_Folks panel
 
