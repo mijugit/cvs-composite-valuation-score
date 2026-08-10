@@ -1,9 +1,9 @@
 ---
 id: llm-free-wallet
 title: "LLM_Free_Wallet — second, unconstrained LLM-driven portfolio"
-status: implementing
+status: implemented
 created: 2026-08-06
-updated: 2026-08-07
+updated: 2026-08-10
 ---
 
 ## Summary

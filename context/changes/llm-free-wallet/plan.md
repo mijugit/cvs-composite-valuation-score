@@ -636,8 +636,8 @@ Non-Goals: the baseline wallet's history is explicitly left untouched).
 
 #### Manual
 - [x] 4.3 Manual SSH CLI run seeds the wallet; one `llm_free_cycle` row, `status='completed'`, non-null `legend` — confirmed live 2026-08-10 22:39 (cycle id=2, 4 BUYs executed, legend written)
-- [x] 4.4 Re-run same day is a no-op (idempotency) — confirmed via `testCompletedCycleIsNotReRun` (LlmFreeCycleRepositoryTest.php:68, `claimForRun()` returns null when status='completed'); live manual re-run at 2026-08-10 23:20 correctly no-op'd (outside_rebalance_window guard, window had closed by then — did not re-exercise the in-window claim path live, but the claim guard itself is deterministically unit-tested against the exact same status transition)
-- [x] 4.5 Cron entries added in Cyber_Folks panel — confirmed live 2026-08-10 (three active entries: 21:55/22:10/22:20 Warsaw, all within the [21:30,23:00) window)
+- [x] 4.4 Re-run same day is a no-op (idempotency) — confirmed via `testCompletedCycleIsNotReRun` (LlmFreeCycleRepositoryTest.php:68, `claimForRun()` returns null when status='completed'); live manual re-run at 2026-08-10 23:20 correctly no-op'd (outside_rebalance_window guard, window had closed by then — did not re-exercise the in-window claim path live, but the claim guard itself is deterministically unit-tested against the exact same status transition) — c3adcbd
+- [x] 4.5 Cron entries added in Cyber_Folks panel — confirmed live 2026-08-10 (three active entries: 21:55/22:10/22:20 Warsaw, all within the [21:30,23:00) window) — c3adcbd
 
 ### Phase 5: UI
 
@@ -647,6 +647,6 @@ Non-Goals: the baseline wallet's history is explicitly left untouched).
 - [x] 5.3 Full `vendor/bin/phpunit` suite green
 
 #### Manual
-- [x] 5.4 `/llm-free` renders positions/return/legend correctly — confirmed live 2026-08-10 (user screenshot: positions table with live prices/P&L, legend section with 2026-08-10 entry)
-- [x] 5.5 "Portfele" dropdown works on desktop and ≤768px, active-state correct — confirmed live 2026-08-10: desktop dropdown opens and shows both entries with correct hrefs (screenshot), `aria-current="page"` correctly set on "LLM Free" while on `/llm-free` (templates/layout.php:51); mobile not independently screenshotted (viewport resize unavailable in this session) but the dropdown is the same pre-existing `.admin-menu` component already used site-wide (e.g. the Admin menu) — only a homogeneous `<li><a>` sibling was added, no llm-free-specific nav CSS/JS
-- [x] 5.6 `/llm-free` redirects to `/login` when logged out — confirmed via browser (unauthenticated GET /llm-free → /login)
+- [x] 5.4 `/llm-free` renders positions/return/legend correctly — confirmed live 2026-08-10 (user screenshot: positions table with live prices/P&L, legend section with 2026-08-10 entry) — c3adcbd
+- [x] 5.5 "Portfele" dropdown works on desktop and ≤768px, active-state correct — confirmed live 2026-08-10: desktop dropdown opens and shows both entries with correct hrefs (screenshot), `aria-current="page"` correctly set on "LLM Free" while on `/llm-free` (templates/layout.php:51); mobile not independently screenshotted (viewport resize unavailable in this session) but the dropdown is the same pre-existing `.admin-menu` component already used site-wide (e.g. the Admin menu) — only a homogeneous `<li><a>` sibling was added, no llm-free-specific nav CSS/JS — c3adcbd
+- [x] 5.6 `/llm-free` redirects to `/login` when logged out — confirmed via browser (unauthenticated GET /llm-free → /login) — c3adcbd
