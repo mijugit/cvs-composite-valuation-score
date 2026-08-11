@@ -233,21 +233,4 @@
         </div>
     </div>
     <?php endif; ?>
-
-    <?php /* Shared toggle for every .accordion on this page (watchlist + history) */ ?>
-    <script>
-    (function () {
-        document.querySelectorAll('.accordion__toggle').forEach(function (toggle) {
-            var body = document.getElementById(toggle.getAttribute('aria-controls') || '');
-            if (!body) return;
-            toggle.addEventListener('click', function () {
-                var open = toggle.getAttribute('aria-expanded') === 'true';
-                toggle.setAttribute('aria-expanded', open ? 'false' : 'true');
-                body.hidden = open;
-                var arrow = toggle.querySelector('.accordion__arrow');
-                if (arrow) arrow.textContent = open ? '▼' : '▲';
-            });
-        });
-    })();
-    </script>
 </section>

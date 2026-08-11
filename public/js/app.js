@@ -42,6 +42,27 @@
     });
 })();
 
+/**
+ * Shared toggle for every .accordion on any page (dashboard's watchlist/
+ * history, screener's "Więcej filtrów"...). Runs on every page; a no-op
+ * where there are no .accordion__toggle elements.
+ */
+(function () {
+    'use strict';
+
+    document.querySelectorAll('.accordion__toggle').forEach(function (toggle) {
+        var body = document.getElementById(toggle.getAttribute('aria-controls') || '');
+        if (!body) return;
+        toggle.addEventListener('click', function () {
+            var open = toggle.getAttribute('aria-expanded') === 'true';
+            toggle.setAttribute('aria-expanded', open ? 'false' : 'true');
+            body.hidden = open;
+            var arrow = toggle.querySelector('.accordion__arrow');
+            if (arrow) arrow.textContent = open ? '▼' : '▲';
+        });
+    });
+})();
+
 (function () {
     'use strict';
 

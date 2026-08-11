@@ -283,11 +283,25 @@ button, a { -webkit-tap-highlight-color: rgba(64, 144, 224, .2); }
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     gap: .75rem;
     padding-top: .95rem;
     border-top: 1px solid var(--c-border);
 }
+
+/* "Więcej filtrów" — same shared .accordion component as the dashboard's
+   watchlist/history, sitting inside a <form> rather than a <div>. Modest
+   negative margin lines its toggle up with the visible fields above/below
+   instead of floating with the card's default vertical rhythm. */
+.screener-advanced-filters { margin: .5rem 0; }
+.screener-advanced-filters .accordion__toggle {
+    width: auto;
+    padding: .4rem 0;
+    font-size: var(--text-sm);
+    color: var(--c-muted);
+}
+.screener-advanced-filters .accordion__toggle:hover { background: transparent; color: var(--c-text); }
+.screener-advanced-filters .accordion__body { padding: .75rem 0 0; border-top: none; }
 
 .screener-filters__toggles {
     display: flex;

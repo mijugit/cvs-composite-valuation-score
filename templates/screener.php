@@ -25,6 +25,14 @@ $recoOptions = [
     '⬇⬇ UNIKAJ',
 ];
 
+// distill: collapse the 5 least-used filters (+2 checkboxes) behind a
+// disclosure so the panel doesn't front-load 10 equal-weight decisions —
+// but auto-expand it when one of those filters is already active, so a
+// returning user with e.g. a sector filter set never has to go hunting
+// for why the list looks the way it does.
+$hasAdvancedFilter = $filter_sector !== null || $filter_market !== null || $filter_atr !== null
+    || $filter_min_swing > 0 || $filter_near_boundary || $filter_fv_only;
+
 $signalLabels = [
     'strong'    => '⭐⭐ Silny sygnał',
     'watchlist' => '⭐ Obserwuj',
@@ -236,73 +244,86 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
                     <?php endforeach; ?>
                 </select>
             </div>
+        </div>
 
-            <?php if (!empty($sectors)): ?>
-            <div class="form-group">
-                <label for="screener-filter-sector">Sektor<?= $hint('Ogranicza listę do jednego sektora GICS.') ?></label>
-                <select name="sector" id="screener-filter-sector">
-                    <option value="">— Wszystkie —</option>
-                    <?php foreach ($sectors as $sec): ?>
-                    <option value="<?= htmlspecialchars($sec) ?>" <?= $filter_sector === $sec ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($sec) ?>
-                    </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <?php endif; ?>
+        <div class="accordion screener-advanced-filters">
+            <button type="button" class="accordion__toggle"
+                    aria-expanded="<?= $hasAdvancedFilter ? 'true' : 'false' ?>"
+                    aria-controls="screener-advanced-body">
+                <span class="accordion__title">Więcej filtrów</span>
+                <span class="accordion__arrow"><?= $hasAdvancedFilter ? '▲' : '▼' ?></span>
+            </button>
+            <div class="accordion__body" id="screener-advanced-body" <?= $hasAdvancedFilter ? '' : 'hidden' ?>>
+                <div class="screener-filters__fields">
+                    <?php if (!empty($sectors)): ?>
+                    <div class="form-group">
+                        <label for="screener-filter-sector">Sektor<?= $hint('Ogranicza listę do jednego sektora GICS.') ?></label>
+                        <select name="sector" id="screener-filter-sector">
+                            <option value="">— Wszystkie —</option>
+                            <?php foreach ($sectors as $sec): ?>
+                            <option value="<?= htmlspecialchars($sec) ?>" <?= $filter_sector === $sec ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($sec) ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <?php endif; ?>
 
-            <?php if (!empty($markets)): ?>
-            <div class="form-group">
-                <label for="screener-filter-market">Rynek<?= $hint('Ogranicza listę do jednego rynku/giełdy, wyznaczonego sufiksem tickera (np. .WA = GPW Warszawa).') ?></label>
-                <select name="market" id="screener-filter-market">
-                    <option value="">— Wszystkie —</option>
-                    <?php foreach ($markets as $m): ?>
-                    <option value="<?= htmlspecialchars($m['value']) ?>" <?= $filter_market === $m['value'] ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($m['label']) ?>
-                    </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <?php endif; ?>
+                    <?php if (!empty($markets)): ?>
+                    <div class="form-group">
+                        <label for="screener-filter-market">Rynek<?= $hint('Ogranicza listę do jednego rynku/giełdy, wyznaczonego sufiksem tickera (np. .WA = GPW Warszawa).') ?></label>
+                        <select name="market" id="screener-filter-market">
+                            <option value="">— Wszystkie —</option>
+                            <?php foreach ($markets as $m): ?>
+                            <option value="<?= htmlspecialchars($m['value']) ?>" <?= $filter_market === $m['value'] ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($m['label']) ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <?php endif; ?>
 
-            <div class="form-group">
-                <label for="screener-filter-atr">Strefa ATR<?= $hint('Pozycja ceny względem strefy akumulacji wyliczonej z ATR: w strefie kupna, powyżej (czekaj na cofnięcie) lub poniżej (pod wsparciem).') ?></label>
-                <select name="atr" id="screener-filter-atr">
-                    <option value="">— Wszystkie —</option>
-                    <option value="in_zone" <?= $filter_atr === 'in_zone' ? 'selected' : '' ?>>✓ W strefie kupna</option>
-                    <option value="above"   <?= $filter_atr === 'above'   ? 'selected' : '' ?>>↑ Powyżej strefy</option>
-                    <option value="below"   <?= $filter_atr === 'below'   ? 'selected' : '' ?>>↓ Poniżej strefy</option>
-                </select>
-            </div>
+                    <div class="form-group">
+                        <label for="screener-filter-atr">Strefa ATR<?= $hint('Pozycja ceny względem strefy akumulacji wyliczonej z ATR: w strefie kupna, powyżej (czekaj na cofnięcie) lub poniżej (pod wsparciem).') ?></label>
+                        <select name="atr" id="screener-filter-atr">
+                            <option value="">— Wszystkie —</option>
+                            <option value="in_zone" <?= $filter_atr === 'in_zone' ? 'selected' : '' ?>>✓ W strefie kupna</option>
+                            <option value="above"   <?= $filter_atr === 'above'   ? 'selected' : '' ?>>↑ Powyżej strefy</option>
+                            <option value="below"   <?= $filter_atr === 'below'   ? 'selected' : '' ?>>↓ Poniżej strefy</option>
+                        </select>
+                    </div>
 
-            <div class="form-group">
-                <label for="filter-min-swing">Min CVS Swing<?= $hint('Pokazuje tylko spółki z wynikiem CVS Swing co najmniej tak wysokim (skala 0–100).') ?></label>
-                <input type="number" id="filter-min-swing" name="min_swing" min="0" max="100"
-                       value="<?= $filter_min_swing > 0 ? $filter_min_swing : '' ?>"
-                       placeholder="0–100">
+                    <div class="form-group">
+                        <label for="filter-min-swing">Min CVS Swing<?= $hint('Pokazuje tylko spółki z wynikiem CVS Swing co najmniej tak wysokim (skala 0–100).') ?></label>
+                        <input type="number" id="filter-min-swing" name="min_swing" min="0" max="100"
+                               value="<?= $filter_min_swing > 0 ? $filter_min_swing : '' ?>"
+                               placeholder="0–100">
+                    </div>
+                </div>
+
+                <div class="screener-filters__toggles">
+                    <div class="filter-toggle">
+                        <label class="filter-toggle__control">
+                            <input type="checkbox" name="near_boundary" value="1" <?= $filter_near_boundary ? 'checked' : '' ?>>
+                            <span class="filter-toggle__pill">Tylko pogranicze (±5 pkt)</span>
+                        </label>
+                        <?= $hint('Tylko spółki, których CVS Swing leży blisko progu rekomendacji — mały ruch wystarczy, by etykieta się zmieniła, więc warto je obserwować.') ?>
+                    </div>
+
+                    <div class="filter-toggle">
+                        <label class="filter-toggle__control">
+                            <input type="checkbox" name="fv_only" value="1" <?= $filter_fv_only ? 'checked' : '' ?>>
+                            <span class="filter-toggle__pill">Tylko FV &gt; cena</span>
+                        </label>
+                        <?= $hint('Tylko spółki, dla których model widzi margines bezpieczeństwa: implikowana wartość godziwa CVS (Fair Value) jest powyżej bieżącej ceny.') ?>
+                    </div>
+                </div>
             </div>
         </div>
 
         <div class="screener-filters__footer">
-            <div class="screener-filters__toggles">
-                <div class="filter-toggle">
-                    <label class="filter-toggle__control">
-                        <input type="checkbox" name="near_boundary" value="1" <?= $filter_near_boundary ? 'checked' : '' ?>>
-                        <span class="filter-toggle__pill">Tylko pogranicze (±5 pkt)</span>
-                    </label>
-                    <?= $hint('Tylko spółki, których CVS Swing leży blisko progu rekomendacji — mały ruch wystarczy, by etykieta się zmieniła, więc warto je obserwować.') ?>
-                </div>
-
-                <div class="filter-toggle">
-                    <label class="filter-toggle__control">
-                        <input type="checkbox" name="fv_only" value="1" <?= $filter_fv_only ? 'checked' : '' ?>>
-                        <span class="filter-toggle__pill">Tylko FV &gt; cena</span>
-                    </label>
-                    <?= $hint('Tylko spółki, dla których model widzi margines bezpieczeństwa: implikowana wartość godziwa CVS (Fair Value) jest powyżej bieżącej ceny.') ?>
-                </div>
-            </div>
-
             <input type="hidden" name="sort" value="<?= htmlspecialchars($sort) ?>">
+            <input type="hidden" name="dir" value="<?= htmlspecialchars($dir) ?>">
 
             <div class="screener-filters__actions">
                 <button type="submit" class="btn btn--primary btn--sm">Filtruj</button>
