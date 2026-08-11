@@ -609,6 +609,12 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
     transition: border-color .15s;
     user-select: none;
 }
+/* The chip's own `display: inline-flex` above has the same specificity as
+   the browser's built-in `[hidden] { display: none }` rule, and an author
+   stylesheet always wins over the UA stylesheet regardless — so without
+   this, setting `hidden` on a chip (the reco-filter) has zero visual
+   effect. */
+.watchlist-chip[hidden] { display: none; }
 
 /* Hover/focus tooltip: company full name + CVS Swing/Fund numbers.
    Opens below the chip (not above) so it never overlaps the accordion
