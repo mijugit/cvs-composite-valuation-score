@@ -190,6 +190,32 @@
             appendTickerToTextarea(ticker);
         });
 
+        // ------ Inline sort (no screener trip needed) ---------------
+        const sortSelect = document.getElementById('watchlist-sort');
+        if (sortSelect) {
+            // "Needs attention" first: REDUKUJ/UNIKAJ ahead of neutral, AKUMULUJ/SILNE KUPUJ last.
+            const severityRank = {
+                'reco--avoid': 0, 'reco--reduce': 1, '': 2, 'reco--accumulate': 3, 'reco--strong-buy': 4,
+            };
+            const recoClassOf = (li) => ['reco--strong-buy', 'reco--accumulate', 'reco--reduce', 'reco--avoid']
+                .find((c) => li.classList.contains(c)) ?? '';
+            const originalOrder = Array.from(chips.children);
+
+            sortSelect.addEventListener('change', () => {
+                let sorted;
+                if (sortSelect.value === 'alpha') {
+                    sorted = Array.from(chips.children)
+                        .sort((a, b) => a.dataset.ticker.localeCompare(b.dataset.ticker));
+                } else if (sortSelect.value === 'severity') {
+                    sorted = Array.from(chips.children)
+                        .sort((a, b) => severityRank[recoClassOf(a)] - severityRank[recoClassOf(b)]);
+                } else {
+                    sorted = originalOrder.filter((li) => li.isConnected);
+                }
+                sorted.forEach((li) => chips.appendChild(li));
+            });
+        }
+
         // Double-click on a chip → open the latest analysis for that ticker.
         chips.addEventListener('dblclick', (e) => {
             const chip = e.target.closest('.watchlist-chip');

@@ -83,6 +83,16 @@
             <span class="accordion__arrow">▼</span>
         </button>
         <div class="accordion__body" id="watchlist-body" hidden>
+            <?php if (count($watchlist ?? []) > 1): ?>
+            <div class="watchlist-toolbar">
+                <label for="watchlist-sort" class="watchlist-toolbar__label">Sortuj</label>
+                <select id="watchlist-sort" class="watchlist-toolbar__select">
+                    <option value="default">Kolejność dodania</option>
+                    <option value="severity">Wymagające uwagi najpierw</option>
+                    <option value="alpha">Alfabetycznie</option>
+                </select>
+            </div>
+            <?php endif; ?>
             <ul class="watchlist-chips" role="list">
                 <?php foreach ($watchlist ?? [] as $t):
                     $reco      = $watchlistRecos[$t] ?? '';
