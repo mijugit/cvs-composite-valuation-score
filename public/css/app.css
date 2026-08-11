@@ -622,11 +622,13 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
     user-select: none;
 }
 
-/* Hover tooltip: company full name + CVS Swing/Fund numbers */
+/* Hover/focus tooltip: company full name + CVS Swing/Fund numbers.
+   Opens below the chip (not above) so it never overlaps the accordion
+   header for chips in the watchlist's first row. */
 .watchlist-chip__tooltip {
     display: none;
     position: absolute;
-    bottom: calc(100% + 6px);
+    top: calc(100% + 6px);
     left: 50%;
     transform: translateX(-50%);
     z-index: 50;
