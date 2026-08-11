@@ -88,6 +88,13 @@
 
     // ------ Chip helpers -------------------------------------------
 
+    /** Keeps the accordion header's item count in sync after a JS-only add/remove. */
+    function updateWatchlistCount(section, delta) {
+        const badge = section.querySelector('.accordion__count');
+        if (!badge) return;
+        badge.textContent = String(Math.max(0, (parseInt(badge.textContent, 10) || 0) + delta));
+    }
+
     function addWatchlistChip(ticker) {
         const section = document.querySelector('.watchlist-section');
         const chips   = document.querySelector('.watchlist-chips');
@@ -104,16 +111,18 @@
             ` aria-label="Usuń ${esc(ticker)}">&times;</button>`;
         chips.appendChild(span);
         section.hidden = false;
+        updateWatchlistCount(section, 1);
     }
 
     function removeWatchlistChip(ticker) {
         const chip  = document.querySelector(`.watchlist-chips .watchlist-chip[data-ticker="${CSS.escape(ticker)}"]`);
         if (chip) chip.remove();
 
-        const chips = document.querySelector('.watchlist-chips');
-        if (chips && chips.children.length === 0) {
-            const section = document.querySelector('.watchlist-section');
-            if (section) section.hidden = true;
+        const chips  = document.querySelector('.watchlist-chips');
+        const section = document.querySelector('.watchlist-section');
+        if (section) updateWatchlistCount(section, -1);
+        if (chips && chips.children.length === 0 && section) {
+            section.hidden = true;
         }
     }
 
@@ -210,6 +219,7 @@
             if (data?.ok && data.action === 'removed') {
                 chip.remove();
                 watchedSet.delete(ticker);
+                updateWatchlistCount(section, -1);
                 if (chips.children.length === 0) section.hidden = true;
                 updateCardToggleBtns(ticker, false);
             }

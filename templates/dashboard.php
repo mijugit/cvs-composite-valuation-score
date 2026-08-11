@@ -42,52 +42,79 @@
     </script>
 
     <?php /* Watchlist section — always rendered; hidden when empty so JS can reveal it */ ?>
-    <div class="watchlist-section card"
+    <?php
+    // Maps a recommendation label to the same border-colour class used on the
+    // chip itself, so the tooltip's CVS Swing/Fund numbers get matching colours.
+    $recoToClass = static fn(string $reco): string => match (true) {
+        str_contains($reco, 'SILNE KUPUJ') => 'reco--strong-buy',
+        str_contains($reco, 'AKUMULUJ')    => 'reco--accumulate',
+        str_contains($reco, 'REDUKUJ')     => 'reco--reduce',
+        str_contains($reco, 'UNIKAJ')      => 'reco--avoid',
+        default                            => '',
+    };
+    // Count how many watched tickers currently fall into each recommendation
+    // band, so the collapsed accordion header can surface "what needs
+    // attention" without forcing every chip open first (distill: the wall of
+    // ~95 chips previously occupied the whole above-the-fold viewport).
+    $watchlistRecoCounts = ['reco--strong-buy' => 0, 'reco--accumulate' => 0, 'reco--reduce' => 0, 'reco--avoid' => 0];
+    foreach ($watchlist ?? [] as $t) {
+        $cls = $recoToClass($watchlistRecos[$t] ?? '');
+        if (isset($watchlistRecoCounts[$cls])) {
+            $watchlistRecoCounts[$cls]++;
+        }
+    }
+    ?>
+    <div class="watchlist-section card accordion"
          data-watchlist='<?= json_encode($watchlist ?? []) ?>'
          <?= empty($watchlist) ? 'hidden' : '' ?>>
-        <h3>Obserwowane</h3>
-        <?php
-        // Maps a recommendation label to the same border-colour class used on the
-        // chip itself, so the tooltip's CVS Swing/Fund numbers get matching colours.
-        $recoToClass = static fn(string $reco): string => match (true) {
-            str_contains($reco, 'SILNE KUPUJ') => 'reco--strong-buy',
-            str_contains($reco, 'AKUMULUJ')    => 'reco--accumulate',
-            str_contains($reco, 'REDUKUJ')     => 'reco--reduce',
-            str_contains($reco, 'UNIKAJ')      => 'reco--avoid',
-            default                            => '',
-        };
-        ?>
-        <div class="watchlist-chips">
-            <?php foreach ($watchlist ?? [] as $t):
-                $reco      = $watchlistRecos[$t] ?? '';
-                $recoClass = $recoToClass($reco);
-                $info      = $watchlistInfo[$t] ?? [];
-                $name      = $info['companyName'] ?? null;
-                $cvsSwing  = $info['cvsSwing'] ?? null;
-                $cvsFund   = $info['cvsFund']  ?? null;
-                $swingCls  = $recoToClass((string) ($info['recoSwing'] ?? ''));
-                $fundCls   = $recoToClass((string) ($info['recoFund']  ?? ''));
-            ?>
-            <span class="watchlist-chip <?= $recoClass ?>" data-ticker="<?= htmlspecialchars($t) ?>">
-                <?= htmlspecialchars($t) ?>
-                <button class="watchlist-chip__remove"
-                        data-ticker="<?= htmlspecialchars($t) ?>"
-                        aria-label="Usuń <?= htmlspecialchars($t) ?>">&times;</button>
-                <span class="watchlist-chip__tooltip">
-                    <strong><?= htmlspecialchars($name ?? $t) ?></strong>
-                    <?php if ($cvsSwing !== null || $cvsFund !== null): ?>
-                    <span class="watchlist-chip__tooltip-scores">
-                        <?php if ($cvsSwing !== null): ?>
-                        <span class="<?= $swingCls ?>">CVS Swing <?= number_format($cvsSwing, 1) ?></span>
-                        <?php endif; ?>
-                        <?php if ($cvsFund !== null): ?>
-                        <span class="<?= $fundCls ?>">CVS Fund <?= number_format($cvsFund, 1) ?></span>
+        <button class="accordion__toggle" aria-expanded="false" aria-controls="watchlist-body">
+            <span class="accordion__title">
+                Obserwowane
+                <span class="accordion__count"><?= count($watchlist ?? []) ?></span>
+            </span>
+            <?php if (array_sum($watchlistRecoCounts) > 0): ?>
+            <span class="accordion__summary">
+                <?php if ($watchlistRecoCounts['reco--strong-buy']): ?><span class="reco--strong-buy"><?= $watchlistRecoCounts['reco--strong-buy'] ?> SILNE KUPUJ</span><?php endif; ?>
+                <?php if ($watchlistRecoCounts['reco--accumulate']): ?><span class="reco--accumulate"><?= $watchlistRecoCounts['reco--accumulate'] ?> AKUMULUJ</span><?php endif; ?>
+                <?php if ($watchlistRecoCounts['reco--reduce']): ?><span class="reco--reduce"><?= $watchlistRecoCounts['reco--reduce'] ?> REDUKUJ</span><?php endif; ?>
+                <?php if ($watchlistRecoCounts['reco--avoid']): ?><span class="reco--avoid"><?= $watchlistRecoCounts['reco--avoid'] ?> UNIKAJ</span><?php endif; ?>
+            </span>
+            <?php endif; ?>
+            <span class="accordion__arrow">▼</span>
+        </button>
+        <div class="accordion__body" id="watchlist-body" hidden>
+            <div class="watchlist-chips">
+                <?php foreach ($watchlist ?? [] as $t):
+                    $reco      = $watchlistRecos[$t] ?? '';
+                    $recoClass = $recoToClass($reco);
+                    $info      = $watchlistInfo[$t] ?? [];
+                    $name      = $info['companyName'] ?? null;
+                    $cvsSwing  = $info['cvsSwing'] ?? null;
+                    $cvsFund   = $info['cvsFund']  ?? null;
+                    $swingCls  = $recoToClass((string) ($info['recoSwing'] ?? ''));
+                    $fundCls   = $recoToClass((string) ($info['recoFund']  ?? ''));
+                ?>
+                <span class="watchlist-chip <?= $recoClass ?>" data-ticker="<?= htmlspecialchars($t) ?>">
+                    <?= htmlspecialchars($t) ?>
+                    <button class="watchlist-chip__remove"
+                            data-ticker="<?= htmlspecialchars($t) ?>"
+                            aria-label="Usuń <?= htmlspecialchars($t) ?>">&times;</button>
+                    <span class="watchlist-chip__tooltip">
+                        <strong><?= htmlspecialchars($name ?? $t) ?></strong>
+                        <?php if ($cvsSwing !== null || $cvsFund !== null): ?>
+                        <span class="watchlist-chip__tooltip-scores">
+                            <?php if ($cvsSwing !== null): ?>
+                            <span class="<?= $swingCls ?>">CVS Swing <?= number_format($cvsSwing, 1) ?></span>
+                            <?php endif; ?>
+                            <?php if ($cvsFund !== null): ?>
+                            <span class="<?= $fundCls ?>">CVS Fund <?= number_format($cvsFund, 1) ?></span>
+                            <?php endif; ?>
+                        </span>
                         <?php endif; ?>
                     </span>
-                    <?php endif; ?>
                 </span>
-            </span>
-            <?php endforeach; ?>
+                <?php endforeach; ?>
+            </div>
         </div>
     </div>
 
@@ -146,15 +173,15 @@
 
     <?php /* Analysis history — collapsible accordion, newest first */ ?>
     <?php if (!empty($history)): ?>
-    <div class="history-section card history-accordion">
-        <button class="history-accordion__toggle" aria-expanded="false" aria-controls="history-body">
-            <span class="history-accordion__title">
+    <div class="history-section card accordion">
+        <button class="accordion__toggle" aria-expanded="false" aria-controls="history-body">
+            <span class="accordion__title">
                 Ostatnie analizy
-                <span class="history-accordion__count"><?= count($history) ?></span>
+                <span class="accordion__count"><?= count($history) ?></span>
             </span>
-            <span class="history-accordion__arrow">▼</span>
+            <span class="accordion__arrow">▼</span>
         </button>
-        <div class="history-accordion__body" id="history-body" hidden>
+        <div class="accordion__body" id="history-body" hidden>
             <table class="history-table">
                 <thead>
                     <tr>
@@ -178,18 +205,22 @@
             </table>
         </div>
     </div>
+    <?php endif; ?>
+
+    <?php /* Shared toggle for every .accordion on this page (watchlist + history) */ ?>
     <script>
     (function () {
-        var toggle = document.querySelector('.history-accordion__toggle');
-        var body   = document.getElementById('history-body');
-        if (!toggle || !body) return;
-        toggle.addEventListener('click', function () {
-            var open = toggle.getAttribute('aria-expanded') === 'true';
-            toggle.setAttribute('aria-expanded', open ? 'false' : 'true');
-            body.hidden = open;
-            toggle.querySelector('.history-accordion__arrow').textContent = open ? '▼' : '▲';
+        document.querySelectorAll('.accordion__toggle').forEach(function (toggle) {
+            var body = document.getElementById(toggle.getAttribute('aria-controls') || '');
+            if (!body) return;
+            toggle.addEventListener('click', function () {
+                var open = toggle.getAttribute('aria-expanded') === 'true';
+                toggle.setAttribute('aria-expanded', open ? 'false' : 'true');
+                body.hidden = open;
+                var arrow = toggle.querySelector('.accordion__arrow');
+                if (arrow) arrow.textContent = open ? '▼' : '▲';
+            });
         });
     })();
     </script>
-    <?php endif; ?>
 </section>
