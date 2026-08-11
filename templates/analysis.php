@@ -741,7 +741,7 @@
                                 <?php if ($score !== null): ?>
                                 <div class="progress-bar">
                                     <div class="progress-bar__track">
-                                        <div class="progress-bar__fill" style="width:<?= min(100, round((float)$score)) ?>%"></div>
+                                        <div class="progress-bar__fill" style="transform:scaleX(<?= max(0.01, min(1, round((float)$score) / 100)) ?>)"></div>
                                     </div>
                                     <span style="font-size:var(--text-xs);color:var(--c-muted);min-width:2.5rem;"><?= number_format((float)$score, 1) ?></span>
                                 </div>

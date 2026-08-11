@@ -272,19 +272,19 @@
     <h2 class="sg-heading">Komponenty — Progress Bar</h2>
     <div style="display:flex;flex-direction:column;gap:.75rem;max-width:480px;">
         <?php foreach ([
-            ['74%', 'primary',  ''],
-            ['55%', 'success',  '--success'],
-            ['45%', 'warn',     '--warn'],
-            ['22%', 'danger',   '--danger'],
-            ['68%', 'fund (żółty)', '--fund'],
-        ] as [$w, $label, $mod]): ?>
+            [74, 'primary',  ''],
+            [55, 'success',  '--success'],
+            [45, 'warn',     '--warn'],
+            [22, 'danger',   '--danger'],
+            [68, 'fund (żółty)', '--fund'],
+        ] as [$pct, $label, $mod]): ?>
         <div>
-            <div class="sg-label"><?= $label ?> (<?= $w ?>)</div>
+            <div class="sg-label"><?= $label ?> (<?= $pct ?>%)</div>
             <div class="progress-bar">
                 <div class="progress-bar__track">
-                    <div class="progress-bar__fill<?= $mod ? ' progress-bar__fill'.$mod : '' ?>" style="width:<?= $w ?>;"></div>
+                    <div class="progress-bar__fill<?= $mod ? ' progress-bar__fill'.$mod : '' ?>" style="transform:scaleX(<?= $pct / 100 ?>)"></div>
                 </div>
-                <span style="font-size:var(--text-xs);color:var(--c-muted);min-width:2.5rem;"><?= $w ?></span>
+                <span style="font-size:var(--text-xs);color:var(--c-muted);min-width:2.5rem;"><?= $pct ?>%</span>
             </div>
         </div>
         <?php endforeach; ?>
