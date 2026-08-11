@@ -472,6 +472,17 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
 .pillar-table td { padding: .6rem .5rem; text-align: left; border-bottom: 1px solid var(--c-border); }
 .pillar-table th { font-size: .8rem; color: var(--c-muted); text-transform: uppercase; }
 
+/* Screener only: the shared .pillar-table above is also used for small,
+   fully-visible tables elsewhere where a sticky header would be pointless
+   (or shift layout unexpectedly) — scoped to #screener-table so those other
+   uses are untouched. The site header itself isn't sticky, so top:0 is safe. */
+#screener-table thead th {
+    position: sticky;
+    top: 0;
+    background: var(--c-surface);
+    z-index: 2;
+}
+
 .failure-list { padding-left: 1.25rem; margin-top: .5rem; }
 .failure-list li { color: var(--c-danger); margin-bottom: .25rem; }
 
