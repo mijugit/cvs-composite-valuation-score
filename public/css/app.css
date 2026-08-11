@@ -6,6 +6,28 @@
 /* Design tokens live in tokens.css (loaded before this file). */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* --- Scrollbars --------------------------------------------
+   Default OS/browser scrollbars are light-themed and stand out hard
+   against this dark navy app — most visibly on .screener-table-scroll's
+   own scrollbar, but this covers the page scrollbar and any future
+   scroll container too. `scrollbar-color`/`-width` are inherited
+   properties (Firefox, and Chromium 121+), so setting them once on
+   :root covers every scrollable descendant without repeating the rule;
+   the ::-webkit-scrollbar-* pseudo-elements need the wildcard because
+   they don't inherit, but only render on elements that actually scroll. */
+:root {
+    scrollbar-width: thin;
+    scrollbar-color: var(--c-border) var(--c-bg);
+}
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: var(--c-bg); }
+*::-webkit-scrollbar-thumb {
+    background: var(--c-border);
+    border-radius: var(--radius-pill);
+    border: 2px solid var(--c-bg);
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--c-primary); }
+
 /* Animated video background — same opacity / stacking as the previous static illustration. */
 .bg-video {
     position: fixed;
