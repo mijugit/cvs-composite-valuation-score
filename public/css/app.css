@@ -362,8 +362,13 @@ button, a { -webkit-tap-highlight-color: rgba(64, 144, 224, .2); }
 }
 /* Selects need extra right padding beyond the shared .85rem so long option
    text (e.g. "⬆⬆ SILNE KUPUJ") doesn't sit under the browser's native
-   dropdown caret — confirmed clipped to "SILNE KUPI" without this. */
-.form-group select { padding-right: 2rem; }
+   dropdown caret. Padding alone wasn't enough on the 5-column screener
+   filter grid (minmax(150px,1fr) columns leave each select ~161px, and
+   "⬆⬆ SILNE KUPUJ" at the shared 1rem/16px still overflowed the space left
+   after padding) — measured live: 16px needed ~125px of the ~112px
+   available, 13px needed ~102px. Scoped smaller than the shared 1rem so
+   text/number inputs are untouched. */
+.form-group select { padding-right: 2rem; font-size: .8125rem; }
 .form-group input:focus,
 .form-group select:focus,
 .form-group textarea:focus {
