@@ -1255,6 +1255,55 @@
 }());
 
 // ------------------------------------------------------------------
+// Watchlist chip hover hint — portal
+// ------------------------------------------------------------------
+// Same clipping bug as the ticker/chart hint portals above: .watchlist-chip
+// lives inside .watchlist-section, which carries the shared .accordion
+// class (padding:0; overflow:hidden — needed for the collapse box's rounded
+// corners), so a position:absolute tooltip nested inside it gets clipped by
+// that edge the moment it would render outside the box. Same fix — a single
+// body-level portal, repositioned via getBoundingClientRect() on hover/focus
+// instead of pure CSS :hover. Opens BELOW the chip (unlike ticker-hint-portal,
+// which opens above) so it also never overlaps the accordion header for
+// chips in the watchlist's first row.
+
+(function () {
+    'use strict';
+
+    const chips = document.querySelectorAll('.watchlist-chip');
+    if (!chips.length) return;
+
+    const portal = document.createElement('div');
+    portal.className = 'watchlist-chip-portal';
+    document.body.appendChild(portal);
+
+    function show(chip, tooltip) {
+        portal.innerHTML = tooltip.innerHTML;
+        const r = chip.getBoundingClientRect();
+        portal.style.left = (r.left + r.width / 2) + 'px';
+        portal.style.top = (r.bottom + 6) + 'px';
+        portal.classList.add('watchlist-chip-portal--visible');
+    }
+
+    function hide() {
+        portal.classList.remove('watchlist-chip-portal--visible');
+    }
+
+    chips.forEach(chip => {
+        const tooltip = chip.querySelector('.watchlist-chip__tooltip');
+        if (!tooltip || tooltip.innerHTML.trim() === '') return;
+
+        chip.addEventListener('mouseenter', () => show(chip, tooltip));
+        chip.addEventListener('mouseleave', hide);
+        // Keyboard users: focusing the chip's "Usuń" button also reveals it.
+        chip.addEventListener('focusin', () => show(chip, tooltip));
+        chip.addEventListener('focusout', hide);
+    });
+
+    window.addEventListener('scroll', hide, true);
+}());
+
+// ------------------------------------------------------------------
 // Analysis page — chart zoom modal (desktop only)
 // ------------------------------------------------------------------
 // Radar / price / trajectory charts render small on the analysis page.

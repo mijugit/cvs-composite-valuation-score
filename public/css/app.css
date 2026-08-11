@@ -701,27 +701,13 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
    effect. */
 .watchlist-chip[hidden] { display: none; }
 
-/* Hover/focus tooltip: company full name + CVS Swing/Fund numbers.
-   Opens below the chip (not above) so it never overlaps the accordion
-   header for chips in the watchlist's first row. */
-.watchlist-chip__tooltip {
-    display: none;
-    position: absolute;
-    top: calc(100% + 6px);
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 50;
-    background: var(--c-surface);
-    border: 1px solid var(--c-border);
-    border-radius: var(--radius-md, 6px);
-    box-shadow: var(--shadow-lg);
-    padding: .5rem .75rem;
-    font-size: .8rem;
-    white-space: nowrap;
-    cursor: default;
-}
-.watchlist-chip:hover .watchlist-chip__tooltip,
-.watchlist-chip:focus-within .watchlist-chip__tooltip { display: block; }
+/* Content source only — never shown in place. .watchlist-section carries
+   the shared .accordion class (padding:0; overflow:hidden;), which clips
+   any position:absolute descendant that renders outside its rounded-corner
+   box — this is the exact same bug .ticker-hint__tooltip/.chart-hint__tooltip
+   already hit (see components.css/app.css), fixed there the same way: a
+   single body-level portal (public/js/app.js) instead of CSS :hover. */
+.watchlist-chip__tooltip { display: none; }
 
 .watchlist-chip__tooltip-scores {
     display: flex;
@@ -737,6 +723,37 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
 
 .watchlist-chip:hover,
 .watchlist-chip:focus-within { border-color: var(--c-primary); }
+
+/* Single shared tooltip, appended to <body> by app.js and repositioned on
+   each hover/focus — opens BELOW the chip (unlike ticker-hint-portal, which
+   opens above) so it never overlaps the accordion header for first-row
+   chips; a body-level child is never clipped by the accordion's overflow. */
+.watchlist-chip-portal {
+    display: none;
+    position: fixed;
+    transform: translate(-50%, 0);
+    z-index: 9999;
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-md, 6px);
+    box-shadow: var(--shadow-lg);
+    padding: .5rem .75rem;
+    font-size: .8rem;
+    white-space: nowrap;
+    text-align: left;
+    pointer-events: none;
+}
+/* Small arrow, pointing up at the chip */
+.watchlist-chip-portal::after {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-bottom-color: var(--c-border);
+}
+.watchlist-chip-portal--visible { display: block; }
 
 /* Chip border colours by latest recommendation (from cvs_snapshots) */
 .watchlist-chip.reco--strong-buy  { border-color: var(--c-success);  box-shadow: 0 0 0 1px var(--c-success); }
