@@ -337,6 +337,11 @@ return [
             '.DE' => 'Niemcy (Xetra)',
             '.L'  => 'Wielka Brytania (LSE)',
             '.PA' => 'Francja (Euronext)',
+            '.F'  => 'Niemcy (Frankfurt)',
+            '.MI' => 'Włochy (Borsa Italiana)',
+            '.OL' => 'Norwegia (Oslo Børs)',
+            '.SW' => 'Szwajcaria (SIX)',
+            '.TO' => 'Kanada (TSX)',
         ],
     ],
 
