@@ -475,7 +475,15 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
 /* Screener only: the shared .pillar-table above is also used for small,
    fully-visible tables elsewhere where a sticky header would be pointless
    (or shift layout unexpectedly) — scoped to #screener-table so those other
-   uses are untouched. The site header itself isn't sticky, so top:0 is safe. */
+   uses are untouched. The site header itself isn't sticky, so top:0 is safe.
+   `border-collapse: collapse` (inherited from .pillar-table) silently
+   breaks `position: sticky` on <th> in every major browser — verified live,
+   the header scrolled off entirely under collapse. Switching to `separate`
+   + zero spacing keeps the same visual look while letting sticky work. */
+#screener-table {
+    border-collapse: separate;
+    border-spacing: 0;
+}
 #screener-table thead th {
     position: sticky;
     top: 0;
