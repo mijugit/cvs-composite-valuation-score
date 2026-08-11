@@ -360,6 +360,10 @@ button, a { -webkit-tap-highlight-color: rgba(64, 144, 224, .2); }
     box-shadow: var(--shadow);
     transition: border-color .15s, box-shadow .15s;
 }
+/* Selects need extra right padding beyond the shared .85rem so long option
+   text (e.g. "⬆⬆ SILNE KUPUJ") doesn't sit under the browser's native
+   dropdown caret — confirmed clipped to "SILNE KUPI" without this. */
+.form-group select { padding-right: 2rem; }
 .form-group input:focus,
 .form-group select:focus,
 .form-group textarea:focus {

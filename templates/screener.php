@@ -214,8 +214,8 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
 
         <div class="screener-filters__fields">
             <div class="form-group">
-                <label>Rekomendacja<?= $hint('Etykieta wynikająca z CVS Swing: od SILNE KUPUJ do UNIKAJ.') ?></label>
-                <select name="reco">
+                <label for="screener-filter-reco">Rekomendacja<?= $hint('Etykieta wynikająca z CVS Swing: od SILNE KUPUJ do UNIKAJ.') ?></label>
+                <select name="reco" id="screener-filter-reco">
                     <option value="">— Wszystkie —</option>
                     <?php foreach ($recoOptions as $opt): ?>
                     <option value="<?= htmlspecialchars($opt) ?>" <?= $filter_reco === $opt ? 'selected' : '' ?>>
@@ -226,8 +226,8 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
             </div>
 
             <div class="form-group">
-                <label>Złoty sygnał<?= $hint('⭐⭐ wartość + momentum, ⭐ obserwuj (setup fundamentalny), ↑ momentum. Puste = brak filtra.') ?></label>
-                <select name="signal">
+                <label for="screener-filter-signal">Złoty sygnał<?= $hint('⭐⭐ wartość + momentum, ⭐ obserwuj (setup fundamentalny), ↑ momentum. Puste = brak filtra.') ?></label>
+                <select name="signal" id="screener-filter-signal">
                     <option value="">— Wszystkie —</option>
                     <?php foreach ($signalLabels as $val => $label): ?>
                     <option value="<?= htmlspecialchars($val) ?>" <?= $filter_signal === $val ? 'selected' : '' ?>>
@@ -239,8 +239,8 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
 
             <?php if (!empty($sectors)): ?>
             <div class="form-group">
-                <label>Sektor<?= $hint('Ogranicza listę do jednego sektora GICS.') ?></label>
-                <select name="sector">
+                <label for="screener-filter-sector">Sektor<?= $hint('Ogranicza listę do jednego sektora GICS.') ?></label>
+                <select name="sector" id="screener-filter-sector">
                     <option value="">— Wszystkie —</option>
                     <?php foreach ($sectors as $sec): ?>
                     <option value="<?= htmlspecialchars($sec) ?>" <?= $filter_sector === $sec ? 'selected' : '' ?>>
@@ -253,8 +253,8 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
 
             <?php if (!empty($markets)): ?>
             <div class="form-group">
-                <label>Rynek<?= $hint('Ogranicza listę do jednego rynku/giełdy, wyznaczonego sufiksem tickera (np. .WA = GPW Warszawa).') ?></label>
-                <select name="market">
+                <label for="screener-filter-market">Rynek<?= $hint('Ogranicza listę do jednego rynku/giełdy, wyznaczonego sufiksem tickera (np. .WA = GPW Warszawa).') ?></label>
+                <select name="market" id="screener-filter-market">
                     <option value="">— Wszystkie —</option>
                     <?php foreach ($markets as $m): ?>
                     <option value="<?= htmlspecialchars($m['value']) ?>" <?= $filter_market === $m['value'] ? 'selected' : '' ?>>
@@ -266,8 +266,8 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
             <?php endif; ?>
 
             <div class="form-group">
-                <label>Strefa ATR<?= $hint('Pozycja ceny względem strefy akumulacji wyliczonej z ATR: w strefie kupna, powyżej (czekaj na cofnięcie) lub poniżej (pod wsparciem).') ?></label>
-                <select name="atr">
+                <label for="screener-filter-atr">Strefa ATR<?= $hint('Pozycja ceny względem strefy akumulacji wyliczonej z ATR: w strefie kupna, powyżej (czekaj na cofnięcie) lub poniżej (pod wsparciem).') ?></label>
+                <select name="atr" id="screener-filter-atr">
                     <option value="">— Wszystkie —</option>
                     <option value="in_zone" <?= $filter_atr === 'in_zone' ? 'selected' : '' ?>>✓ W strefie kupna</option>
                     <option value="above"   <?= $filter_atr === 'above'   ? 'selected' : '' ?>>↑ Powyżej strefy</option>
@@ -334,17 +334,17 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
            data-is-admin="<?= $isAdmin ? '1' : '0' ?>" data-user-id="<?= (int) $currentUserId ?>">
         <thead>
             <tr>
-                <th><?= $sortLink('ticker', 'Ticker') ?></th>
-                <th><?= $sortLink('swing', 'CVS Swing') . $hint('Złożony wynik 0–100 w horyzoncie swing (1–4 mies.). Wyżej = lepiej.') ?></th>
-                <th><?= $sortLink('fund',  'CVS Fund') . $hint('Złożony wynik 0–100 w horyzoncie fundamentalnym (6–12 mies.).') ?></th>
-                <th>Trend (d/d)<?= $hint('Zmiana CVS Swing względem poprzedniego rescore (zwykle poprzedni dzień roboczy). Bardziej zaszumiony niż w/w — pojedynczy dzień potrafi się cofnąć mimo trwałego trendu w górę, i odwrotnie.') ?></th>
-                <th>Trend (w/w)<?= $hint('Zmiana CVS Swing względem ~7 dni temu. Odróżnia spółki pnące się w górę od tych, które spadają — przy identycznym dzisiejszym wyniku kierunek dojścia bywa ważniejszy niż sam poziom.') ?></th>
-                <th>Rekomendacja<?= $hint('Etykieta od SILNE KUPUJ do UNIKAJ wynikająca z wyniku CVS Swing.') ?></th>
-                <th>Sygnał<?= $hint('Złoty sygnał: ⭐⭐ wartość + momentum, ⭐ obserwuj (setup fundamentalny), ↑ momentum.') ?></th>
-                <th>Wyniki<?= $hint('Bliskość publikacji wyników kwartalnych (📅 za N dni / w oknie / N dni temu).') ?></th>
-                <th><?= $sortLink('atr', 'ATR') . $hint('Pozycja ceny względem strefy akumulacji ATR: ✓ w strefie kupna, ↑ powyżej (czekaj na cofnięcie), ↓ poniżej (pod wsparciem). Sortowanie: najpierw w strefie, potem poniżej, potem powyżej.') ?></th>
-                <th><?= $sortLink('fv', 'FV') . $hint('Margines implikowanej wartości godziwej CVS (Fair Value) nad lub pod bieżącą ceną. Dodatni = model widzi margines bezpieczeństwa. Ujemny mimo dobrej rekomendacji = sygnał ciągnięty głównie przez momentum, nie przez wycenę — sprawdź kartę spółki przed decyzją.') ?></th>
-                <th><?= $sortLink('price', 'Cena') ?></th>
+                <th scope="col"><?= $sortLink('ticker', 'Ticker') ?></th>
+                <th scope="col"><?= $sortLink('swing', 'CVS Swing') . $hint('Złożony wynik 0–100 w horyzoncie swing (1–4 mies.). Wyżej = lepiej.') ?></th>
+                <th scope="col"><?= $sortLink('fund',  'CVS Fund') . $hint('Złożony wynik 0–100 w horyzoncie fundamentalnym (6–12 mies.).') ?></th>
+                <th scope="col">Trend (d/d)<?= $hint('Zmiana CVS Swing względem poprzedniego rescore (zwykle poprzedni dzień roboczy). Bardziej zaszumiony niż w/w — pojedynczy dzień potrafi się cofnąć mimo trwałego trendu w górę, i odwrotnie.') ?></th>
+                <th scope="col">Trend (w/w)<?= $hint('Zmiana CVS Swing względem ~7 dni temu. Odróżnia spółki pnące się w górę od tych, które spadają — przy identycznym dzisiejszym wyniku kierunek dojścia bywa ważniejszy niż sam poziom.') ?></th>
+                <th scope="col">Rekomendacja<?= $hint('Etykieta od SILNE KUPUJ do UNIKAJ wynikająca z wyniku CVS Swing.') ?></th>
+                <th scope="col">Sygnał<?= $hint('Złoty sygnał: ⭐⭐ wartość + momentum, ⭐ obserwuj (setup fundamentalny), ↑ momentum.') ?></th>
+                <th scope="col">Wyniki<?= $hint('Bliskość publikacji wyników kwartalnych (📅 za N dni / w oknie / N dni temu).') ?></th>
+                <th scope="col"><?= $sortLink('atr', 'ATR') . $hint('Pozycja ceny względem strefy akumulacji ATR: ✓ w strefie kupna, ↑ powyżej (czekaj na cofnięcie), ↓ poniżej (pod wsparciem). Sortowanie: najpierw w strefie, potem poniżej, potem powyżej.') ?></th>
+                <th scope="col"><?= $sortLink('fv', 'FV') . $hint('Margines implikowanej wartości godziwej CVS (Fair Value) nad lub pod bieżącą ceną. Dodatni = model widzi margines bezpieczeństwa. Ujemny mimo dobrej rekomendacji = sygnał ciągnięty głównie przez momentum, nie przez wycenę — sprawdź kartę spółki przed decyzją.') ?></th>
+                <th scope="col"><?= $sortLink('price', 'Cena') ?></th>
             </tr>
         </thead>
         <tbody>
