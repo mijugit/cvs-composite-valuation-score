@@ -72,16 +72,30 @@
                 Obserwowane
                 <span class="accordion__count"><?= count($watchlist ?? []) ?></span>
             </span>
-            <?php if (array_sum($watchlistRecoCounts) > 0): ?>
-            <span class="accordion__summary">
-                <?php if ($watchlistRecoCounts['reco--strong-buy']): ?><span class="reco--strong-buy"><?= $watchlistRecoCounts['reco--strong-buy'] ?> SILNE KUPUJ</span><?php endif; ?>
-                <?php if ($watchlistRecoCounts['reco--accumulate']): ?><span class="reco--accumulate"><?= $watchlistRecoCounts['reco--accumulate'] ?> AKUMULUJ</span><?php endif; ?>
-                <?php if ($watchlistRecoCounts['reco--reduce']): ?><span class="reco--reduce"><?= $watchlistRecoCounts['reco--reduce'] ?> REDUKUJ</span><?php endif; ?>
-                <?php if ($watchlistRecoCounts['reco--avoid']): ?><span class="reco--avoid"><?= $watchlistRecoCounts['reco--avoid'] ?> UNIKAJ</span><?php endif; ?>
-            </span>
-            <?php endif; ?>
             <span class="accordion__arrow">▼</span>
         </button>
+        <?php if (array_sum($watchlistRecoCounts) > 0): ?>
+        <?php
+        // Each badge is a real <button>, never nested inside .accordion__toggle
+        // (buttons can't nest) — it both filters the chip list below to that
+        // recommendation and expands the accordion if it was collapsed.
+        $recoLabels = [
+            'reco--strong-buy' => 'SILNE KUPUJ',
+            'reco--accumulate' => 'AKUMULUJ',
+            'reco--reduce'     => 'REDUKUJ',
+            'reco--avoid'      => 'UNIKAJ',
+        ];
+        ?>
+        <div class="accordion__summary" role="group" aria-label="Filtruj obserwowane wg rekomendacji">
+            <?php foreach ($recoLabels as $cls => $label): ?>
+            <?php if ($watchlistRecoCounts[$cls]): ?>
+            <button type="button" class="accordion__summary-btn <?= $cls ?>" data-filter="<?= $cls ?>" aria-pressed="false">
+                <?= $watchlistRecoCounts[$cls] ?> <?= $label ?>
+            </button>
+            <?php endif; ?>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
         <div class="accordion__body" id="watchlist-body" hidden>
             <?php if (count($watchlist ?? []) > 1): ?>
             <div class="watchlist-toolbar">

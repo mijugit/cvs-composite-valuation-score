@@ -190,6 +190,9 @@
             appendTickerToTextarea(ticker);
         });
 
+        const recoClassOf = (li) => ['reco--strong-buy', 'reco--accumulate', 'reco--reduce', 'reco--avoid']
+            .find((c) => li.classList.contains(c)) ?? '';
+
         // ------ Inline sort (no screener trip needed) ---------------
         const sortSelect = document.getElementById('watchlist-sort');
         if (sortSelect) {
@@ -197,8 +200,6 @@
             const severityRank = {
                 'reco--avoid': 0, 'reco--reduce': 1, '': 2, 'reco--accumulate': 3, 'reco--strong-buy': 4,
             };
-            const recoClassOf = (li) => ['reco--strong-buy', 'reco--accumulate', 'reco--reduce', 'reco--avoid']
-                .find((c) => li.classList.contains(c)) ?? '';
             const originalOrder = Array.from(chips.children);
 
             sortSelect.addEventListener('change', () => {
@@ -213,6 +214,42 @@
                     sorted = originalOrder.filter((li) => li.isConnected);
                 }
                 sorted.forEach((li) => chips.appendChild(li));
+            });
+        }
+
+        // ------ Reco filter (click a count badge in the header) -----
+        // Clicking "N UNIKAJ" etc. shows only that band and opens the
+        // accordion if it was collapsed; clicking the same badge again
+        // clears the filter. Badges live outside .accordion__toggle
+        // (a <button> can't contain another <button>).
+        const summaryBtns = section.querySelectorAll('.accordion__summary-btn');
+        if (summaryBtns.length) {
+            const toggle = section.querySelector('.accordion__toggle');
+            const toggleBody = toggle ? document.getElementById(toggle.getAttribute('aria-controls') || '') : null;
+            let activeFilter = null;
+
+            summaryBtns.forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    const cls = btn.dataset.filter;
+                    const turningOff = activeFilter === cls;
+                    activeFilter = turningOff ? null : cls;
+
+                    summaryBtns.forEach((b) => {
+                        const isActive = b === btn && !turningOff;
+                        b.classList.toggle('is-active', isActive);
+                        b.setAttribute('aria-pressed', String(isActive));
+                    });
+                    Array.from(chips.children).forEach((li) => {
+                        li.hidden = !!activeFilter && recoClassOf(li) !== activeFilter;
+                    });
+
+                    if (toggle && toggleBody && toggle.getAttribute('aria-expanded') !== 'true') {
+                        toggle.setAttribute('aria-expanded', 'true');
+                        toggleBody.hidden = false;
+                        const arrow = toggle.querySelector('.accordion__arrow');
+                        if (arrow) arrow.textContent = '▲';
+                    }
+                });
             });
         }
 
