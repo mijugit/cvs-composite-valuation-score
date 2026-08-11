@@ -19,12 +19,11 @@
     scrollbar-width: thin;
     scrollbar-color: var(--c-border) var(--c-bg);
 }
-*::-webkit-scrollbar { width: 10px; height: 10px; }
-*::-webkit-scrollbar-track { background: var(--c-bg); }
+*::-webkit-scrollbar { width: 6px; height: 6px; }
+*::-webkit-scrollbar-track { background: transparent; }
 *::-webkit-scrollbar-thumb {
     background: var(--c-border);
     border-radius: var(--radius-pill);
-    border: 2px solid var(--c-bg);
 }
 *::-webkit-scrollbar-thumb:hover { background: var(--c-primary); }
 
@@ -245,6 +244,9 @@ button, a { -webkit-tap-highlight-color: rgba(64, 144, 224, .2); }
 .screener-table-scroll {
     overflow: auto;
     max-height: 70vh;
+    /* Room for the scrollbar's own lane so it doesn't sit flush against
+       (and visually read as cutting into) the last column ("Cena"). */
+    padding-right: .5rem;
 }
 
 /* --- Screener filter panel ---------------------------------
@@ -541,12 +543,18 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
 #screener-table {
     border-collapse: separate;
     border-spacing: 0;
+    /* Match the dashboard's .history-table scale/weight — the inherited
+       .pillar-table th above (uppercase, browser-default-bold th, no
+       explicit body size) reads visibly bigger/bolder/shoutier next to it. */
+    font-size: .85rem;
 }
 #screener-table thead th {
     position: sticky;
     top: 0;
     background: var(--c-surface);
     z-index: 2;
+    text-transform: none;
+    font-weight: 600;
 }
 
 .failure-list { padding-left: 1.25rem; margin-top: .5rem; }

@@ -111,7 +111,7 @@ $fvChip = static function (?float $marginPct): string {
     $title = $marginPct > 0
         ? 'CVS Fair Value powyżej ceny — model widzi margines bezpieczeństwa'
         : 'CVS Fair Value poniżej ceny mimo rekomendacji — sprawdź filar Wyceny i Jakości przed decyzją';
-    return '<span style="color:' . $color . ';font-weight:600;" title="' . htmlspecialchars($title) . '">'
+    return '<span style="color:' . $color . ';" title="' . htmlspecialchars($title) . '">'
         . $sign . number_format($marginPct, 0) . '%</span>';
 };
 
@@ -133,7 +133,7 @@ $trendChip = static function (?float $delta, string $title, string $emptyTitle):
         default     => ['→', 'var(--c-muted)'],
     };
     $sign = $delta > 0 ? '+' : '';
-    return '<span style="color:' . $color . ';font-weight:600;" title="' . htmlspecialchars($title) . '">'
+    return '<span style="color:' . $color . ';" title="' . htmlspecialchars($title) . '">'
         . $arrow . ' ' . $sign . number_format($delta, 1) . '</span>';
 };
 
@@ -378,8 +378,8 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
             // Colour reco — full 5-level palette matching watchlist chip colours
             $recoStr   = (string) ($row['reco_swing'] ?? '');
             $recoColor = match (true) {
-                str_contains($recoStr, 'SILNE KUPUJ') => 'color:var(--c-success);font-weight:700;',
-                str_contains($recoStr, 'AKUMULUJ')    => 'color:var(--c-primary);font-weight:700;',
+                str_contains($recoStr, 'SILNE KUPUJ') => 'color:var(--c-success);',
+                str_contains($recoStr, 'AKUMULUJ')    => 'color:var(--c-primary);',
                 str_contains($recoStr, 'REDUKUJ')     => 'color:var(--c-warn);',
                 str_contains($recoStr, 'UNIKAJ')      => 'color:var(--c-danger);',
                 default                               => 'color:var(--c-muted);',
@@ -392,14 +392,14 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
             <td>
                 <span class="ticker-hint">
                     <a href="/analysis/<?= urlencode((string) $row['ticker']) ?>"
-                       style="font-weight:700;color:var(--c-fund);">
+                       style="color:var(--c-fund);">
                         <?= htmlspecialchars((string) $row['ticker']) ?>
                     </a>
                     <?= $tickerHint((string) $row['ticker'], $row) ?>
                 </span><?= $heldBadge((string) $row['ticker'], $recoStr) ?>
             </td>
-            <td><strong style="color:var(--c-primary);"><?= $swing ?></strong></td>
-            <td><strong style="color:var(--c-fund);"><?= $fund ?></strong></td>
+            <td style="color:var(--c-primary);"><?= $swing ?></td>
+            <td style="color:var(--c-fund);"><?= $fund ?></td>
             <td><?= $trendChip(
                 $row['trend_delta_daily'] ?? null,
                 'Zmiana CVS Swing względem poprzedniego rescore',
