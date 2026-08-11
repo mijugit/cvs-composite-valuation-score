@@ -77,8 +77,23 @@ return [
         'model'               => 'claude-sonnet-5',
         'max_retries'         => 0,     // service-level retry owns the policy (LlmFreeDecisionService)
         'max_tokens'          => 8192,  // headroom for adaptive thinking (on by default on Sonnet 5) + legend text
-        'timeout'             => 45,
-        'total_timeout'       => 55,
+        // 45s/55s (copied from the pre-Sonnet-5 baseline) was too tight once
+        // this module moved to Sonnet 5: thinking is on by default there
+        // (unlike Sonnet 4.6, where omitting `thinking` meant off — see
+        // ClaudeClient::buildBody(), which never sets the param explicitly),
+        // so generation now routinely runs longer than 45s. Observed live
+        // 2026-08-11 22:02: both service-level attempts hit CURLOPT_TIMEOUT
+        // and aborted mid-generation — Anthropic's own request log showed
+        // the model had already produced ~3.5K output tokens per attempt
+        // when our client gave up (visible as HTTP 499 "client disconnected"
+        // in the Console). This cron entrypoint has no request-lifecycle
+        // time pressure (see bin/llm-free-wallet-rebalance.php's docblock:
+        // "takes as long as it takes"), so there is no reason for the tight
+        // budget — widened well past any realistic generation time instead
+        // of touching the `thinking` param (adaptive thinking is a good fit
+        // for this module's whole premise: genuine interpretive freedom).
+        'timeout'             => 180,
+        'total_timeout'       => 200,
         'retry_base_delay_ms' => 0,     // irrelevant at max_retries=0
         'retry_delay_seconds' => 2,     // flat delay between service-level attempts
         'system_prompt_ttl'   => '5m',  // CacheableSystem TTL
