@@ -317,10 +317,11 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
     <a href="/screener" class="btn btn--ghost btn--sm" style="margin-top:.75rem;">Wyczyść filtry</a>
 </div>
 <?php else: ?>
-<div class="card screener-results-card" style="overflow-x:auto;">
+<div class="card screener-results-card">
     <p id="screener-count" style="color:var(--c-muted);font-size:var(--text-xs);margin-bottom:.75rem;" data-total="<?= count($rows) ?>">
         <?= count($rows) ?> spółek
     </p>
+    <div class="screener-table-scroll">
     <table class="pillar-table" id="screener-table" style="width:100%;"
            data-is-admin="<?= $isAdmin ? '1' : '0' ?>" data-user-id="<?= (int) $currentUserId ?>">
         <thead>
@@ -399,6 +400,7 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
         </tr>
         </tbody>
     </table>
+    </div>
 </div>
 <?php endif; ?>
 
