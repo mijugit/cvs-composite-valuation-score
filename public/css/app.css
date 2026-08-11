@@ -820,6 +820,27 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
 .accordion__summary-btn.reco--reduce     { color: var(--c-warn); }
 .accordion__summary-btn.reco--avoid      { color: var(--c-danger); }
 
+/* Only shown once a badge filter is active — an explicit, visible way out
+   instead of expecting the user to guess that re-clicking the same badge
+   clears it. */
+.accordion__summary-clear {
+    background: transparent;
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-sm);
+    color: var(--c-muted);
+    padding: .1rem .5rem;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+.accordion__summary-clear:hover,
+.accordion__summary-clear:focus-visible {
+    color: var(--c-text);
+    border-color: var(--c-muted);
+    outline: none;
+}
+.accordion__summary-clear[hidden] { display: none; }
+
 .accordion__arrow {
     font-size: var(--text-sm);
     color: var(--c-muted);

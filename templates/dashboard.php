@@ -94,6 +94,9 @@
             </button>
             <?php endif; ?>
             <?php endforeach; ?>
+            <button type="button" id="watchlist-filter-clear" class="accordion__summary-clear" hidden>
+                &times; Pokaż wszystkie
+            </button>
         </div>
         <?php endif; ?>
         <div class="accordion__body" id="watchlist-body" hidden>

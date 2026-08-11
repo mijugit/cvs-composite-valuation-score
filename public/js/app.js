@@ -219,38 +219,44 @@
 
         // ------ Reco filter (click a count badge in the header) -----
         // Clicking "N UNIKAJ" etc. shows only that band and opens the
-        // accordion if it was collapsed; clicking the same badge again
-        // clears the filter. Badges live outside .accordion__toggle
-        // (a <button> can't contain another <button>).
+        // accordion if it was collapsed; clicking the same badge again,
+        // or the "Pokaż wszystkie" button that appears once a filter is
+        // active, clears it. Badges live outside .accordion__toggle (a
+        // <button> can't contain another <button>).
         const summaryBtns = section.querySelectorAll('.accordion__summary-btn');
+        const clearBtn = document.getElementById('watchlist-filter-clear');
         if (summaryBtns.length) {
             const toggle = section.querySelector('.accordion__toggle');
             const toggleBody = toggle ? document.getElementById(toggle.getAttribute('aria-controls') || '') : null;
             let activeFilter = null;
 
+            const setFilter = (cls) => {
+                activeFilter = cls;
+
+                summaryBtns.forEach((b) => {
+                    const isActive = b.dataset.filter === activeFilter;
+                    b.classList.toggle('is-active', isActive);
+                    b.setAttribute('aria-pressed', String(isActive));
+                });
+                Array.from(chips.children).forEach((li) => {
+                    li.hidden = !!activeFilter && recoClassOf(li) !== activeFilter;
+                });
+                if (clearBtn) clearBtn.hidden = !activeFilter;
+
+                if (activeFilter && toggle && toggleBody && toggle.getAttribute('aria-expanded') !== 'true') {
+                    toggle.setAttribute('aria-expanded', 'true');
+                    toggleBody.hidden = false;
+                    const arrow = toggle.querySelector('.accordion__arrow');
+                    if (arrow) arrow.textContent = '▲';
+                }
+            };
+
             summaryBtns.forEach((btn) => {
                 btn.addEventListener('click', () => {
-                    const cls = btn.dataset.filter;
-                    const turningOff = activeFilter === cls;
-                    activeFilter = turningOff ? null : cls;
-
-                    summaryBtns.forEach((b) => {
-                        const isActive = b === btn && !turningOff;
-                        b.classList.toggle('is-active', isActive);
-                        b.setAttribute('aria-pressed', String(isActive));
-                    });
-                    Array.from(chips.children).forEach((li) => {
-                        li.hidden = !!activeFilter && recoClassOf(li) !== activeFilter;
-                    });
-
-                    if (toggle && toggleBody && toggle.getAttribute('aria-expanded') !== 'true') {
-                        toggle.setAttribute('aria-expanded', 'true');
-                        toggleBody.hidden = false;
-                        const arrow = toggle.querySelector('.accordion__arrow');
-                        if (arrow) arrow.textContent = '▲';
-                    }
+                    setFilter(activeFilter === btn.dataset.filter ? null : btn.dataset.filter);
                 });
             });
+            if (clearBtn) clearBtn.addEventListener('click', () => setFilter(null));
         }
 
         // Double-click on a chip → open the latest analysis for that ticker.
