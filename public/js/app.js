@@ -103,13 +103,13 @@
         // Avoid duplicates
         if (chips.querySelector(`[data-ticker="${CSS.escape(ticker)}"]`)) return;
 
-        const span = document.createElement('span');
-        span.className       = 'watchlist-chip';
-        span.dataset.ticker  = ticker;
-        span.innerHTML = esc(ticker) +
+        const li = document.createElement('li');
+        li.className       = 'watchlist-chip';
+        li.dataset.ticker  = ticker;
+        li.innerHTML = esc(ticker) +
             `<button class="watchlist-chip__remove" data-ticker="${esc(ticker)}"` +
             ` aria-label="Usuń ${esc(ticker)}">&times;</button>`;
-        chips.appendChild(span);
+        chips.appendChild(li);
         section.hidden = false;
         updateWatchlistCount(section, 1);
     }

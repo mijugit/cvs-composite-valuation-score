@@ -83,7 +83,7 @@
             <span class="accordion__arrow">▼</span>
         </button>
         <div class="accordion__body" id="watchlist-body" hidden>
-            <div class="watchlist-chips">
+            <ul class="watchlist-chips" role="list">
                 <?php foreach ($watchlist ?? [] as $t):
                     $reco      = $watchlistRecos[$t] ?? '';
                     $recoClass = $recoToClass($reco);
@@ -94,7 +94,7 @@
                     $swingCls  = $recoToClass((string) ($info['recoSwing'] ?? ''));
                     $fundCls   = $recoToClass((string) ($info['recoFund']  ?? ''));
                 ?>
-                <span class="watchlist-chip <?= $recoClass ?>" data-ticker="<?= htmlspecialchars($t) ?>">
+                <li class="watchlist-chip <?= $recoClass ?>" data-ticker="<?= htmlspecialchars($t) ?>">
                     <?= htmlspecialchars($t) ?>
                     <button class="watchlist-chip__remove"
                             data-ticker="<?= htmlspecialchars($t) ?>"
@@ -112,9 +112,9 @@
                         </span>
                         <?php endif; ?>
                     </span>
-                </span>
+                </li>
                 <?php endforeach; ?>
-            </div>
+            </ul>
         </div>
     </div>
 

@@ -19,7 +19,10 @@
 
     /* --- Text --- */
     --c-text:  #dce8f5;
-    --c-muted: #5a7595;
+    /* Lightened from #5a7595 — that value read ~4.0:1 against --c-bg and ~3.6:1
+       against --c-surface, both below the WCAG AA 4.5:1 floor for normal text
+       (this token drives form hints, table headers, and tooltip labels). */
+    --c-muted: #6c88a7;
     --c-text-muted: var(--c-muted);   /* alias — some templates/components reference this name */
 
     /* --- Interactive (blue) --- */
