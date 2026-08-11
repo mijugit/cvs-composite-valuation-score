@@ -18,6 +18,23 @@ use PDO;
  */
 class ScreenerRepository
 {
+    /**
+     * Natural default direction per sort column, used when no explicit `dir`
+     * is given. Score-like columns default to "best first" (desc); ticker
+     * defaults to A→Z; atr defaults to most-actionable-first (its own rank,
+     * see $atrRank in getFiltered()) — both are "asc" in the sense of their
+     * own natural ordering, not literal numeric ascent.
+     */
+    private const SORT_DEFAULT_DIR = [
+        'ticker' => 'asc',
+        'atr'    => 'asc',
+    ];
+
+    public static function defaultDirFor(string $sort): string
+    {
+        return self::SORT_DEFAULT_DIR[$sort] ?? 'desc';
+    }
+
     private PDO $db;
 
     /**
@@ -76,10 +93,11 @@ class ScreenerRepository
      * @param string|null $signal   golden_signal value; 'none' = only null signals
      * @param int         $minSwing Minimum cvs_swing (0 = no filter)
      * @param string|null $sector   Exact sector match (null = all)
-     * @param string      $sort     'swing'|'fund'|'date'
+     * @param string      $sort     'swing'|'fund'|'date'|'ticker'|'price'|'atr'|'fv'
      * @param bool        $nearBoundary Only rows within trajectory.boundary_margin of a recommendation threshold
      * @param bool        $fvOnly   Only rows where fair_value_price > price_at_snapshot (both non-null)
      * @param string|null $market   Ticker suffix (e.g. '.WA'), or the 'US' sentinel for no-suffix tickers (null = all)
+     * @param string|null $dir      'asc'|'desc', or null to use $sort's natural default (see defaultDirFor())
      * @return array<int, array<string, mixed>>
      */
     public function getFiltered(
@@ -91,7 +109,8 @@ class ScreenerRepository
         ?string $atr         = null,
         bool    $nearBoundary = false,
         bool    $fvOnly      = false,
-        ?string $market      = null
+        ?string $market      = null,
+        ?string $dir         = null
     ): array {
         $rows = $this->findAllLatest();
 
@@ -196,17 +215,23 @@ class ScreenerRepository
         }
 
         // Sort. ATR ranks by actionability for entries: in zone, then below, then above.
-        $atrRank = static fn (?string $s): int => ['in_zone' => 0, 'below' => 1, 'above' => 2][$s] ?? 3;
+        // Every branch below compares $a <=> $b in the column's own natural ascending
+        // order; $sign flips the whole result for 'desc' (or a column's default — see
+        // defaultDirFor()) so there is exactly one place that knows about direction,
+        // instead of baking "desc" into half the branches via a swapped $b <=> $a.
+        $atrRank     = static fn (?string $s): int => ['in_zone' => 0, 'below' => 1, 'above' => 2][$s] ?? 3;
+        $resolvedDir = in_array($dir, ['asc', 'desc'], true) ? $dir : self::defaultDirFor($sort);
+        $sign        = $resolvedDir === 'asc' ? 1 : -1;
         $rows = array_values($rows);
-        usort($rows, function (array $a, array $b) use ($sort, $atrRank): int {
-            return match ($sort) {
-                'fund'   => (float) ($b['cvs_fund']  ?? 0) <=> (float) ($a['cvs_fund']  ?? 0),
-                'date'   => ($b['score_date'] ?? '') <=> ($a['score_date'] ?? ''),
+        usort($rows, function (array $a, array $b) use ($sort, $atrRank, $sign): int {
+            return $sign * match ($sort) {
+                'fund'   => (float) ($a['cvs_fund']  ?? 0) <=> (float) ($b['cvs_fund']  ?? 0),
+                'date'   => ($a['score_date'] ?? '') <=> ($b['score_date'] ?? ''),
                 'ticker' => strcmp((string) ($a['ticker'] ?? ''), (string) ($b['ticker'] ?? '')),
-                'price'  => (float) ($b['price_at_snapshot'] ?? 0) <=> (float) ($a['price_at_snapshot'] ?? 0),
+                'price'  => (float) ($a['price_at_snapshot'] ?? 0) <=> (float) ($b['price_at_snapshot'] ?? 0),
                 'atr'    => $atrRank($a['atr_state'] ?? null) <=> $atrRank($b['atr_state'] ?? null),
-                'fv'     => ($b['fv_margin_pct'] ?? -PHP_FLOAT_MAX) <=> ($a['fv_margin_pct'] ?? -PHP_FLOAT_MAX),
-                default  => (float) ($b['cvs_swing'] ?? 0) <=> (float) ($a['cvs_swing'] ?? 0),
+                'fv'     => ($a['fv_margin_pct'] ?? -PHP_FLOAT_MAX) <=> ($b['fv_margin_pct'] ?? -PHP_FLOAT_MAX),
+                default  => (float) ($a['cvs_swing'] ?? 0) <=> (float) ($b['cvs_swing'] ?? 0),
             };
         });
 

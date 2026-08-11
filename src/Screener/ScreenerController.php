@@ -52,6 +52,9 @@ class ScreenerController
         $sort     = in_array($req->query('sort'), self::VALID_SORTS, true)
             ? (string) $req->query('sort')
             : 'swing';
+        $dir      = in_array($req->query('dir'), ['asc', 'desc'], true)
+            ? (string) $req->query('dir')
+            : null;
         $nearBoundary = $req->query('near_boundary') === '1';
         $fvOnly       = $req->query('fv_only') === '1';
 
@@ -61,7 +64,7 @@ class ScreenerController
         $sector = $sector !== '' ? $sector : null;
         $market = $market !== '' ? $market : null;
 
-        $rows      = $this->repo->getFiltered($reco, $signal, $minSwing, $sector, $sort, $atr, $nearBoundary, $fvOnly, $market);
+        $rows      = $this->repo->getFiltered($reco, $signal, $minSwing, $sector, $sort, $atr, $nearBoundary, $fvOnly, $market, $dir);
         $lastScored = $this->repo->getLastScoredAt();
         $sectors   = $this->repo->getDistinctSectors();
         $markets   = $this->repo->getDistinctMarkets();
@@ -95,6 +98,7 @@ class ScreenerController
             'filter_near_boundary' => $nearBoundary,
             'filter_fv_only'   => $fvOnly,
             'sort'             => $sort,
+            'dir'              => $dir ?? ScreenerRepository::defaultDirFor($sort),
             'heldTickersMap'   => $heldTickersMap,
             'isAdmin'          => $isAdmin,
             'currentUserId'    => $currentUserId,

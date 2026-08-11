@@ -12,6 +12,7 @@
 /** @var bool $filter_near_boundary */
 /** @var bool $filter_fv_only */
 /** @var string $sort */
+/** @var string $dir */
 /** @var array<string, true> $heldTickersMap */
 /** @var bool $isAdmin */
 /** @var int $currentUserId */
@@ -31,9 +32,15 @@ $signalLabels = [
     'none'      => '— Brak sygnału',
 ];
 
-// Helper: sort link with arrow indicator
-$sortLink = static function (string $col, string $label) use ($sort, $filter_reco, $filter_signal, $filter_min_swing, $filter_sector, $filter_market, $filter_atr, $filter_near_boundary, $filter_fv_only): string {
-    $arrow = $col === $sort ? ' ↓' : '';
+// Helper: sort link. Arrow reflects the CURRENT direction of the active
+// column (↓ desc, ↑ asc) and is omitted on inactive columns rather than
+// always showing a static ↓ regardless of what's actually happening.
+// Clicking the active column flips its direction; clicking a different
+// column omits `dir` so the controller resolves that column's own default
+// (see ScreenerRepository::defaultDirFor()).
+$sortLink = static function (string $col, string $label) use ($sort, $dir, $filter_reco, $filter_signal, $filter_min_swing, $filter_sector, $filter_market, $filter_atr, $filter_near_boundary, $filter_fv_only): string {
+    $isActive = $col === $sort;
+    $arrow    = $isActive ? ($dir === 'asc' ? ' ↑' : ' ↓') : '';
     $params = http_build_query(array_filter([
         'reco'          => $filter_reco,
         'signal'        => $filter_signal,
@@ -44,6 +51,7 @@ $sortLink = static function (string $col, string $label) use ($sort, $filter_rec
         'near_boundary' => $filter_near_boundary ? '1' : null,
         'fv_only'       => $filter_fv_only ? '1' : null,
         'sort'          => $col,
+        'dir'           => $isActive ? ($dir === 'asc' ? 'desc' : 'asc') : null,
     ], fn($v) => $v !== null && $v !== ''));
     return '<a href="/screener?' . $params . '" style="color:inherit;text-decoration:none;">'
         . htmlspecialchars($label) . $arrow . '</a>';
