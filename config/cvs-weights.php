@@ -226,7 +226,7 @@ return [
 
     // --- Quality Gate thresholds (binary filter, applied before CVS) ---
     'quality_gate' => [
-        'min_gross_margin'      => 0.10,  // < 10% gross margin → FAIL
+        'min_gross_margin'      => 0.04,  // < 4% gross margin → FAIL (covers legit low-margin IT/hardware distributors: AB SA, ALSO, ASBIS)
         'max_debt_to_equity'    => 5.0,   // > 5x D/E → FAIL
         'min_current_ratio'     => 0.5,   // < 0.5 current ratio → FAIL
         'require_positive_revenue' => true, // Revenue must be > 0
