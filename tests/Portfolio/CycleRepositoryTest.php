@@ -21,12 +21,13 @@ class CycleRepositoryTest extends TestCase
 
         $this->db->exec('
             CREATE TABLE rebalance_cycle (
-                id            INTEGER PRIMARY KEY AUTOINCREMENT,
-                cycle_date    TEXT    NOT NULL UNIQUE,
-                status        TEXT    NOT NULL DEFAULT "started",
-                attempt_count INTEGER NOT NULL DEFAULT 1,
-                started_at    TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                finished_at   TEXT
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                cycle_date          TEXT    NOT NULL UNIQUE,
+                status              TEXT    NOT NULL DEFAULT "started",
+                attempt_count       INTEGER NOT NULL DEFAULT 1,
+                started_at          TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                finished_at         TEXT,
+                portfolio_value_usd REAL
             )
         ');
 
@@ -96,5 +97,27 @@ class CycleRepositoryTest extends TestCase
 
         $this->assertNotNull($id);
         $this->assertSame(3, (int) $this->fetch('2026-06-29')['attempt_count']);
+    }
+
+    public function testGetValueSeriesReturnsCompletedCyclesOldestFirst(): void
+    {
+        $this->db->exec("INSERT INTO rebalance_cycle (cycle_date, status, attempt_count, portfolio_value_usd) VALUES ('2026-06-30', 'completed', 1, 10250.75)");
+        $this->db->exec("INSERT INTO rebalance_cycle (cycle_date, status, attempt_count, portfolio_value_usd) VALUES ('2026-06-29', 'completed', 1, 10000.00)");
+        $this->db->exec("INSERT INTO rebalance_cycle (cycle_date, status, attempt_count) VALUES ('2026-07-01', 'llm_failed', 1)");
+
+        $series = $this->repo->getValueSeries();
+
+        $this->assertCount(2, $series);
+        $this->assertSame('2026-06-29', $series[0]['date']);
+        $this->assertEqualsWithDelta(10000.00, $series[0]['value'], 0.001);
+        $this->assertSame('2026-06-30', $series[1]['date']);
+        $this->assertEqualsWithDelta(10250.75, $series[1]['value'], 0.001);
+    }
+
+    public function testGetValueSeriesReturnsEmptyWhenNoCompletedCycles(): void
+    {
+        $this->db->exec("INSERT INTO rebalance_cycle (cycle_date, status, attempt_count) VALUES ('2026-06-29', 'llm_failed', 1)");
+
+        $this->assertSame([], $this->repo->getValueSeries());
     }
 }

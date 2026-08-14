@@ -6,9 +6,11 @@ namespace CVS\LlmFree;
 
 use CVS\Api\FinancialDataFetcher;
 use CVS\Auth\AuthController;
+use CVS\Charts\WalletNavChartService;
 use CVS\Core\Database;
 use CVS\Core\Request;
 use CVS\Core\Response;
+use CVS\Portfolio\CycleRepository;
 use CVS\Portfolio\LivePriceProvider;
 
 /**
@@ -73,6 +75,16 @@ class LlmFreeController
         // matches what the model "remembers" on the next cycle.
         $legendHistory = $walletRepo->getLegendHistory((int) ($walletConfig['legend_context_count'] ?? 10));
 
+        // NAV comparison chart (change: wallet-nav-chart) — same four series
+        // (LLM Bazowy, LLM Free, S&P 500, Nasdaq 100) shown on /portfolio.
+        $navChart = (new WalletNavChartService(
+            new CycleRepository($db),
+            new LlmFreeCycleRepository($db),
+            new FinancialDataFetcher($cvsConfig['data_source'] ?? []),
+        ))->fetch();
+        $chartSeries = $navChart['chartSeries'];
+        $chartD0     = $navChart['d0'];
+
         Response::view('llm-free', compact(
             'state',
             'holdings',
@@ -80,6 +92,8 @@ class LlmFreeController
             'walletConfig',
             'legendHistory',
             'marketHolidays',
+            'chartSeries',
+            'chartD0',
         ));
     }
 

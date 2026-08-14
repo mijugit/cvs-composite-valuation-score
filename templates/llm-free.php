@@ -66,6 +66,8 @@ $tickerHint = static function (
 
 <?php require __DIR__ . '/partials/wallet-summary.php'; ?>
 
+<?php require __DIR__ . '/partials/wallet-nav-chart.php'; ?>
+
 <!-- ─── Holdings ──────────────────────────────────────────────── -->
 <h2 style="font-size:1rem;font-weight:600;margin:0 0 .75rem;">Pozycje</h2>
 

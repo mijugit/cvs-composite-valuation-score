@@ -160,4 +160,26 @@ class LlmFreeCycleRepositoryTest extends TestCase
         $this->assertSame('completed', $row['status']);
         $this->assertNotNull($row['finished_at']);
     }
+
+    public function testGetValueSeriesReturnsCompletedCyclesOldestFirst(): void
+    {
+        $this->db->exec("INSERT INTO llm_free_cycle (cycle_date, status, attempt_count, portfolio_value_usd) VALUES ('2026-08-12', 'completed', 1, 10123.45)");
+        $this->db->exec("INSERT INTO llm_free_cycle (cycle_date, status, attempt_count, portfolio_value_usd) VALUES ('2026-08-10', 'completed', 1, 10000.00)");
+        $this->db->exec("INSERT INTO llm_free_cycle (cycle_date, status, attempt_count) VALUES ('2026-08-11', 'llm_failed', 1)");
+
+        $series = $this->repo->getValueSeries();
+
+        $this->assertCount(2, $series);
+        $this->assertSame('2026-08-10', $series[0]['date']);
+        $this->assertEqualsWithDelta(10000.00, $series[0]['value'], 0.001);
+        $this->assertSame('2026-08-12', $series[1]['date']);
+        $this->assertEqualsWithDelta(10123.45, $series[1]['value'], 0.001);
+    }
+
+    public function testGetValueSeriesReturnsEmptyWhenNoCompletedCycles(): void
+    {
+        $this->db->exec("INSERT INTO llm_free_cycle (cycle_date, status, attempt_count) VALUES ('2026-08-11', 'llm_failed', 1)");
+
+        $this->assertSame([], $this->repo->getValueSeries());
+    }
 }

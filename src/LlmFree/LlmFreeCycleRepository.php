@@ -35,6 +35,29 @@ class LlmFreeCycleRepository
     }
 
     /**
+     * Full mark-to-market history, oldest first — feeds the wallet NAV
+     * comparison chart on /llm-free (change: wallet-nav-chart). Mirrors
+     * CVS\Portfolio\CycleRepository::getValueSeries() exactly, one table over.
+     *
+     * @return list<array{date: string, value: float}>
+     */
+    public function getValueSeries(): array
+    {
+        $stmt = $this->db->query(
+            "SELECT cycle_date, portfolio_value_usd FROM llm_free_cycle
+             WHERE status = 'completed' AND portfolio_value_usd IS NOT NULL
+             ORDER BY cycle_date ASC"
+        );
+        $rows = $stmt !== false ? ($stmt->fetchAll() ?: []) : [];
+
+        $out = [];
+        foreach ($rows as $r) {
+            $out[] = ['date' => (string) $r['cycle_date'], 'value' => (float) $r['portfolio_value_usd']];
+        }
+        return $out;
+    }
+
+    /**
      * Claims the cycle for the given date for execution, returning its id, or
      * null when the cycle must NOT run now.
      *

@@ -34,6 +34,31 @@ class CycleRepository
     }
 
     /**
+     * Full mark-to-market history, oldest first — feeds the wallet NAV
+     * comparison chart on /portfolio (change: wallet-nav-chart). Same query
+     * shape as LabRepository::getLlmValueSeries(), which already reads this
+     * same table read-only from the Lab module; kept here too as the
+     * canonical method so callers don't have to know the table name.
+     *
+     * @return list<array{date: string, value: float}>
+     */
+    public function getValueSeries(): array
+    {
+        $stmt = $this->db->query(
+            "SELECT cycle_date, portfolio_value_usd FROM rebalance_cycle
+             WHERE status = 'completed' AND portfolio_value_usd IS NOT NULL
+             ORDER BY cycle_date ASC"
+        );
+        $rows = $stmt !== false ? ($stmt->fetchAll() ?: []) : [];
+
+        $out = [];
+        foreach ($rows as $r) {
+            $out[] = ['date' => (string) $r['cycle_date'], 'value' => (float) $r['portfolio_value_usd']];
+        }
+        return $out;
+    }
+
+    /**
      * Inserts a new cycle row using INSERT IGNORE to be idempotent.
      *
      * Returns the new row's id on success, or null when a row for

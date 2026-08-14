@@ -6,9 +6,11 @@ namespace CVS\Portfolio;
 
 use CVS\Api\FinancialDataFetcher;
 use CVS\Auth\AuthController;
+use CVS\Charts\WalletNavChartService;
 use CVS\Core\Database;
 use CVS\Core\Request;
 use CVS\Core\Response;
+use CVS\LlmFree\LlmFreeCycleRepository;
 use DateTimeImmutable;
 use DateTimeZone;
 
@@ -83,6 +85,16 @@ class PortfolioController
         $heldTickers = array_keys(array_fill_keys(array_column($holdings, 'ticker'), true));
         $recommended = $portfolioRepo->getScreenerRecommendationsNotHeld($heldTickers, $liveModelVersion);
 
+        // NAV comparison chart (change: wallet-nav-chart) — same four series
+        // (LLM Bazowy, LLM Free, S&P 500, Nasdaq 100) shown on /llm-free.
+        $navChart = (new WalletNavChartService(
+            new CycleRepository($db),
+            new LlmFreeCycleRepository($db),
+            new FinancialDataFetcher($cvsConfig['data_source'] ?? []),
+        ))->fetch();
+        $chartSeries = $navChart['chartSeries'];
+        $chartD0     = $navChart['d0'];
+
         Response::view('portfolio', compact(
             'state',
             'holdings',
@@ -91,6 +103,8 @@ class PortfolioController
             'nextTradingDay',
             'portfolioConfig',
             'recommended',
+            'chartSeries',
+            'chartD0',
         ));
     }
 

@@ -481,7 +481,8 @@ class FinancialDataFetcher implements LatestPriceSource
      * Phase 1) — the Lab module's benchmark (P0) and the /lab NAV chart's SPY
      * comparison series. Distinct from fetchSpyCloses() above (monthly, used by
      * MomentumPillar) — different cadence, different cache key, so neither
-     * invalidates the other's TTL.
+     * invalidates the other's TTL. Thin wrapper over fetchDailyCloses() that
+     * preserves the original 'cvs_spy_daily_closes' cache key untouched.
      *
      * SPY is always USD — no FX conversion needed.
      *
@@ -489,7 +490,20 @@ class FinancialDataFetcher implements LatestPriceSource
      */
     public function fetchSpyDailyCloses(): ?array
     {
-        $cacheKey = 'cvs_spy_daily_closes';
+        return $this->fetchDailyCloses('SPY', 'cvs_spy_daily_closes');
+    }
+
+    /**
+     * Fetch daily closes for the last year for any ticker (generalises
+     * fetchSpyDailyCloses() above) — used by the wallet NAV comparison chart
+     * (change: wallet-nav-chart) for the Nasdaq-100 (QQQ) benchmark line, and
+     * reusable for any future daily-resolution benchmark need.
+     *
+     * @return array{date: string[], close: float[]}|null null on any fetch/parse failure.
+     */
+    public function fetchDailyCloses(string $ticker, ?string $cacheKey = null): ?array
+    {
+        $cacheKey ??= 'cvs_daily_closes_' . $ticker;
         $ttl      = (int) ($this->config['cache_ttl'] ?? 3600);
 
         if (isset($_SESSION[$cacheKey], $_SESSION[$cacheKey . '_ts'])) {
@@ -499,7 +513,7 @@ class FinancialDataFetcher implements LatestPriceSource
         }
 
         $auth = $this->getCrumbAndCookie();
-        $url  = self::CHART_URL . urlencode('SPY')
+        $url  = self::CHART_URL . urlencode($ticker)
               . '?interval=1d&range=1y'
               . '&crumb=' . urlencode($auth['crumb']);
 
