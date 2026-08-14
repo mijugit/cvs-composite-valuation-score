@@ -110,14 +110,23 @@ $fmtPct = static fn(float $v): string => ($v >= 0 ? '+' : '') . number_format($v
     <p style="margin:0;">Pierwszy cykl jeszcze się nie odbył. Legenda pojawi się po pierwszym rebalansie.</p>
 </div>
 <?php else: ?>
-<div class="card" style="padding:1.5rem;">
+<?php /* Same collapsible pattern as /portfolio/history's .cycle-card (native
+   <details>, no JS needed) — newest entry open by default, older ones
+   collapsed, so a growing history doesn't turn into a wall of paragraphs. */ ?>
+<div style="display:flex;flex-direction:column;gap:.75rem;">
     <?php foreach ($legendHistory as $i => $entry): ?>
-    <div style="<?= $i > 0 ? 'margin-top:1.25rem;padding-top:1.25rem;border-top:1px solid var(--c-border);' : '' ?>">
-        <p style="margin:0 0 .35rem;font-size:var(--text-xs);color:var(--c-muted);text-transform:uppercase;letter-spacing:.05em;">
-            <?= htmlspecialchars((string) $entry['cycle_date']) ?>
-        </p>
-        <p style="margin:0;line-height:1.6;"><?= nl2br(htmlspecialchars((string) $entry['legend'])) ?></p>
-    </div>
+    <details class="card cycle-card"<?= $i === 0 ? ' open' : '' ?>>
+        <summary>
+            <div class="cycle-card__summary">
+                <div class="cycle-card__meta">
+                    <strong><?= htmlspecialchars((string) $entry['cycle_date']) ?></strong>
+                </div>
+            </div>
+        </summary>
+        <div class="cycle-card__body">
+            <p style="margin:0;line-height:1.6;"><?= nl2br(htmlspecialchars((string) $entry['legend'])) ?></p>
+        </div>
+    </details>
     <?php endforeach; ?>
 </div>
 <?php endif; ?>
