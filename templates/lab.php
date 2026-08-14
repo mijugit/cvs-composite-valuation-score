@@ -187,45 +187,9 @@ $palette = [
 
 <script>
 window.addEventListener('load', function () {
-    if (typeof Chart === 'undefined') return;
-    var ctx = document.getElementById('lab-nav-chart');
-    if (!ctx) return;
-
-    var chartSeries = <?= json_encode($chartSeries) ?>;
-    var palette = <?= json_encode($palette) ?>;
-
-    var allDates = [];
-    Object.keys(chartSeries).forEach(function (code) {
-        chartSeries[code].forEach(function (p) { if (allDates.indexOf(p.date) === -1) allDates.push(p.date); });
-    });
-    allDates.sort();
-
-    var datasets = Object.keys(chartSeries).map(function (code) {
-        var byDate = {};
-        chartSeries[code].forEach(function (p) { byDate[p.date] = p.value; });
-        return {
-            label: code === 'LLM' ? 'LLM (poglądowo)' : code,
-            data: allDates.map(function (d) { return byDate.hasOwnProperty(d) ? byDate[d] : null; }),
-            borderColor: palette[code] || 'rgba(255,255,255,0.6)',
-            backgroundColor: 'transparent',
-            borderDash: code === 'LLM' ? [6, 4] : [],
-            pointRadius: 0, borderWidth: 2, spanGaps: true,
-        };
-    });
-
-    new Chart(ctx.getContext('2d'), {
-        type: 'line',
-        data: { labels: allDates, datasets: datasets },
-        options: {
-            animation: false, responsive: true, maintainAspectRatio: false,
-            plugins: {
-                legend: { position: 'top', labels: { color: 'rgba(255,255,255,.7)', boxWidth: 12, font: { size: 11 } } },
-            },
-            scales: {
-                x: { grid: { color: 'rgba(128,128,128,.08)' }, ticks: { color: 'rgba(255,255,255,.45)', font: { size: 10 } } },
-                y: { grid: { color: 'rgba(128,128,128,.08)' }, ticks: { color: 'rgba(255,255,255,.45)', font: { size: 10 } } },
-            },
-        },
+    renderCvsNavChart('lab-nav-chart', <?= json_encode($chartSeries) ?>, <?= json_encode($palette) ?>, {
+        dashedLabels: ['LLM'],
+        labelFor: function (code) { return code === 'LLM' ? 'LLM (poglądowo)' : code; },
     });
 });
 </script>

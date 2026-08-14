@@ -9,6 +9,126 @@
  */
 
 /**
+ * Shared NAV comparison chart renderer (line chart + crosshair + multi-
+ * series tooltip) — used by /lab's NAV chart and the wallet NAV chart
+ * partial (/portfolio, /llm-free) so all three read the same way instead of
+ * three near-identical copies drifting apart. Callers defer to
+ * window.addEventListener('load', ...) before calling this (Chart.js must
+ * be loaded), so this can sit anywhere in this file regardless of <script>
+ * tag order in the page — see the callers' own comments.
+ *
+ * @param {string} canvasId        id of the <canvas> to render into
+ * @param {Object<string, Array<{date: string, value: number}>>} chartSeries series label => base=100 points
+ * @param {Object<string, string>} palette    series label => CSS color
+ * @param {Object} [opts]
+ * @param {string[]} [opts.dashedLabels] series labels to render as a dashed "for reference" line
+ * @param {(label: string) => string} [opts.labelFor] optional legend/tooltip label override per series key
+ * @returns {Chart|null} the created Chart.js instance, or null if the canvas/Chart.js is missing
+ */
+function renderCvsNavChart(canvasId, chartSeries, palette, opts) {
+    opts = opts || {};
+    var dashedLabels = opts.dashedLabels || [];
+
+    var ctx = document.getElementById(canvasId);
+    if (!ctx || typeof Chart === 'undefined') return null;
+
+    var allDates = [];
+    Object.keys(chartSeries).forEach(function (label) {
+        chartSeries[label].forEach(function (p) { if (allDates.indexOf(p.date) === -1) allDates.push(p.date); });
+    });
+    allDates.sort();
+
+    var datasets = Object.keys(chartSeries).map(function (label) {
+        var byDate = {};
+        chartSeries[label].forEach(function (p) { byDate[p.date] = p.value; });
+        return {
+            label: opts.labelFor ? opts.labelFor(label) : label,
+            data: allDates.map(function (d) { return byDate.hasOwnProperty(d) ? byDate[d] : null; }),
+            borderColor: palette[label] || 'rgba(255,255,255,0.6)',
+            backgroundColor: 'transparent',
+            borderDash: dashedLabels.indexOf(label) !== -1 ? [6, 4] : [],
+            pointRadius: 0, pointHoverRadius: 3, borderWidth: 2, spanGaps: true,
+        };
+    });
+
+    // Crosshair: a vertical line snapped to the hovered date (same index the
+    // tooltip reads) + a horizontal line following the raw mouse Y, so any
+    // point can be read off both axes at once. Passed as a per-chart plugin
+    // (not Chart.register'd) so it only ever attaches to charts built through
+    // this function — never leaks onto the analysis page's radar/price/
+    // trajectory charts or the sector-history modal chart. afterEvent stores
+    // the pointer position and forces a redraw (args.changed) even when the
+    // active dataset index hasn't moved, so the horizontal line tracks the
+    // cursor smoothly instead of only updating on date-to-date jumps.
+    var crosshairPlugin = {
+        id: 'cvsNavCrosshair',
+        afterEvent: function (chart, args) {
+            var e = args.event;
+            if (e.type === 'mouseout' || e.type === 'mouseleave') {
+                chart.$crosshair = null;
+                args.changed = true;
+                return;
+            }
+            if (e.type === 'mousemove' || e.type === 'mousedown') {
+                chart.$crosshair = { x: e.x, y: e.y };
+                args.changed = true;
+            }
+        },
+        afterDatasetsDraw: function (chart) {
+            var pos = chart.$crosshair;
+            if (!pos) return;
+            var area = chart.chartArea;
+            if (pos.x < area.left || pos.x > area.right || pos.y < area.top || pos.y > area.bottom) return;
+
+            var active = chart.getActiveElements();
+            var vx = active.length ? active[0].element.x : pos.x;
+
+            var c = chart.ctx;
+            c.save();
+            c.setLineDash([4, 4]);
+            c.lineWidth = 1;
+            c.strokeStyle = 'rgba(255,255,255,.35)';
+
+            c.beginPath();
+            c.moveTo(vx, area.top);
+            c.lineTo(vx, area.bottom);
+            c.stroke();
+
+            c.beginPath();
+            c.moveTo(area.left, pos.y);
+            c.lineTo(area.right, pos.y);
+            c.stroke();
+
+            c.restore();
+        },
+    };
+
+    return new Chart(ctx.getContext('2d'), {
+        type: 'line',
+        data: { labels: allDates, datasets: datasets },
+        plugins: [crosshairPlugin],
+        options: {
+            animation: false, responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { position: 'top', labels: { color: 'rgba(255,255,255,.7)', boxWidth: 12, font: { size: 11 } } },
+                tooltip: {
+                    callbacks: {
+                        label: function (item) {
+                            return item.dataset.label + ': ' + item.parsed.y.toFixed(1);
+                        },
+                    },
+                },
+            },
+            scales: {
+                x: { grid: { color: 'rgba(128,128,128,.08)' }, ticks: { color: 'rgba(255,255,255,.45)', font: { size: 10 } } },
+                y: { grid: { color: 'rgba(128,128,128,.08)' }, ticks: { color: 'rgba(255,255,255,.45)', font: { size: 10 } } },
+            },
+        },
+    });
+}
+
+/**
  * Mobile navigation toggle (hamburger). Runs on every page — independent of
  * the dashboard logic below, which early-returns when there is no analysis form.
  */
