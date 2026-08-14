@@ -1388,6 +1388,13 @@
         // and safe to clone.
         const zoomData    = cloneForChart(srcChart.config.data);
         const zoomOptions = cloneForChart(srcChart.config.options);
+        // Per-chart plugins (e.g. the wallet NAV chart's crosshair) live in
+        // config.plugins — a separate array from config.options.plugins (the
+        // legend/tooltip *configuration* object cloned above). Without this,
+        // any chart-instance plugin silently disappeared in the zoom view.
+        // Functions inside a plugin object pass through cloneForChart by
+        // reference (same rule as tooltip callbacks) — safe, they're stateless.
+        const zoomPlugins = srcChart.config.plugins ? cloneForChart(srcChart.config.plugins) : undefined;
         zoomOptions.responsive = true;
         // Small charts disable animation (several render at once on page
         // load — no flourish worth the flicker). The zoom modal only ever
@@ -1416,6 +1423,7 @@
             type: srcChart.config.type,
             data: zoomData,
             options: zoomOptions,
+            plugins: zoomPlugins,
         });
     }
 
