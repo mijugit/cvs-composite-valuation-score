@@ -462,7 +462,6 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
     </div>
 </div>
 
-<p class="disclaimer-inline" style="margin-top:1.5rem;">
-    Wyniki CVS to hipoteza modelu analitycznego, nie rekomendacja inwestycyjna.
-    Dane aktualizowane codziennie. Inwestuj świadomie.
+<p style="margin-top:1.5rem;font-size:var(--text-xs);color:var(--c-muted);">
+    Dane aktualizowane codziennie.
 </p>

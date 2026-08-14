@@ -27,6 +27,10 @@ class LlmFreeController
 
         $cvsConfig        = require dirname(__DIR__, 2) . '/config/cvs-weights.php';
         $walletConfig     = require dirname(__DIR__, 2) . '/config/llm-free-wallet.php';
+        // holidays only — shared NYSE calendar fact, not module logic (same
+        // reuse as bin/llm-free-wallet-rebalance.php).
+        $portfolioConfig  = require dirname(__DIR__, 2) . '/config/portfolio.php';
+        $marketHolidays   = $portfolioConfig['holidays'] ?? [];
         $liveModelVersion = (string) ($cvsConfig['model_version'] ?? '4.0');
 
         $db         = Database::connection();
@@ -75,6 +79,7 @@ class LlmFreeController
             'totalValue',
             'walletConfig',
             'legendHistory',
+            'marketHolidays',
         ));
     }
 

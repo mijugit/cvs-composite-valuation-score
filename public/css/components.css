@@ -140,6 +140,45 @@
 .signal-pill--watchlist { background: rgba(250, 204, 21,  .15); color: var(--c-fund); }
 .signal-pill--momentum  { background: rgba(64,  144, 224, .15); color: var(--c-primary); }
 .signal-pill--neutral   { background: var(--c-border, rgba(255,255,255,.08)); color: var(--c-text-muted, #888); }
+.signal-pill--danger    { background: rgba(239, 68,  68,  .15); color: var(--c-danger); }
+
+/* --- KPI card (label + headline value + caption) ----------- */
+/*
+ * Usage: <div class="card kpi-card">
+ *          <p class="kpi-card__label">Label</p>
+ *          <p class="kpi-card__value kpi-card__value--up">+1.99%</p>
+ *          <p class="kpi-card__caption">context</p>
+ *        </div>
+ * Portfolio/LLM-Free summary tiles — distinct from .stat-chip (an inline
+ * badge for small deltas inside tables), this is the page-level headline
+ * metric itself.
+ */
+.kpi-card { padding: 1.25rem; }
+.kpi-card__label {
+    font-size: var(--text-xs);
+    color: var(--c-muted);
+    margin: 0 0 .25rem;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+}
+.kpi-card__value { font-size: 1.5rem; font-weight: 700; margin: 0; }
+.kpi-card__value--up   { color: var(--c-success); }
+.kpi-card__value--down { color: var(--c-danger); }
+.kpi-card__caption { font-size: var(--text-xs); color: var(--c-muted); margin: .25rem 0 0; }
+
+/* --- Market clock (Warsaw/NY session strip) ----------------- */
+.market-clock { display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: center; }
+.market-clock__item { display: flex; flex-direction: column; gap: .15rem; }
+.market-clock__label {
+    font-size: var(--text-xs);
+    color: var(--c-muted);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+}
+.market-clock__value { font-size: 1.1rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.market-clock__value--session { font-size: .95rem; }
+.market-clock__hint { font-size: var(--text-xs); color: var(--c-muted); }
+.market-clock__sep { width: 1px; background: var(--c-border); align-self: stretch; }
 
 /* --- Admin Sectors table ----------------------------------- */
 .sectors-table td, .sectors-table th { vertical-align: middle; }

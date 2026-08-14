@@ -11,13 +11,9 @@
  * @var array<int, array<string, mixed>>  $recommended    S-04: screener SILNE KUPUJ/AKUMULUJ not held
  */
 
-$cash          = (float) $state['cash'];
+$cash           = (float) $state['cash'];
 $initialCapital = (float) ($portfolioConfig['initial_capital_usd'] ?? 10000.0);
-$pnl           = $totalValue - $initialCapital;
-$pnlPct        = $initialCapital > 0 ? ($pnl / $initialCapital) * 100.0 : 0.0;
-
-$fmt = static fn(float $v): string => '$' . number_format($v, 2, '.', ' ');
-$fmtPct = static fn(float $v): string => ($v >= 0 ? '+' : '') . number_format($v, 2, '.', '') . '%';
+$marketHolidays = $portfolioConfig['holidays'] ?? [];
 
 // Hover hint: friendly company name + CVS Swing/Fund — same content shape as
 // the dashboard watchlist chip tooltip (rendered via the shared .ticker-hint
@@ -64,11 +60,11 @@ $tickerHint = static function (
 $statusChip = static function (?string $status): string {
     return match ($status) {
         'completed'         => '<span class="signal-pill signal-pill--strong">✓ Zakończony</span>',
-        'llm_failed'        => '<span class="signal-pill" style="background:var(--c-danger-bg,#fee2e2);color:var(--c-danger);">✕ Błąd LLM</span>',
-        'failed'            => '<span class="signal-pill" style="background:var(--c-danger-bg,#fee2e2);color:var(--c-danger);">✕ Błąd</span>',
+        'llm_failed'        => '<span class="signal-pill signal-pill--danger">✕ Błąd LLM</span>',
+        'failed'            => '<span class="signal-pill signal-pill--danger">✕ Błąd</span>',
         'started'           => '<span class="signal-pill signal-pill--momentum">⟳ W toku</span>',
-        'market_closed'     => '<span class="signal-pill" style="background:var(--c-muted-bg,#f1f5f9);color:var(--c-muted);">— Rynek zamknięty</span>',
-        default             => '<span class="signal-pill" style="color:var(--c-muted);">' . htmlspecialchars((string) $status) . '</span>',
+        'market_closed'     => '<span class="signal-pill signal-pill--neutral">— Rynek zamknięty</span>',
+        default             => '<span class="signal-pill signal-pill--neutral">' . htmlspecialchars((string) $status) . '</span>',
     };
 };
 ?>
@@ -80,126 +76,7 @@ $statusChip = static function (?string $status): string {
     </p>
 </div>
 
-<!-- ─── Summary cards ─────────────────────────────────────────── -->
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:1.5rem;">
-
-    <div class="card" style="padding:1.25rem;">
-        <p style="font-size:var(--text-xs);color:var(--c-muted);margin:0 0 .25rem;text-transform:uppercase;letter-spacing:.05em;">Gotówka</p>
-        <p style="font-size:1.5rem;font-weight:700;margin:0;"><?= $fmt($cash) ?></p>
-        <p style="font-size:var(--text-xs);color:var(--c-muted);margin:.25rem 0 0;">USD — dostępna gotówka</p>
-    </div>
-
-    <div class="card" style="padding:1.25rem;">
-        <p style="font-size:var(--text-xs);color:var(--c-muted);margin:0 0 .25rem;text-transform:uppercase;letter-spacing:.05em;">Wycena portfela</p>
-        <p style="font-size:1.5rem;font-weight:700;margin:0;"><?= $fmt($totalValue) ?></p>
-        <p style="font-size:var(--text-xs);color:var(--c-muted);margin:.25rem 0 0;">cash + pozycje</p>
-    </div>
-
-    <div class="card" style="padding:1.25rem;">
-        <p style="font-size:var(--text-xs);color:var(--c-muted);margin:0 0 .25rem;text-transform:uppercase;letter-spacing:.05em;">Wynik vs start</p>
-        <p style="font-size:1.5rem;font-weight:700;margin:0;color:<?= $pnl >= 0 ? 'var(--c-success)' : 'var(--c-danger)' ?>;">
-            <?= $fmtPct($pnlPct) ?>
-        </p>
-        <p style="font-size:var(--text-xs);color:var(--c-muted);margin:.25rem 0 0;"><?= $fmt(abs($pnl)) ?> <?= $pnl >= 0 ? 'zysku' : 'straty' ?> vs <?= $fmt($initialCapital) ?></p>
-    </div>
-
-</div>
-
-<!-- ─── Market clock ───────────────────────────────────────────── -->
-<div class="card" style="padding:1.25rem;margin-bottom:1.5rem;">
-    <div style="display:flex;flex-wrap:wrap;gap:1.5rem;align-items:center;">
-
-        <div style="display:flex;flex-direction:column;gap:.15rem;">
-            <span style="font-size:var(--text-xs);color:var(--c-muted);text-transform:uppercase;letter-spacing:.05em;">Warszawa</span>
-            <span id="clock-waw" style="font-size:1.1rem;font-weight:700;font-variant-numeric:tabular-nums;">—</span>
-            <span style="font-size:var(--text-xs);color:var(--c-muted);">Europe/Warsaw (CET/CEST)</span>
-        </div>
-
-        <div style="width:1px;background:var(--c-border);align-self:stretch;"></div>
-
-        <div style="display:flex;flex-direction:column;gap:.15rem;">
-            <span style="font-size:var(--text-xs);color:var(--c-muted);text-transform:uppercase;letter-spacing:.05em;">Nowy Jork</span>
-            <span id="clock-ny" style="font-size:1.1rem;font-weight:700;font-variant-numeric:tabular-nums;">—</span>
-            <span style="font-size:var(--text-xs);color:var(--c-muted);">America/New_York (ET)</span>
-        </div>
-
-        <div style="width:1px;background:var(--c-border);align-self:stretch;"></div>
-
-        <div style="display:flex;flex-direction:column;gap:.15rem;">
-            <span style="font-size:var(--text-xs);color:var(--c-muted);text-transform:uppercase;letter-spacing:.05em;">Sesja NYSE</span>
-            <span style="font-size:.95rem;font-weight:600;">09:30 – 16:00 ET</span>
-            <span style="font-size:var(--text-xs);color:var(--c-muted);">15:30 – 22:00 Warsaw</span>
-        </div>
-
-        <div style="width:1px;background:var(--c-border);align-self:stretch;"></div>
-
-        <div style="display:flex;flex-direction:column;gap:.15rem;">
-            <span style="font-size:var(--text-xs);color:var(--c-muted);text-transform:uppercase;letter-spacing:.05em;">Status rynku</span>
-            <span id="market-status" style="font-size:.95rem;font-weight:700;">—</span>
-            <span id="market-hint" style="font-size:var(--text-xs);color:var(--c-muted);"></span>
-        </div>
-
-    </div>
-</div>
-
-<script>
-(function () {
-    function pad(n) { return String(n).padStart(2, '0'); }
-
-    function fmt(date, tz) {
-        try {
-            return date.toLocaleTimeString('pl-PL', {
-                timeZone: tz,
-                hour: '2-digit', minute: '2-digit', second: '2-digit',
-                hour12: false
-            });
-        } catch (_) { return '—'; }
-    }
-
-    function isMarketOpen(now) {
-        // NYSE Mon–Fri 09:30–16:00 ET, excluding holidays
-        const holidays = <?= json_encode($portfolioConfig['holidays'] ?? []) ?>;
-        const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
-        const dow = et.getDay(); // 0=Sun 6=Sat
-        if (dow === 0 || dow === 6) return false;
-
-        const ymd = et.getFullYear() + '-'
-            + pad(et.getMonth() + 1) + '-'
-            + pad(et.getDate());
-        if (holidays.includes(ymd)) return false;
-
-        const mins = et.getHours() * 60 + et.getMinutes();
-        return mins >= 570 && mins < 960; // 09:30–16:00
-    }
-
-    function tick() {
-        const now = new Date();
-        document.getElementById('clock-waw').textContent = fmt(now, 'Europe/Warsaw');
-        document.getElementById('clock-ny').textContent  = fmt(now, 'America/New_York');
-
-        const open = isMarketOpen(now);
-        const statusEl = document.getElementById('market-status');
-        const hintEl   = document.getElementById('market-hint');
-        if (open) {
-            statusEl.textContent = '🟢 Otwarta';
-            statusEl.style.color = 'var(--c-success)';
-            hintEl.textContent   = 'Trwa sesja NYSE';
-        } else {
-            statusEl.textContent = '🔴 Zamknięta';
-            statusEl.style.color = 'var(--c-muted)';
-            // hint: next open
-            const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
-            const dow = et.getDay();
-            hintEl.textContent = (dow >= 1 && dow <= 4) ? 'Jutro od 09:30 ET'
-                               : (dow === 5 || dow === 6) ? 'Poniedziałek 09:30 ET'
-                               : 'Jutro od 09:30 ET';
-        }
-    }
-
-    tick();
-    setInterval(tick, 1000);
-})();
-</script>
+<?php require __DIR__ . '/partials/wallet-summary.php'; ?>
 
 <!-- ─── Holdings ──────────────────────────────────────────────── -->
 <h2 style="font-size:1rem;font-weight:600;margin:0 0 .75rem;">Pozycje</h2>
@@ -233,7 +110,8 @@ $statusChip = static function (?string $status): string {
             <tr>
                 <td>
                     <span class="ticker-hint">
-                        <strong><?= htmlspecialchars($h['ticker']) ?></strong>
+                        <a href="/analysis/<?= urlencode((string) $h['ticker']) ?>"
+                           style="font-weight:700;color:var(--c-fund);"><?= htmlspecialchars($h['ticker']) ?></a>
                         <?= $tickerHint(
                             $h['ticker'],
                             $h['company_name'] ?? null,
@@ -408,7 +286,7 @@ $statusChip = static function (?string $status): string {
     </div>
 
     <?php if (!empty($latestCycle['notes'])): ?>
-    <p style="font-size:var(--text-sm);color:var(--c-text);margin:0 0 .5rem;padding:.75rem;background:var(--c-surface-alt,#f8fafc);border-radius:.375rem;">
+    <p class="cycle-card__notes">
         <?= htmlspecialchars((string) $latestCycle['notes']) ?>
     </p>
     <?php endif; ?>
@@ -483,7 +361,3 @@ $statusChip = static function (?string $status): string {
         </div>
     </div>
 </div>
-
-<p class="disclaimer-inline" style="margin-top:2rem;font-size:var(--text-xs);color:var(--c-muted);">
-    Wyniki CVS to hipoteza modelu analitycznego, nie rekomendacja inwestycyjna. Inwestuj świadomie.
-</p>

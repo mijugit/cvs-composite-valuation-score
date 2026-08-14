@@ -7,15 +7,53 @@
  * @var float                             $totalValue     cash + sum(holdings value_usd)
  * @var array<string, mixed>              $walletConfig   config/llm-free-wallet.php
  * @var array<int, array{cycle_date: string, legend: string}> $legendHistory newest-first
+ * @var array<int, string>                $marketHolidays NYSE holiday dates, from config/portfolio.php
  */
 
 $cash           = (float) $state['cash'];
 $initialCapital = (float) ($walletConfig['initial_capital_usd'] ?? 10000.0);
-$pnl            = $totalValue - $initialCapital;
-$pnlPct         = $initialCapital > 0 ? ($pnl / $initialCapital) * 100.0 : 0.0;
 
-$fmt    = static fn(float $v): string => '$' . number_format($v, 2, '.', ' ');
-$fmtPct = static fn(float $v): string => ($v >= 0 ? '+' : '') . number_format($v, 2, '.', '') . '%';
+// Hover hint: friendly company name + CVS Swing/Fund — identical shape to
+// templates/portfolio.php's copy (kept separate rather than extracted: the
+// two tables' surrounding markup differs enough — no .pos-info reason button
+// here — that a shared partial would need its own parameter surface anyway).
+$hintRecoColor = static function (?string $reco): string {
+    return match (true) {
+        $reco === null                        => 'color:var(--c-muted);',
+        str_contains($reco, 'SILNE KUPUJ')     => 'color:var(--c-success);',
+        str_contains($reco, 'AKUMULUJ')        => 'color:var(--c-primary);',
+        str_contains($reco, 'REDUKUJ')         => 'color:var(--c-warn);',
+        str_contains($reco, 'UNIKAJ')          => 'color:var(--c-danger);',
+        default                                => 'color:var(--c-muted);',
+    };
+};
+
+$tickerHint = static function (
+    string  $ticker,
+    ?string $name,
+    ?float  $swing,
+    ?float  $fund,
+    ?string $recoSwing,
+    ?string $recoFund
+) use ($hintRecoColor): string {
+    if ($name === null && $swing === null && $fund === null) {
+        return '';
+    }
+
+    $html = '<span class="ticker-hint__tooltip"><strong>' . htmlspecialchars($name ?? $ticker) . '</strong>';
+    if ($swing !== null || $fund !== null) {
+        $html .= '<span class="ticker-hint__tooltip-scores">';
+        if ($swing !== null) {
+            $html .= '<span style="' . $hintRecoColor($recoSwing) . '">CVS Swing ' . number_format($swing, 1) . '</span>';
+        }
+        if ($fund !== null) {
+            $html .= '<span style="' . $hintRecoColor($recoFund) . '">CVS Fund ' . number_format($fund, 1) . '</span>';
+        }
+        $html .= '</span>';
+    }
+    $html .= '</span>';
+    return $html;
+};
 ?>
 
 <div style="margin-bottom:1.5rem;">
@@ -26,30 +64,7 @@ $fmtPct = static fn(float $v): string => ($v >= 0 ? '+' : '') . number_format($v
     </p>
 </div>
 
-<!-- ─── Summary cards ─────────────────────────────────────────── -->
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:1.5rem;">
-
-    <div class="card" style="padding:1.25rem;">
-        <p style="font-size:var(--text-xs);color:var(--c-muted);margin:0 0 .25rem;text-transform:uppercase;letter-spacing:.05em;">Gotówka</p>
-        <p style="font-size:1.5rem;font-weight:700;margin:0;"><?= $fmt($cash) ?></p>
-        <p style="font-size:var(--text-xs);color:var(--c-muted);margin:.25rem 0 0;">USD — dostępna gotówka</p>
-    </div>
-
-    <div class="card" style="padding:1.25rem;">
-        <p style="font-size:var(--text-xs);color:var(--c-muted);margin:0 0 .25rem;text-transform:uppercase;letter-spacing:.05em;">Wycena portfela</p>
-        <p style="font-size:1.5rem;font-weight:700;margin:0;"><?= $fmt($totalValue) ?></p>
-        <p style="font-size:var(--text-xs);color:var(--c-muted);margin:.25rem 0 0;">cash + pozycje</p>
-    </div>
-
-    <div class="card" style="padding:1.25rem;">
-        <p style="font-size:var(--text-xs);color:var(--c-muted);margin:0 0 .25rem;text-transform:uppercase;letter-spacing:.05em;">Wynik vs start</p>
-        <p style="font-size:1.5rem;font-weight:700;margin:0;color:<?= $pnl >= 0 ? 'var(--c-success)' : 'var(--c-danger)' ?>;">
-            <?= $fmtPct($pnlPct) ?>
-        </p>
-        <p style="font-size:var(--text-xs);color:var(--c-muted);margin:.25rem 0 0;"><?= $fmt(abs($pnl)) ?> <?= $pnl >= 0 ? 'zysku' : 'straty' ?> vs <?= $fmt($initialCapital) ?></p>
-    </div>
-
-</div>
+<?php require __DIR__ . '/partials/wallet-summary.php'; ?>
 
 <!-- ─── Holdings ──────────────────────────────────────────────── -->
 <h2 style="font-size:1rem;font-weight:600;margin:0 0 .75rem;">Pozycje</h2>
@@ -80,7 +95,20 @@ $fmtPct = static fn(float $v): string => ($v >= 0 ? '+' : '') . number_format($v
                 $pnlRow       = (float) ($h['pnl_pct'] ?? 0.0);
             ?>
             <tr>
-                <td><strong><?= htmlspecialchars($h['ticker']) ?></strong></td>
+                <td>
+                    <span class="ticker-hint">
+                        <a href="/analysis/<?= urlencode((string) $h['ticker']) ?>"
+                           style="font-weight:700;color:var(--c-fund);"><?= htmlspecialchars($h['ticker']) ?></a>
+                        <?= $tickerHint(
+                            $h['ticker'],
+                            $h['company_name'] ?? null,
+                            $h['cvs_swing'] ?? null,
+                            $h['cvs_fund']  ?? null,
+                            $h['reco_swing'] ?? null,
+                            $h['reco_fund']  ?? null
+                        ) ?>
+                    </span>
+                </td>
                 <td><?= (int) $h['quantity'] ?></td>
                 <td style="text-align:right;color:var(--c-muted);"><?= $fmt((float) $h['avg_entry_price']) ?></td>
                 <td style="text-align:right;">
@@ -130,7 +158,3 @@ $fmtPct = static fn(float $v): string => ($v >= 0 ? '+' : '') . number_format($v
     <?php endforeach; ?>
 </div>
 <?php endif; ?>
-
-<p class="disclaimer-inline" style="margin-top:2rem;font-size:var(--text-xs);color:var(--c-muted);">
-    Wyniki CVS to hipoteza modelu analitycznego, nie rekomendacja inwestycyjna. Inwestuj świadomie.
-</p>

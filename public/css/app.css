@@ -1392,13 +1392,17 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
 .px-badge--stale { background: rgba(148,163,184,.18); color: var(--c-muted); }
 
 .pos-info {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.5rem;
+    min-height: 1.5rem;
     border: none;
     background: none;
     color: var(--c-primary);
     cursor: pointer;
     font-size: .9rem;
     line-height: 1;
-    padding: 0 .15rem;
     vertical-align: middle;
     opacity: .8;
 }
@@ -1455,7 +1459,7 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
     color: var(--c-text);
     margin: 0 0 .75rem;
     padding: .6rem .75rem;
-    background: var(--c-surface-alt, #f8fafc);
+    background: var(--c-bg);
     border-radius: var(--radius);
 }
 .cycle-tx-table { width: 100%; }

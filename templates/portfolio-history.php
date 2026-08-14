@@ -15,11 +15,11 @@ $fmtPct = static fn(float $v): string => ($v >= 0 ? '+' : '') . number_format($v
 $statusChip = static function (?string $status): string {
     return match ($status) {
         'completed'     => '<span class="signal-pill signal-pill--strong">&#10003; Zakończony</span>',
-        'llm_failed'    => '<span class="signal-pill" style="background:var(--c-danger-bg,#fee2e2);color:var(--c-danger);">&#10005; Błąd LLM</span>',
-        'failed'        => '<span class="signal-pill" style="background:var(--c-danger-bg,#fee2e2);color:var(--c-danger);">&#10005; Błąd</span>',
+        'llm_failed'    => '<span class="signal-pill signal-pill--danger">&#10005; Błąd LLM</span>',
+        'failed'        => '<span class="signal-pill signal-pill--danger">&#10005; Błąd</span>',
         'started'       => '<span class="signal-pill signal-pill--momentum">&#8635; W toku</span>',
-        'market_closed' => '<span class="signal-pill" style="background:var(--c-muted-bg,#f1f5f9);color:var(--c-muted);">&mdash; Rynek zamknięty</span>',
-        default         => '<span class="signal-pill" style="color:var(--c-muted);">' . htmlspecialchars((string) $status) . '</span>',
+        'market_closed' => '<span class="signal-pill signal-pill--neutral">&mdash; Rynek zamknięty</span>',
+        default         => '<span class="signal-pill signal-pill--neutral">' . htmlspecialchars((string) $status) . '</span>',
     };
 };
 ?>
