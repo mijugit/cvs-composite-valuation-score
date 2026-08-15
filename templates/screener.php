@@ -7,6 +7,7 @@ use CVS\Screener\SnapshotFreshness;
 /** @var int $warnAfterDays */
 /** @var string $todayDate */
 /** @var array<string, true> $watchedTickers */
+/** @var \CVS\CVS\Valuation\PeerCoverage $peerCoverage */
 /** @var string[] $sectors */
 /** @var list<array{value: string, label: string}> $markets */
 /** @var string|null $filter_reco */
@@ -172,6 +173,26 @@ $staleBadge = static function (?string $scoreDate, string $ticker) use ($todayDa
             $why
         ), ENT_QUOTES)
         . '">' . ($orphan ? '👁 ' : '⚠ ') . $age . ' dni</span>';
+};
+
+// Peer-coverage badge: this company's industry bucket is too thin to benchmark
+// against, so its Valuation pillar rests on a SECTOR fallback. Worth saying out
+// loud — ASB.WA (only distributor in the universe, n=1) was judged against
+// software multiples and ranked second overall until someone noticed by eye.
+$peerBadge = static function (?string $industry) use ($peerCoverage): string {
+    if (!$peerCoverage->isThin($industry)) {
+        return '';
+    }
+    $n = $peerCoverage->sampleCount($industry);
+    return ' <span class="peer-badge" title="'
+        . htmlspecialchars(sprintf(
+            'Branża „%s" ma tylko %d %s w bazie (próg: %d), więc wycena porównywana jest do MEDIANY SEKTORA, nie do bezpośrednich konkurentów. Wynik może być zawyżony lub zaniżony — sprawdź samodzielnie przed decyzją.',
+            $industry !== null && $industry !== '' ? $industry : 'nieznana',
+            $n,
+            $n === 1 ? 'spółkę' : 'spółek',
+            $peerCoverage->minSampleCount()
+        ), ENT_QUOTES)
+        . '">◍ brak peerów</span>';
 };
 
 // S-04: badge "w portfelu" next to the ticker link.
@@ -433,7 +454,7 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
                         <?= htmlspecialchars((string) $row['ticker']) ?>
                     </a>
                     <?= $tickerHint((string) $row['ticker'], $row) ?>
-                </span><?= $heldBadge((string) $row['ticker'], $recoStr) ?><?= $staleBadge(isset($row['score_date']) ? (string) $row['score_date'] : null, (string) $row['ticker']) ?>
+                </span><?= $heldBadge((string) $row['ticker'], $recoStr) ?><?= $staleBadge(isset($row['score_date']) ? (string) $row['score_date'] : null, (string) $row['ticker']) ?><?= $peerBadge(isset($row['industry']) ? (string) $row['industry'] : null) ?>
             </td>
             <td style="color:var(--c-primary);"><?= $swing ?></td>
             <td style="color:var(--c-fund);"><?= $fund ?></td>

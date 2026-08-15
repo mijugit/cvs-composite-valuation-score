@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CVS\Ai;
 
+use CVS\CVS\Valuation\MedianResolver;
 use CVS\Api\FinancialDataFetcher;
 use CVS\Auth\AuthController;
 use CVS\Core\Request;
@@ -158,7 +159,7 @@ class AiAnalysisController
         $cvsResult = $this->model->calculate($ticker, $financials)->toArray();
 
         // Calculate CVS implied fair value (sector-median-parity price).
-        $cvsFairPrice = FairPriceCalculator::compute($financials, $this->cvsConfig);
+        $cvsFairPrice = FairPriceCalculator::compute($financials, $this->cvsConfig, MedianResolver::fromConfig($this->cvsConfig));
 
         // Phase 8 enrichment — CVS trajectory + ATR execution plan for the prompt.
         $modelVersion = (string) ($this->cvsConfig['model_version'] ?? '');
@@ -251,7 +252,7 @@ class AiAnalysisController
         }
 
         $cvsResult    = $this->model->calculate($ticker, $financials)->toArray();
-        $cvsFairPrice = FairPriceCalculator::compute($financials, $this->cvsConfig);
+        $cvsFairPrice = FairPriceCalculator::compute($financials, $this->cvsConfig, MedianResolver::fromConfig($this->cvsConfig));
 
         $modelVersion = (string) ($this->cvsConfig['model_version'] ?? '');
         $trajWindow   = (int) ($this->cvsConfig['trajectory']['window_days'] ?? 90);

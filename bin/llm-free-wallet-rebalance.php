@@ -104,6 +104,8 @@ use CVS\LlmFree\LlmFreeDecisionService;
 use CVS\LlmFree\LlmFreeRepository;
 use CVS\LlmFree\LlmFreeService;
 use CVS\Portfolio\MarketCalendar;
+use CVS\CVS\Valuation\PeerCoverage;
+use CVS\CVS\Valuation\PeerMedianRepository;
 use CVS\Screener\ScreenerRepository;
 use CVS\Screener\SnapshotFreshness;
 
@@ -194,6 +196,41 @@ if ($partitioned['dropped'] !== []) {
         $cycleDate,
         count($partitioned['dropped']),
         implode(', ', $partitioned['dropped'])
+    ));
+}
+
+// Peer coverage: a company whose industry bucket is below min_sample_count is
+// benchmarked against its SECTOR, which can misprice it badly in either
+// direction — ASB.WA (n=1) read as 58% below Technology while sitting exactly
+// on its own industry median. A human gets a badge and can judge; a model
+// cannot, so thin-bucket tickers stay out of the candidate list. HELD tickers
+// are exempt for the same reason as stale ones: the executor prices trades from
+// these rows, so dropping a held ticker strands the position.
+$peerCoverage = new PeerCoverage(
+    (new PeerMedianRepository($db))->findIndustrySampleCounts(
+        (string) ($cvsConfig['model_version'] ?? ''),
+        'ev_fcf'
+    ),
+    (int) ($cvsConfig['peer_group']['min_sample_count'] ?? 5)
+);
+$thinDropped = [];
+$screenerRows = array_values(array_filter($screenerRows, static function (array $r) use ($peerCoverage, $heldTickers, &$thinDropped): bool {
+    $t = strtoupper((string) ($r['ticker'] ?? ''));
+    if (in_array($t, $heldTickers, true)) {
+        return true;
+    }
+    if ($peerCoverage->isThin(isset($r['industry']) ? (string) $r['industry'] : null)) {
+        $thinDropped[] = $t;
+        return false;
+    }
+    return true;
+}));
+if ($thinDropped !== []) {
+    $log(sprintf(
+        'cycle %s withheld %d candidate(s) with no industry peers: %s',
+        $cycleDate,
+        count($thinDropped),
+        implode(', ', $thinDropped)
     ));
 }
 

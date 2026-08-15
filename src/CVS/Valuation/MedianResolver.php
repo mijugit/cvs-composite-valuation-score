@@ -31,6 +31,30 @@ class MedianResolver
         private readonly string $modelVersion,
     ) {}
 
+    /**
+     * Build a resolver straight from config/cvs-weights.php.
+     *
+     * The four constructor arguments have to agree everywhere or two callers
+     * silently benchmark against different medians — which is exactly how fair
+     * value ended up contradicting the Valuation pillar. Mirrors
+     * ClaudeClientFactory::fromConfig()'s role for the AI client.
+     *
+     * @param array<string, mixed> $cvsConfig Full config/cvs-weights.php
+     */
+    public static function fromConfig(array $cvsConfig, ?PeerMedianRepository $repo = null): self
+    {
+        /** @var array<string, array<string, float|int>> $benchmarks */
+        $benchmarks = $cvsConfig['benchmarks'] ?? [];
+        $peerGroup  = is_array($cvsConfig['peer_group'] ?? null) ? $cvsConfig['peer_group'] : [];
+
+        return new self(
+            $repo ?? new PeerMedianRepository(),
+            $benchmarks,
+            (int) ($peerGroup['min_sample_count'] ?? 5),
+            (string) ($cvsConfig['model_version'] ?? ''),
+        );
+    }
+
     // ------------------------------------------------------------------
     // Primary resolution (subsector → sector → cold-start)
     // ------------------------------------------------------------------

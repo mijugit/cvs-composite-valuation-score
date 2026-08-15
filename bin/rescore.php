@@ -67,6 +67,7 @@ use CVS\Api\PayloadCompleteness;
 use CVS\Auth\UserRepository;
 use CVS\Execution\AtrZoneCalculator;
 use CVS\CVS\CVSModel;
+use CVS\CVS\Valuation\MedianResolver;
 use CVS\Mail\MailService;
 use CVS\TrackRecord\CvsSnapshotRepository;
 use CVS\TrackRecord\SnapshotWriter;
@@ -106,6 +107,11 @@ if (count($tickers) === 0) {
     $log('rescore: watchlist union is empty — nothing to score');
     exit(0);
 }
+
+// Built once, outside the loop: fair value must resolve its EV/FCF benchmark
+// through the same peer-group ladder ValuationPillar uses, or the two disagree
+// in adjacent screener columns.
+$medianResolver = MedianResolver::fromConfig($config);
 
 // Three outcomes, counted separately. The old pair (success/failed) incremented
 // `failed` only when fetch() returned null, so a Quality Gate REJECTION counted
@@ -160,7 +166,7 @@ foreach ($tickers as $ticker) {
     // Screener FV column: same $financials already fetched above for scoring —
     // zero extra Yahoo calls. Returns null when inputs are missing/out of the
     // 0.05x-10x sanity band (FairPriceCalculator's own guard).
-    $fairValue = FairPriceCalculator::compute($financials, $config);
+    $fairValue = FairPriceCalculator::compute($financials, $config, $medianResolver);
 
     // Base (4.0) + shadow (3.1/3.2) rows in one call — shadow mode (FR-016/FR-019).
     // FX fields propagate to every version row (same stock, same point in time).

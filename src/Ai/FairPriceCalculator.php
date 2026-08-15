@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CVS\Ai;
 
+use CVS\CVS\Valuation\MedianResolver;
+
 /**
  * CVS implied fair value: price at which Valuation pillar = 50 (sector-median parity).
  * Fair EV = median_ev_fcf × FCF × (1 + growth_capped)²
@@ -18,14 +20,37 @@ final class FairPriceCalculator
     /**
      * @param array<string, mixed> $financials
      * @param array<string, mixed> $cvsConfig  Full config/cvs-weights.php
+     * @param MedianResolver|null  $resolver   Peer-group medians (phase 3). Pass it
+     *        wherever one is available: without it this falls back to the STATIC
+     *        sector benchmark, which is what made fair value contradict the
+     *        Valuation pillar sitting next to it in the screener — ASB.WA scored
+     *        as fairly valued against its industry median of 10.3x while the FV
+     *        column, still using Technology's static 32x, claimed +722% upside.
      */
-    public static function compute(array $financials, array $cvsConfig): ?float
+    public static function compute(array $financials, array $cvsConfig, ?MedianResolver $resolver = null): ?float
     {
         $sector     = (string) ($financials['sector'] ?? 'DEFAULT');
         $benchmarks = $cvsConfig['benchmarks'] ?? [];
         $bm         = $benchmarks[$sector] ?? $benchmarks['DEFAULT'] ?? [];
         $medEvFcf   = (float) ($bm['median_ev_fcf'] ?? 0);
+        // max_growth stays sector-level: it is a cap on extrapolated growth, not
+        // a peer multiple, and peer_medians carries no equivalent. Worth revisiting
+        // — 60% for Technology is generous for a distributor — but that is a
+        // methodology change, not this fix.
         $maxGrowth  = (float) ($bm['max_growth']    ?? 20);
+
+        // Same resolution ladder ValuationPillar uses: industry median when the
+        // bucket is deep enough, else sector, else the static benchmark above.
+        if ($resolver !== null) {
+            $resolved = $resolver->resolve(
+                (string) ($financials['industry'] ?? ''),
+                $sector,
+                'ev_fcf'
+            );
+            if ($resolved->isValid()) {
+                $medEvFcf = (float) $resolved->value;
+            }
+        }
 
         $fcf = (float) ($financials['free_cash_flow'] ?? 0);
         if ($fcf <= 0) $fcf = (float) ($financials['free_cash_flow_adjusted'] ?? 0);

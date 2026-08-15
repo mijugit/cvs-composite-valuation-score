@@ -172,6 +172,40 @@ class PeerMedianRepository
      *
      * @return array{median: float|null, sample_count: int}|null
      */
+    /**
+     * Sample size behind every industry bucket, keyed by industry name.
+     *
+     * One bulk read for callers that need to know, across many tickers at once,
+     * whether a company actually has peers — MedianResolver answers that per
+     * ticker and hits the DB each time. A bucket below min_sample_count silently
+     * falls back to the sector median, which is how ASB.WA (the only electronics
+     * distributor in the universe, n=1) came to be judged against software
+     * multiples and ranked second overall on a comparison that meant nothing.
+     *
+     * @return array<string, int> industry => sample_count
+     */
+    public function findIndustrySampleCounts(string $modelVersion, string $metricType): array
+    {
+        $stmt = $this->db->prepare('
+            SELECT bucket_key, sample_count
+            FROM   peer_medians
+            WHERE  level         = :level
+              AND  model_version = :model_version
+              AND  metric_type   = :metric_type
+        ');
+        $stmt->execute([
+            ':level'         => 'industry',
+            ':model_version' => $modelVersion,
+            ':metric_type'   => $metricType,
+        ]);
+
+        $out = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+            $out[(string) $row['bucket_key']] = (int) $row['sample_count'];
+        }
+        return $out;
+    }
+
     public function findByBucket(
         string $level,
         string $bucketKey,

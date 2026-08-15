@@ -75,6 +75,7 @@ $_SESSION = [];
 $cvsConfig = require ROOT_PATH . '/config/cvs-weights.php';
 $aiConfig  = require ROOT_PATH . '/config/ai.php';
 
+use CVS\CVS\Valuation\MedianResolver;
 use CVS\Ai\AiAnalysisRepository;
 use CVS\Ai\AiCriticalReviewRepository;
 use CVS\Ai\AiCriticalReviewService;
@@ -108,7 +109,7 @@ try {
     $model     = new CVSModel($cvsConfig);
     $cvsResult = $model->calculate($ticker, $financials)->toArray();
 
-    $cvsFairPrice = FairPriceCalculator::compute($financials, $cvsConfig);
+    $cvsFairPrice = FairPriceCalculator::compute($financials, $cvsConfig, MedianResolver::fromConfig($cvsConfig));
 
     $modelVersion = (string) ($cvsConfig['model_version'] ?? '');
     $trajWindow   = (int) ($cvsConfig['trajectory']['window_days'] ?? 90);

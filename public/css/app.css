@@ -1582,3 +1582,21 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
     .ai-modal__inner,
     .company-modal__inner { padding: 1.5rem 1.25rem; max-width: calc(100vw - 2rem); }
 }
+
+/* Thin peer bucket: the Valuation pillar fell back to the sector median because
+   the company's industry has too few tickers to compare against. Neutral grey —
+   it is a caveat about the comparison, not a verdict on the company. */
+.peer-badge {
+    display: inline-block;
+    font-size: .65rem;
+    font-weight: 600;
+    letter-spacing: .02em;
+    padding: .1em .45em;
+    border-radius: 99px;
+    vertical-align: middle;
+    background: rgba(167,139,250,.16);
+    color: #a78bfa;
+    margin-left: .3rem;
+    white-space: nowrap;
+    cursor: help;
+}

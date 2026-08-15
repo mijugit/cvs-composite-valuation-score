@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CVS\Screener;
 
+use CVS\CVS\Valuation\PeerMedianRepository;
+use CVS\CVS\Valuation\PeerCoverage;
 use CVS\Auth\AuthController;
 use CVS\Core\Database;
 use CVS\Core\Request;
@@ -21,6 +23,9 @@ class ScreenerController
     /** @var array<string, mixed> config/cvs-weights.php → snapshot_freshness */
     private array $freshness;
 
+    /** @var array<string, mixed> full config/cvs-weights.php */
+    private array $cvsConfig;
+
     private const VALID_SORTS = ['swing', 'fund', 'date', 'ticker', 'price', 'atr', 'fv'];
     private const VALID_ATR   = ['in_zone', 'above', 'below'];
 
@@ -31,6 +36,7 @@ class ScreenerController
         // ScreenerRepository::$liveModelVersion / findAllLatest().
         $config          = require dirname(__DIR__, 2) . '/config/cvs-weights.php';
         $liveVersion     = $config['model_version'] ?? null;
+        $this->cvsConfig = $config;
         $this->freshness = $config['snapshot_freshness'] ?? [];
         $this->repo      = new ScreenerRepository(
             null,
@@ -121,6 +127,15 @@ class ScreenerController
             'watchedTickers'   => array_fill_keys(
                 array_map('strtoupper', (new WatchlistRepository(Database::connection()))->findAllDistinctTickers()),
                 true
+            ),
+            // Peer coverage: a company whose industry bucket is below
+            // min_sample_count is benchmarked against its SECTOR instead, which
+            // can flatter or punish it badly (ASB.WA: 10.3x industry vs 24.4x
+            // sector). One bulk read, resolved per row in the view.
+            'peerCoverage'     => new PeerCoverage(
+                (new PeerMedianRepository(Database::connection()))
+                    ->findIndustrySampleCounts((string) ($this->cvsConfig['model_version'] ?? ''), 'ev_fcf'),
+                (int) ($this->cvsConfig['peer_group']['min_sample_count'] ?? 5)
             ),
         ]);
     }
