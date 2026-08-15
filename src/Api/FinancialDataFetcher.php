@@ -52,6 +52,19 @@ class FinancialDataFetcher implements LatestPriceSource
     private const CONSENT_URL = 'https://fc.yahoo.com';
     private const CRUMB_URL   = 'https://query2.finance.yahoo.com/v1/test/getcrumb';
 
+    /**
+     * Quote currencies Yahoo reports in a minor unit, mapped to their major one.
+     * A price in these is one hundredth of the statement currency's unit, so it
+     * must be divided by 100 before any comparison with balance-sheet figures.
+     * London (GBp) is the one that bites in this universe; the other two are
+     * included because they behave identically and cost nothing to cover.
+     */
+    private const MINOR_UNIT_CURRENCIES = [
+        'GBp' => 'GBP', // pence      → pound sterling
+        'ZAc' => 'ZAR', // cents      → rand
+        'ILA' => 'ILS', // agorot     → shekel
+    ];
+
     private const MODULES = [
         'assetProfile',
         'quoteType',
@@ -828,7 +841,75 @@ class FinancialDataFetcher implements LatestPriceSource
         //      (price is already USD, only financials need conversion).
         // ------------------------------------------------------------------
         $fxF = $fxRateToUsd ?? 1.0;
-        $fxP = (is_string($sd['currency'] ?? null) && ($sd['currency'] ?? '') === 'USD') ? 1.0 : $fxF;
+
+        // The quote currency is NOT always the financial currency, and it is not
+        // always a major unit. London quotes in GBp (pence), Johannesburg in ZAc,
+        // Tel Aviv in ILA — each one hundredth of the major unit — while the
+        // statements stay in GBP/ZAR/ILS (or something else entirely: Unilever
+        // reports in EUR but trades in GBp). The old line assumed "not USD means
+        // same rate as the financials", which on ULVR.L multiplied a pence price
+        // by the EUR rate: 4589 GBp (£45.89) became $5311 instead of ~$62, and an
+        // enterprise value of 11.5 TRILLION followed from it.
+        //
+        // Resolve the price side on its own terms: strip the minor unit, then
+        // convert that currency — not the reporting one — to USD.
+        $quoteCurrency = is_string($sd['currency'] ?? null) ? $sd['currency'] : null;
+        $minorUnit     = $quoteCurrency !== null && isset(self::MINOR_UNIT_CURRENCIES[$quoteCurrency]);
+        $majorQuote    = $minorUnit ? self::MINOR_UNIT_CURRENCIES[$quoteCurrency] : $quoteCurrency;
+
+        // Order matters. When the quote and reporting currencies are the SAME,
+        // both sides must use the SAME rate: enterprise value adds price x shares
+        // to debt - cash, so two independently-fetched rates would make EV — and
+        // with it the supposedly dimensionless EV/FCF — depend on which currency
+        // it was computed in. Only a genuine mismatch (Unilever: quoted in GBp,
+        // reports in EUR) justifies resolving the price side separately.
+        if ($majorQuote === null || $majorQuote === '' || $majorQuote === $financialCurrency) {
+            $fxP = $fxF;
+        } elseif ($majorQuote === 'USD') {
+            $fxP = 1.0;
+        } else {
+            $fxP = $this->fetchFxRateToUsd($majorQuote) ?? $fxF;
+        }
+
+        if ($minorUnit) {
+            $fxP /= 100.0; // pence → pounds, cents → rand, agorot → shekel
+        }
+
+        // ------------------------------------------------------------------
+        // Share count — prefer the figure implied by market cap.
+        //
+        // defaultKeyStatistics.sharesOutstanding counts only the QUOTED class,
+        // while marketCap covers every class. For dual-class companies the two
+        // diverge badly (GOOGL +108%, DELL +99%, ABNB +43%, META +16% measured
+        // across this universe), and since EV = price x shares + debt - cash, an
+        // undercount understates enterprise value and makes the company look
+        // cheaper than it is — an error biased towards "buy", which is the worst
+        // direction for it to run.
+        //
+        // Both sides must be in the same unit first: marketCap is quoted in the
+        // MAJOR currency while a GBp price is not, which is why this sits after
+        // the minor-unit resolution above rather than beside the other fields.
+        $sharesReported = $v($ks['sharesOutstanding'] ?? []);
+        $marketCapRaw   = $v($raw['price']['marketCap'] ?? []) ?? $v($sd['marketCap'] ?? []);
+        $priceMajor     = $minorUnit ? $currentPrice / 100.0 : $currentPrice;
+        $sharesImplied  = ($marketCapRaw !== null && $priceMajor > 0.0)
+            ? $marketCapRaw / $priceMajor
+            : null;
+
+        // A small gap is rounding or a stale share count; a large one means the
+        // two figures are measuring different things. Only then does the implied
+        // value win, so single-class tickers keep the reported figure untouched.
+        $sharesOutstanding = $sharesReported;
+        $sharesSource      = $sharesReported !== null ? 'reported' : null;
+        if ($sharesImplied !== null && $sharesImplied > 0.0) {
+            $divergent = $sharesReported === null
+                || $sharesReported <= 0.0
+                || abs($sharesImplied / $sharesReported - 1.0) > 0.05;
+            if ($divergent) {
+                $sharesOutstanding = $sharesImplied;
+                $sharesSource      = 'implied_market_cap';
+            }
+        }
 
         /** Apply FX rate to a nullable float; preserves null when value is absent. */
         $fxApply = static fn (?float $val, float $rate): ?float =>
@@ -980,7 +1061,8 @@ class FinancialDataFetcher implements LatestPriceSource
             'institutional_ownership'    => $v($ks['heldPercentInstitutions']   ?? []),
 
             // EV / Sector fields
-            'shares_outstanding'         => $v($ks['sharesOutstanding']         ?? []),
+            'shares_outstanding'         => $sharesOutstanding,
+            'shares_source'              => $sharesSource,
             'gross_margins'              => $v($fin['grossMargins']              ?? []), // ratio
             'forward_eps'                => $forwardEps,    // USD
             'trailing_eps'               => $trailingEps,   // USD
