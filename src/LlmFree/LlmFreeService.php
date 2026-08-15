@@ -59,8 +59,12 @@ class LlmFreeService
      * @param array<string, float> $priceMap ticker (uppercase) => today's USD snapshot price.
      *        Marks the cycle-end valuation to market, never cost basis — see
      *        computeHoldingsValue()'s docblock.
+     * @param string|null $notes Operational note stored on the cycle row and shown
+     *        on /llm-free — used to surface decisions the caller had to discard
+     *        (e.g. a BUY/SELL with no known price), so the wallet never diverges
+     *        from the model's own legend without the user being told.
      */
-    public function executeCycle(int $cycleId, array $decisions, array $priceMap): void
+    public function executeCycle(int $cycleId, array $decisions, array $priceMap, ?string $notes = null): void
     {
         $this->db->beginTransaction();
 
@@ -105,7 +109,7 @@ class LlmFreeService
                 $portfolioValueUsd,
                 $executedCount,
                 $skippedCount,
-                null,
+                $notes,
             );
 
             $this->cycleRepo->updateStatus($cycleId, 'completed');

@@ -30,8 +30,17 @@ class QualityGate
     {
         $failures = [];
 
-        // (1) Revenue must be > 0
-        if ($this->thresholds['require_positive_revenue'] && ($financials['revenue'] ?? 0) <= 0) {
+        // (1) Revenue must be > 0.
+        // A MISSING revenue is "unknown", not "zero" — the old `?? 0` coerced an
+        // absent field into a hard business rejection, so an upstream data gap
+        // read exactly like a company with no sales. Yahoo returns an empty
+        // incomeStatementHistory array often enough (observed on MU across
+        // 2026-08-13/14, a ~$40bn-revenue company) that the distinction matters.
+        // Checks (2)-(4) below have always skipped on null; this one now agrees.
+        // Callers that must not score a data-starved payload at all should reject
+        // it before this point — see PayloadCompleteness::missingEssentialFields().
+        $revenue = $financials['revenue'] ?? null;
+        if ($this->thresholds['require_positive_revenue'] && $revenue !== null && (float) $revenue <= 0) {
             $failures[] = 'Brak przychodów (revenue ≤ 0)';
         }
 

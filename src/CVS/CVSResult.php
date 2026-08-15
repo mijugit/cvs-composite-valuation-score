@@ -193,7 +193,18 @@ class CVSResult
      *
      * @param string[] $failures
      */
-    public static function failed(string $ticker, array $failures): self
+    /**
+     * @param string $modelVersion MUST be passed by scoring callers. A gate
+     *        rejection is still a versioned observation about a ticker-day:
+     *        SnapshotWriter maps an empty version to a NULL `model_version`
+     *        column, and in MySQL a NULL never equals another NULL in a UNIQUE
+     *        index — so version-less rows both bypass uq_ticker_day_version
+     *        (accumulating a fresh duplicate on every run) and poison the
+     *        version-agnostic `MAX(score_date)` sub-query in
+     *        ScreenerRepository::findAllLatest(), hiding the ticker's last
+     *        good snapshot entirely. Observed live on MU, 2026-08-13/14.
+     */
+    public static function failed(string $ticker, array $failures, string $modelVersion = ''): self
     {
         return new self(
             qualityGatePassed:         false,
@@ -204,7 +215,8 @@ class CVSResult
             swingRecommendation:       null,
             fundamentalRecommendation: null,
             goldenSignal:              null,
-            pillarScores:              []
+            pillarScores:              [],
+            modelVersion:              $modelVersion
         );
     }
 

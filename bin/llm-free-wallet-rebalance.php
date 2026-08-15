@@ -108,6 +108,7 @@ use CVS\Screener\ScreenerRepository;
 
 $config           = require ROOT_PATH . '/config/llm-free-wallet.php';
 $portfolioConfig  = require ROOT_PATH . '/config/portfolio.php'; // holidays only — shared NYSE calendar fact, not module logic
+$cvsConfig        = require ROOT_PATH . '/config/cvs-weights.php'; // live model_version + screener knobs (see ScreenerRepository below)
 
 // --- Market calendar gate ---
 // Always use an explicit Warsaw timezone for the "current time" reference;
@@ -152,7 +153,21 @@ $aiConfig        = require ROOT_PATH . '/config/ai.php';
 $mergedLlmConfig = array_merge($aiConfig, $config['llm']);
 
 $walletRepo   = new LlmFreeRepository($db);
-$screenerRepo = new ScreenerRepository($db);
+// The live model_version is NOT optional here. Without it ScreenerRepository
+// falls back to a version-agnostic MAX(score_date), which (a) returns the 3.1
+// and 3.2 shadow rows alongside the live 4.0 one — roughly tripling the row
+// count and filling the capped candidate table with the same ticker repeated
+// under different, unlabelled scores — and (b) lets any newer scoreless row
+// mask a ticker's last good snapshot. Every web caller has passed this since
+// the 2026-06-08 duplication hotfix; this cron was missed, and the divergence
+// is what removed MU from the wallet's universe on 2026-08-13/14.
+$screenerRepo = new ScreenerRepository(
+    $db,
+    (string) ($cvsConfig['model_version'] ?? ''),
+    $cvsConfig['trajectory'] ?? [],
+    $cvsConfig['thresholds'] ?? [],
+    $cvsConfig['markets'] ?? []
+);
 
 $portfolioState = $walletRepo->getCurrentState();
 $holdings       = $walletRepo->getCurrentHoldings();
@@ -238,6 +253,7 @@ foreach ($screenerRows as $row) {
 
 $pricedDecisions = [];
 $droppedNoPrice  = 0;
+$dropNote        = null;
 foreach ($result['decisions'] as $decision) {
     $action = strtoupper((string) ($decision['action'] ?? ''));
     $ticker = strtoupper((string) ($decision['ticker'] ?? ''));
@@ -252,8 +268,19 @@ foreach ($result['decisions'] as $decision) {
     $pricedDecisions[] = $decision;
 }
 
+// A dropped BUY/SELL is a decision the model made and the system silently threw
+// away — the wallet then diverges from its own stated legend with nothing in the
+// UI to show it. Observed on MU (2026-08-14): the model wrote that it was
+// trimming the position, the SELL was dropped for want of a screener price, and
+// the position stayed put at 37% of the book. Surface it in the cycle notes so
+// the divergence is visible on /llm-free instead of living only in a cron log.
 if ($droppedNoPrice > 0) {
     $log('cycle ' . $cycleDate . ' dropped ' . $droppedNoPrice . ' BUY/SELL without known price');
+    $dropNote = sprintf(
+        'UWAGA: %d decyzji BUY/SELL odrzucono — brak ceny w screenerze dla tych spółek. '
+        . 'Portfel NIE odzwierciedla w pełni decyzji modelu z tego cyklu.',
+        $droppedNoPrice
+    );
 }
 
 // --- Fresh connection for the write phase ---
@@ -266,7 +293,7 @@ $cycleRepo   = new LlmFreeCycleRepository($writeDb);
 $walletService = new LlmFreeService($writeDb, $cycleRepo);
 
 try {
-    $walletService->executeCycle($id, $pricedDecisions, $priceMap);
+    $walletService->executeCycle($id, $pricedDecisions, $priceMap, $dropNote);
     $log('cycle ' . $cycleDate . ' completed');
 } catch (Throwable $e) {
     $cycleRepo->updateStatus($id, 'failed');

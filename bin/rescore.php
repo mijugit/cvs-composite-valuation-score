@@ -63,6 +63,7 @@ use CVS\Alerts\AlertRepository;
 use CVS\Alerts\AlertService;
 use CVS\Alerts\PriceAlertRepository;
 use CVS\Api\FinancialDataFetcher;
+use CVS\Api\PayloadCompleteness;
 use CVS\Auth\UserRepository;
 use CVS\Execution\AtrZoneCalculator;
 use CVS\CVS\CVSModel;
@@ -114,6 +115,22 @@ foreach ($tickers as $ticker) {
 
     if ($financials === null) {
         $log(sprintf('rescore: fetch failed for %s — skipping', $ticker));
+        $failed++;
+        continue;
+    }
+
+    // Structurally-fine-but-empty payload (Yahoo 200 with an empty income
+    // statement). Treated exactly like a failed fetch: log and skip WITHOUT
+    // persisting, so the ticker keeps its last good snapshot instead of having
+    // it masked by a scoreless newer row. See PayloadCompleteness for why a
+    // written-but-empty snapshot is worse than no snapshot at all.
+    $missing = PayloadCompleteness::missingEssentialFields($financials);
+    if ($missing !== []) {
+        $log(sprintf(
+            'rescore: incomplete payload for %s (missing: %s) — skipping, last good snapshot preserved',
+            $ticker,
+            implode(', ', $missing)
+        ));
         $failed++;
         continue;
     }

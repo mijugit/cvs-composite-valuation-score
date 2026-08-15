@@ -91,7 +91,10 @@ class CVSModel
         $gateResult = $this->qualityGate->evaluate($financials);
 
         if (!$gateResult->passed) {
-            return CVSResult::failed($ticker, $gateResult->failures);
+            // Stamp the live version on rejections too — see CVSResult::failed()'s
+            // docblock for why a version-less row corrupts both the UNIQUE index
+            // and the screener's latest-snapshot lookup.
+            return CVSResult::failed($ticker, $gateResult->failures, (string) ($this->config['model_version'] ?? ''));
         }
 
         $sw = $this->config['modes']['swing'];
