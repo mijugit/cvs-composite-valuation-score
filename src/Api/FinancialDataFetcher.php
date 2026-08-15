@@ -918,7 +918,26 @@ class FinancialDataFetcher implements LatestPriceSource
             'moving_average_200'         => $fxApply($v($fin['twoHundredDayAverage'] ?? []), $fxP),
 
             // Income statement — all in USD
-            'revenue'                    => $fxApply($v($latestIs['totalRevenue'] ?? []), $fxF),
+            //
+            // Revenue falls back to financialData.totalRevenue (TTM) when the
+            // annual statement is absent. Yahoo drops incomeStatementHistory
+            // entirely for some tickers — MU, NIO and several .WA small caps
+            // returned zero annual AND zero quarterly rows, deterministically,
+            // on both narrow and full module requests — while still populating
+            // financialData. Without the fallback those companies have no
+            // revenue at all and drop out of scoring completely.
+            //
+            // The two figures are NOT the same measure: TTM ran +2% to +18%
+            // above the last annual figure on US names (ordinary growth since
+            // fiscal year end) but −64% on LPP.WA, where the periods clearly do
+            // not line up. `revenue_source` records which one was used so a
+            // score computed on TTM stays auditable instead of silently
+            // blending two bases. Annual always wins when present, so no
+            // currently-scoring ticker changes.
+            'revenue'                    => $fxApply($v($latestIs['totalRevenue'] ?? []), $fxF)
+                                            ?? $fxApply($v($fin['totalRevenue'] ?? []), $fxF),
+            'revenue_source'             => isset($latestIs['totalRevenue']['raw']) ? 'annual'
+                                            : (isset($fin['totalRevenue']['raw']) ? 'ttm' : null),
             'gross_profit'               => $fxApply($v($latestIs['grossProfit']  ?? []), $fxF),
             'ebitda'                     => $fxApply($v($fin['ebitda'] ?? []), $fxF),
             'revenue_history'            => $revenueHistory,

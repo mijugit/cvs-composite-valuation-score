@@ -107,15 +107,27 @@ if (count($tickers) === 0) {
     exit(0);
 }
 
-$success = 0;
-$failed  = 0;
+// Three outcomes, counted separately. The old pair (success/failed) incremented
+// `failed` only when fetch() returned null, so a Quality Gate REJECTION counted
+// as a success — MU was rejected five times a day for four days while every run
+// logged "success=103 failed=0". A ticker silently dropping out of the scored
+// universe has to be visible in the first line of the log, not three weeks later.
+$scored   = 0; // gate passed, snapshot written
+$rejected = 0; // fetched and scored, but the Quality Gate said no
+$skipped  = 0; // no usable payload — nothing written, last good snapshot kept
+
+/** @var list<string> $rejectedTickers */
+$rejectedTickers = [];
+/** @var list<string> $skippedTickers */
+$skippedTickers  = [];
 
 foreach ($tickers as $ticker) {
     $financials = $fetcher->fetch($ticker);
 
     if ($financials === null) {
         $log(sprintf('rescore: fetch failed for %s — skipping', $ticker));
-        $failed++;
+        $skipped++;
+        $skippedTickers[] = $ticker;
         continue;
     }
 
@@ -131,7 +143,8 @@ foreach ($tickers as $ticker) {
             $ticker,
             implode(', ', $missing)
         ));
-        $failed++;
+        $skipped++;
+        $skippedTickers[] = $ticker;
         continue;
     }
 
@@ -171,14 +184,29 @@ foreach ($tickers as $ticker) {
         $log(sprintf('rescore: alert sent for %s to %d user(s)', $ticker, $alerted));
     }
 
-    $success++;
+    if ($result->qualityGatePassed) {
+        $scored++;
+    } else {
+        $rejected++;
+        $rejectedTickers[] = $ticker;
+    }
 }
 
 $log(sprintf(
-    'rescore: done — success=%d failed=%d total=%d',
-    $success,
-    $failed,
+    'rescore: done — scored=%d rejected=%d skipped=%d total=%d',
+    $scored,
+    $rejected,
+    $skipped,
     count($tickers)
 ));
+
+// Name them. A count alone still leaves you grepping to find out WHICH ticker
+// left the scored universe — the question that took three weeks to ask last time.
+if ($rejectedTickers !== []) {
+    $log('rescore: rejected by quality gate — ' . implode(', ', $rejectedTickers));
+}
+if ($skippedTickers !== []) {
+    $log('rescore: skipped, no usable payload — ' . implode(', ', $skippedTickers));
+}
 
 exit(0);
