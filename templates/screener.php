@@ -6,6 +6,7 @@ use CVS\Screener\SnapshotFreshness;
 /** @var string|null $lastScored */
 /** @var int $warnAfterDays */
 /** @var string $todayDate */
+/** @var array<string, true> $watchedTickers */
 /** @var string[] $sectors */
 /** @var list<array{value: string, label: string}> $markets */
 /** @var string|null $filter_reco */
@@ -146,7 +147,7 @@ $trendChip = static function (?float $delta, string $title, string $emptyTitle):
 // ticker's newest row with no upper bound on age, so a failing rescore leaves
 // month-old numbers looking exactly like today's — several .WA small caps ran
 // 5-6 weeks that way before anyone noticed. Shows the age, hides nothing.
-$staleBadge = static function (?string $scoreDate) use ($todayDate, $warnAfterDays): string {
+$staleBadge = static function (?string $scoreDate, string $ticker) use ($todayDate, $warnAfterDays, $watchedTickers): string {
     if ($scoreDate === null || $scoreDate === '') {
         return '';
     }
@@ -154,13 +155,23 @@ $staleBadge = static function (?string $scoreDate) use ($todayDate, $warnAfterDa
     if ($age <= $warnAfterDays) {
         return '';
     }
-    return ' <span class="stale-badge" title="'
+
+    // Two different causes, two different remedies. bin/rescore.php iterates the
+    // union of all watchlists, so an unwatched ticker is never refreshed — that
+    // is fixable by the reader in one click, unlike a genuine data gap.
+    $orphan = !isset($watchedTickers[strtoupper($ticker)]);
+    $why    = $orphan
+        ? 'Nikt nie ma jej na liście obserwowanych, więc nie jest przeliczana. Dodaj ją do obserwowanych, aby wznowić aktualizacje.'
+        : 'Rescore tej spółki nie kończy się powodzeniem — dane mogą być nieaktualne.';
+
+    return ' <span class="stale-badge' . ($orphan ? ' stale-badge--orphan' : '') . '" title="'
         . htmlspecialchars(sprintf(
-            'Ostatnie udane przeliczenie: %s (%d dni temu). Rescore tej spółki nie przechodzi — dane mogą być nieaktualne.',
+            'Ostatnie przeliczenie: %s (%d dni temu). %s',
             substr($scoreDate, 0, 10),
-            $age
+            $age,
+            $why
         ), ENT_QUOTES)
-        . '">⚠ ' . $age . ' dni</span>';
+        . '">' . ($orphan ? '👁 ' : '⚠ ') . $age . ' dni</span>';
 };
 
 // S-04: badge "w portfelu" next to the ticker link.
@@ -422,7 +433,7 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
                         <?= htmlspecialchars((string) $row['ticker']) ?>
                     </a>
                     <?= $tickerHint((string) $row['ticker'], $row) ?>
-                </span><?= $heldBadge((string) $row['ticker'], $recoStr) ?><?= $staleBadge(isset($row['score_date']) ? (string) $row['score_date'] : null) ?>
+                </span><?= $heldBadge((string) $row['ticker'], $recoStr) ?><?= $staleBadge(isset($row['score_date']) ? (string) $row['score_date'] : null, (string) $row['ticker']) ?>
             </td>
             <td style="color:var(--c-primary);"><?= $swing ?></td>
             <td style="color:var(--c-fund);"><?= $fund ?></td>

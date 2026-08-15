@@ -1508,6 +1508,14 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
     cursor: help;
 }
 
+/* Orphan variant: nobody watches the ticker, so rescore never reaches it. Not a
+   fault in the data — just unattended — so it reads cooler than the amber
+   "rescore is failing" case, and the remedy is one click away. */
+.stale-badge--orphan {
+    background: rgba(148,163,184,.18);
+    color: var(--c-muted);
+}
+
 /* --- General small-screen spacing & layout ---------------- */
 @media (max-width: 768px) {
     .site-main { padding: 1.25rem 0; }

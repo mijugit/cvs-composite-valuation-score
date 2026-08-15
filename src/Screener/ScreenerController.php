@@ -9,6 +9,7 @@ use CVS\Core\Database;
 use CVS\Core\Request;
 use CVS\Core\Response;
 use CVS\Portfolio\PortfolioRepository;
+use CVS\Watchlist\WatchlistRepository;
 
 /**
  * Handles GET /screener — CVS ranking with filters.
@@ -112,6 +113,15 @@ class ScreenerController
             // visible (config: snapshot_freshness.warn_after_days).
             'warnAfterDays'    => (int) ($this->freshness['warn_after_days'] ?? 3),
             'todayDate'        => (new \DateTimeImmutable())->format('Y-m-d'),
+            // The age badge needs to name the right cause. bin/rescore.php only
+            // iterates the union of every user's watchlist, so a ticker nobody
+            // watches is never refreshed at all — its data is not "failing", it
+            // is simply orphaned, and adding it to a watchlist fixes it. Saying
+            // "rescore nie przechodzi" for those would be a plain misdiagnosis.
+            'watchedTickers'   => array_fill_keys(
+                array_map('strtoupper', (new WatchlistRepository(Database::connection()))->findAllDistinctTickers()),
+                true
+            ),
         ]);
     }
 }
