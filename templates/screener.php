@@ -1,6 +1,11 @@
 <?php declare(strict_types=1);
+
+use CVS\Screener\SnapshotFreshness;
+
 /** @var array<int, array<string, mixed>> $rows */
 /** @var string|null $lastScored */
+/** @var int $warnAfterDays */
+/** @var string $todayDate */
 /** @var string[] $sectors */
 /** @var list<array{value: string, label: string}> $markets */
 /** @var string|null $filter_reco */
@@ -135,6 +140,27 @@ $trendChip = static function (?float $delta, string $title, string $emptyTitle):
     $sign = $delta > 0 ? '+' : '';
     return '<span style="color:' . $color . ';" title="' . htmlspecialchars($title) . '">'
         . $arrow . ' ' . $sign . number_format($delta, 1) . '</span>';
+};
+
+// Age badge for snapshots that stopped refreshing. findAllLatest() returns each
+// ticker's newest row with no upper bound on age, so a failing rescore leaves
+// month-old numbers looking exactly like today's — several .WA small caps ran
+// 5-6 weeks that way before anyone noticed. Shows the age, hides nothing.
+$staleBadge = static function (?string $scoreDate) use ($todayDate, $warnAfterDays): string {
+    if ($scoreDate === null || $scoreDate === '') {
+        return '';
+    }
+    $age = SnapshotFreshness::ageInDays($scoreDate, $todayDate);
+    if ($age <= $warnAfterDays) {
+        return '';
+    }
+    return ' <span class="stale-badge" title="'
+        . htmlspecialchars(sprintf(
+            'Ostatnie udane przeliczenie: %s (%d dni temu). Rescore tej spółki nie przechodzi — dane mogą być nieaktualne.',
+            substr($scoreDate, 0, 10),
+            $age
+        ), ENT_QUOTES)
+        . '">⚠ ' . $age . ' dni</span>';
 };
 
 // S-04: badge "w portfelu" next to the ticker link.
@@ -396,7 +422,7 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
                         <?= htmlspecialchars((string) $row['ticker']) ?>
                     </a>
                     <?= $tickerHint((string) $row['ticker'], $row) ?>
-                </span><?= $heldBadge((string) $row['ticker'], $recoStr) ?>
+                </span><?= $heldBadge((string) $row['ticker'], $recoStr) ?><?= $staleBadge(isset($row['score_date']) ? (string) $row['score_date'] : null) ?>
             </td>
             <td style="color:var(--c-primary);"><?= $swing ?></td>
             <td style="color:var(--c-fund);"><?= $fund ?></td>

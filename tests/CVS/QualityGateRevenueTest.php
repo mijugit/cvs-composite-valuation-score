@@ -77,4 +77,61 @@ class QualityGateRevenueTest extends TestCase
 
         $this->assertTrue($result->passed);
     }
+
+    // -----------------------------------------------------------------------
+    // Gross-margin exemption for sectors that do not report gross profit
+    // -----------------------------------------------------------------------
+
+    /** @return array<string, mixed> */
+    private function thresholdsWithBankExemption(): array
+    {
+        return $this->thresholds() + ['skip_gross_margin_sectors' => ['Financial Services']];
+    }
+
+    /**
+     * Banks report no gross profit, so Yahoo hands back 0 and the margin check
+     * rejected every constituent on a metric that never applied — ING (26.7bn
+     * revenue) and ING.WA (3.0bn PLN) were failing daily on "Marża brutto 0.0%".
+     */
+    public function testBankIsExemptFromTheGrossMarginCheck(): void
+    {
+        $bank = ['revenue' => 26_658_000_000, 'gross_margins' => 0.0, 'sector' => 'Financial Services'];
+
+        $result = (new QualityGate($this->thresholdsWithBankExemption()))->evaluate($bank);
+
+        $this->assertTrue($result->passed);
+    }
+
+    public function testNonExemptSectorStillFailsOnThinMargin(): void
+    {
+        $industrial = ['revenue' => 1_000_000, 'gross_margins' => 0.0, 'sector' => 'Technology'];
+
+        $result = (new QualityGate($this->thresholdsWithBankExemption()))->evaluate($industrial);
+
+        $this->assertFalse($result->passed);
+        $this->assertContains('Marża brutto 0.0% < minimalnej 4.0%', $result->failures);
+    }
+
+    public function testExemptionDoesNotWaiveTheOtherChecks(): void
+    {
+        $bank = [
+            'revenue'       => 0, // genuine zero — still rejected
+            'gross_margins' => 0.0,
+            'sector'        => 'Financial Services',
+        ];
+
+        $result = (new QualityGate($this->thresholdsWithBankExemption()))->evaluate($bank);
+
+        $this->assertFalse($result->passed);
+        $this->assertContains('Brak przychodów (revenue ≤ 0)', $result->failures);
+    }
+
+    public function testMissingSectorIsTreatedAsNonExempt(): void
+    {
+        $unknown = ['revenue' => 1_000_000, 'gross_margins' => 0.0];
+
+        $result = (new QualityGate($this->thresholdsWithBankExemption()))->evaluate($unknown);
+
+        $this->assertFalse($result->passed);
+    }
 }

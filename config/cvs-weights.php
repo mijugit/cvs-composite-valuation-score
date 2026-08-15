@@ -230,6 +230,15 @@ return [
         'max_debt_to_equity'    => 5.0,   // > 5x D/E → FAIL
         'min_current_ratio'     => 0.5,   // < 0.5 current ratio → FAIL
         'require_positive_revenue' => true, // Revenue must be > 0
+
+        // Sectors where "gross profit" is not a reported concept, so Yahoo hands
+        // back 0 and the margin check rejects every constituent on a metric that
+        // was never applicable. Banks are the clear case: ING and ING.WA were
+        // rejected daily on "Marża brutto 0.0%" despite $26.7bn and 3.0bn PLN of
+        // revenue respectively. Exempting the check lets them be scored — with
+        // the standing caveat (CLAUDE.md) that the pillars are calibrated for
+        // industrials, so financial-sector scores carry lower confidence.
+        'skip_gross_margin_sectors' => ['Financial Services'],
     ],
 
     // --- CVS recommendation thresholds ---
@@ -261,6 +270,26 @@ return [
         // a ticker is flagged when its CVS Swing sits within this many points
         // of ANY recommendation threshold (thresholds.* above).
         'boundary_margin' => 5,
+    ],
+
+    // --- Snapshot freshness ---
+    // findAllLatest() returns each ticker's newest snapshot with no upper bound
+    // on its age, so a ticker whose rescore keeps failing (thin Yahoo coverage
+    // is the common cause — several .WA small caps went 5-6 weeks without a
+    // usable payload) silently keeps presenting month-old numbers that look
+    // exactly like today's. These knobs put an age on that.
+    'snapshot_freshness' => [
+        // Screener shows an age badge once a snapshot is older than this many
+        // calendar days. Human-facing only — nothing is hidden.
+        'warn_after_days'  => 3,
+
+        // Hard cutoff for the autonomous wallets' candidate universe: a model
+        // cannot judge how old its inputs are, so stale rows are withheld from
+        // it rather than badged. Tickers ALREADY HELD are exempt — dropping a
+        // held position from the universe strands it (the executor prices
+        // trades only from screener rows), which is exactly how MU became
+        // unsellable on 2026-08-13/14.
+        'llm_max_age_days' => 7,
     ],
 
     // --- ATR entry zones + stops (Phase 8, slice 2) ---

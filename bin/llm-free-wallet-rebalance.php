@@ -105,6 +105,7 @@ use CVS\LlmFree\LlmFreeRepository;
 use CVS\LlmFree\LlmFreeService;
 use CVS\Portfolio\MarketCalendar;
 use CVS\Screener\ScreenerRepository;
+use CVS\Screener\SnapshotFreshness;
 
 $config           = require ROOT_PATH . '/config/llm-free-wallet.php';
 $portfolioConfig  = require ROOT_PATH . '/config/portfolio.php'; // holidays only — shared NYSE calendar fact, not module logic
@@ -173,6 +174,28 @@ $portfolioState = $walletRepo->getCurrentState();
 $holdings       = $walletRepo->getCurrentHoldings();
 $screenerRows   = $screenerRepo->getFiltered(); // no filters = all quality-gate-passed tickers
 $legendHistory  = $walletRepo->getLegendHistory((int) $config['legend_context_count']);
+
+// Withhold snapshots the model cannot date. Held tickers stay regardless — the
+// price map further down is built from these rows, so dropping a held one would
+// strand the position rather than merely excluding it as a candidate. That is
+// precisely the trap MU fell into on 2026-08-13/14.
+$freshness   = $cvsConfig['snapshot_freshness'] ?? [];
+$heldTickers = array_map(static fn (array $h): string => strtoupper((string) $h['ticker']), $holdings);
+$partitioned = SnapshotFreshness::partition(
+    $screenerRows,
+    $heldTickers,
+    $cycleDate,
+    (int) ($freshness['llm_max_age_days'] ?? 7)
+);
+$screenerRows = $partitioned['kept'];
+if ($partitioned['dropped'] !== []) {
+    $log(sprintf(
+        'cycle %s withheld %d stale candidate(s) from the LLM: %s',
+        $cycleDate,
+        count($partitioned['dropped']),
+        implode(', ', $partitioned['dropped'])
+    ));
+}
 
 $log('cycle ' . $cycleDate . ' gathered ' . count($screenerRows) . ' screener rows, ' . count($legendHistory) . ' legend entries');
 

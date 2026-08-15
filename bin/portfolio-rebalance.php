@@ -62,6 +62,7 @@ use CVS\Portfolio\MarketCalendar;
 use CVS\Portfolio\PortfolioRepository;
 use CVS\Portfolio\PortfolioService;
 use CVS\Screener\ScreenerRepository;
+use CVS\Screener\SnapshotFreshness;
 
 $config = require ROOT_PATH . '/config/portfolio.php';
 
@@ -105,7 +106,18 @@ $mergedLlmConfig = array_merge($aiConfig, $config['llm']);
 
 $portfolioRepo   = new PortfolioRepository($db);
 $decisionService = new DecisionService($cycleRepo, $mergedLlmConfig, $config);
-$screenerRepo    = new ScreenerRepository($db);
+// Same defect the sibling llm-free cron carried: without the live model_version
+// ScreenerRepository takes its version-agnostic branch, mixing 3.1/3.2 shadow
+// rows into the universe and letting any newer scoreless row mask a ticker's
+// last good snapshot. Every web caller has passed this since 2026-06-08.
+$cvsConfig       = require ROOT_PATH . '/config/cvs-weights.php';
+$screenerRepo    = new ScreenerRepository(
+    $db,
+    (string) ($cvsConfig['model_version'] ?? ''),
+    $cvsConfig['trajectory'] ?? [],
+    $cvsConfig['thresholds'] ?? [],
+    $cvsConfig['markets'] ?? []
+);
 // PortfolioService is built AFTER the LLM call on a fresh connection (see below),
 // so the write transaction and the cycle summary/status share one connection.
 
@@ -113,6 +125,27 @@ $screenerRepo    = new ScreenerRepository($db);
 $portfolioState = $portfolioRepo->getCurrentState();
 $holdings       = $portfolioRepo->getCurrentHoldings();
 $screenerRows   = $screenerRepo->getFiltered(); // no filters = all quality-gate-passed tickers
+
+// Withhold snapshots the model cannot date. Held tickers stay regardless — the
+// price map below is built from these rows, so dropping a held one would strand
+// the position instead of merely excluding it as a candidate.
+$freshness    = $cvsConfig['snapshot_freshness'] ?? [];
+$heldTickers  = array_map(static fn (array $h): string => strtoupper((string) $h['ticker']), $holdings);
+$partitioned  = SnapshotFreshness::partition(
+    $screenerRows,
+    $heldTickers,
+    $cycleDate,
+    (int) ($freshness['llm_max_age_days'] ?? 7)
+);
+$screenerRows = $partitioned['kept'];
+if ($partitioned['dropped'] !== []) {
+    $log(sprintf(
+        'cycle %s withheld %d stale candidate(s) from the LLM: %s',
+        $cycleDate,
+        count($partitioned['dropped']),
+        implode(', ', $partitioned['dropped'])
+    ));
+}
 
 $log('cycle ' . $cycleDate . ' calling LLM (' . count($screenerRows) . ' screener rows)');
 

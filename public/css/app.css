@@ -1491,6 +1491,23 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
 }
 .tr--held { background: rgba(99,102,241,.04); }
 
+/* Stale-snapshot marker (screener): the row's data is real but old, so it reads
+   as a caution, not an error — amber, same weight as .portfolio-badge. */
+.stale-badge {
+    display: inline-block;
+    font-size: .65rem;
+    font-weight: 600;
+    letter-spacing: .02em;
+    padding: .1em .45em;
+    border-radius: 99px;
+    vertical-align: middle;
+    background: rgba(245,158,11,.18);
+    color: var(--c-warn, #f59e0b);
+    margin-left: .3rem;
+    white-space: nowrap;
+    cursor: help;
+}
+
 /* --- General small-screen spacing & layout ---------------- */
 @media (max-width: 768px) {
     .site-main { padding: 1.25rem 0; }

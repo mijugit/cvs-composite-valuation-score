@@ -17,6 +17,9 @@ class ScreenerController
 {
     private ScreenerRepository $repo;
 
+    /** @var array<string, mixed> config/cvs-weights.php → snapshot_freshness */
+    private array $freshness;
+
     private const VALID_SORTS = ['swing', 'fund', 'date', 'ticker', 'price', 'atr', 'fv'];
     private const VALID_ATR   = ['in_zone', 'above', 'below'];
 
@@ -25,9 +28,10 @@ class ScreenerController
         // Hotfix (2026-06-08): inject the live model_version so the repository
         // can filter out cvs-overlay-penalties shadow rows (3.1) — see
         // ScreenerRepository::$liveModelVersion / findAllLatest().
-        $config      = require dirname(__DIR__, 2) . '/config/cvs-weights.php';
-        $liveVersion = $config['model_version'] ?? null;
-        $this->repo  = new ScreenerRepository(
+        $config          = require dirname(__DIR__, 2) . '/config/cvs-weights.php';
+        $liveVersion     = $config['model_version'] ?? null;
+        $this->freshness = $config['snapshot_freshness'] ?? [];
+        $this->repo      = new ScreenerRepository(
             null,
             $liveVersion !== null ? (string) $liveVersion : null,
             $config['trajectory'] ?? [],
@@ -102,6 +106,12 @@ class ScreenerController
             'heldTickersMap'   => $heldTickersMap,
             'isAdmin'          => $isAdmin,
             'currentUserId'    => $currentUserId,
+            // Age badge: findAllLatest() has no upper bound on snapshot age, so a
+            // ticker whose rescore keeps failing presents month-old numbers that
+            // look identical to today's. Nothing is hidden — the age is just made
+            // visible (config: snapshot_freshness.warn_after_days).
+            'warnAfterDays'    => (int) ($this->freshness['warn_after_days'] ?? 3),
+            'todayDate'        => (new \DateTimeImmutable())->format('Y-m-d'),
         ]);
     }
 }

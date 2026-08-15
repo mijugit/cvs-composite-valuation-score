@@ -49,12 +49,19 @@ class QualityGate
         // Fall back to gross_profit / revenue from the income statement —
         // Yahoo's incomeStatementHistory.grossProfit occasionally returns 0
         // as a data artefact even for high-margin companies (e.g. AAPL).
+        // Sectors that do not report gross profit at all (banks) are exempt —
+        // Yahoo returns 0, which would otherwise reject every constituent on a
+        // metric that never applied to them. See quality_gate.skip_gross_margin_sectors.
+        $skipMarginSectors = $this->thresholds['skip_gross_margin_sectors'] ?? [];
+        $sector            = (string) ($financials['sector'] ?? '');
+        $marginApplies     = !in_array($sector, $skipMarginSectors, true);
+
         $grossMargin = ($financials['gross_margins'] ?? null)
             ?? $this->safeDiv(
                 ($financials['gross_profit'] ?? null),
                 ($financials['revenue']     ?? null)
             );
-        if ($grossMargin !== null && $grossMargin < $this->thresholds['min_gross_margin']) {
+        if ($marginApplies && $grossMargin !== null && $grossMargin < $this->thresholds['min_gross_margin']) {
             $failures[] = sprintf(
                 'Marża brutto %.1f%% < minimalnej %.1f%%',
                 $grossMargin * 100,
