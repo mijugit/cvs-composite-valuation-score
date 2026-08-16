@@ -81,3 +81,45 @@ W tym przypadku ukryło to realny bug: `TypeError` w `PriceAlertService::buildHt
 - **Problem**: Model potrafi *opisać* w uzasadnieniu poprawne respektowanie limitu („redukuję CSCO do 5 szt., bo sektor Tech dobił 40%"), ale w polu strukturalnym `quantity` wpisuje wartość nieprzyciętą (8). Efekt: limit sektorowy 40% przebity (~57% Tech), mimo że model „rozumował" poprawnie. To samo dotyczy stop-loss — LLM zostawia stratną pozycję jako HOLD wbrew regule. LLM nie utrzymuje sumy kroczącej (per-sektor, per-pozycja) ani progów P&L w polach decyzji, nawet przy jawnej instrukcji.
 - **Rule**: Każda reguła wymagająca akumulacji/porównania liczbowego (limit sektorowy, limit na pozycję, stop-loss, budżet gotówki) MUSI być wymuszana deterministycznie po stronie serwera (`DecisionEnforcer`: przycina/odrzuca/wymusza), niezależnie od tego co zwrócił LLM. Prompt opisuje regułę dla spójności uzasadnień, ale NIE jest warstwą egzekwującą. Wyjątkiem mogą być reguły wymagające osądu kontekstowego (np. take-profit „chyba że spółka wciąż przyspiesza") — te mogą zostać miękkie, ale ochrona kapitału nigdy.
 - **Applies to**: każda nowa reguła strategii/ryzyka w portfelu i każdy nowy kontrakt decyzji LLM, gdzie model zwraca pola liczbowe podlegające limitom.
+
+## Brak danych to nie zero — nigdy nie koaleskuj nulla do wartości, którą reguła ocenia
+
+- **Context**: `QualityGate::evaluate()`, ale reguła jest ogólna. Odkryto 2026-08-15 przy śledztwie, dlaczego MU zniknął z uniwersum.
+- **Problem**: warunek `($financials['revenue'] ?? 0) <= 0` zamieniał *brak danych* w *twierdzenie*: „spółka nie ma przychodów". Trzy pozostałe warunki bramki poprawnie pomijały nulla, ten jeden nie. Gdy Yahoo przestał publikować dla MU `incomeStatementHistory` (przy działającej cenie i reszcie modułów), największa pozycja portfela została odrzucona jako startup bez sprzedaży — i zamrożona na trzy tygodnie, bo egzekutor nie miał jej ceny.
+- **Rule**: pytanie „czy wartość łamie próg?" i „czy wartość w ogóle istnieje?" to dwa różne pytania i muszą być dwiema różnymi gałęziami. `?? 0`, `?? ''`, `(int)$null` w warunku oceniającym to bug, nie skrót. Jeśli danej brakuje, właściwą reakcją jest pominięcie warunku albo odmowa oceny — nigdy ocena negatywna. Zanim uznasz brak za wadę spółki, sprawdź drugie źródło tej samej wielkości (`financialData.totalRevenue` zawierało to, czego nie było w sprawozdaniu).
+- **Applies to**: plan, implement, impl-review — każda bramka, filtr i próg czytający dane zewnętrzne.
+
+## NULL w kolumnie indeksu UNIQUE nie chroni przed duplikatami (MySQL)
+
+- **Context**: `cvs_snapshots` / `uq_ticker_day_version`. Odkryto 2026-08-15.
+- **Problem**: `CVSResult::failed()` zapisywał odrzucenie bez `model_version`. MySQL traktuje każdy NULL w indeksie UNIQUE jako różny, więc ograniczenie milczało i powstawało 5 wierszy dziennie (tyle, ile przebiegów rescore). Gorzej: te wiersze były najświeższe, więc każde zapytanie typu `MAX(score_date)` *bez* filtra wersji widziało je zamiast ostatniego dobrego snapshotu. Ta sama metoda repozytorium miała gałąź z filtrem (web) i bez (cron) — więc dwa konteksty widziały dwa różne uniwersa.
+- **Rule**: kolumna wchodząca w skład indeksu UNIQUE musi być `NOT NULL`, a każda ścieżka zapisu — także ta „negatywna" (odrzucenie, błąd, pominięcie) — musi ją wypełniać. Odrzucenie bramki to nadal obserwacja z konkretnej wersji modelu. Nie dopuszczaj też do tego, by jedna metoda repozytorium miała opcjonalny filtr zmieniający zbiór wyników — jeżeli filtr jest wymagany do poprawności, uczyń go wymaganym w sygnaturze.
+- **Applies to**: plan, implement, migracje.
+
+## Liczniki podsumowania muszą rozróżniać porażkę od odrzucenia
+
+- **Context**: `bin/rescore.php`. Odkryto 2026-08-15.
+- **Problem**: log raportował `success=103 failed=0`, gdzie `failed` liczyło wyłącznie błąd pobrania danych. Spółka odrzucona przez bramkę jakości szła do `success`. Metryka wyglądała idealnie przez trzy tygodnie, w których największa pozycja portfela była niewidoczna dla modelu. **Zielony licznik jest groźniejszy niż brak licznika** — powstrzymuje przed patrzeniem.
+- **Rule**: rozbij wynik na kategorie odpowiadające realnym stanom (`scored` / `rejected` / `skipped`), nie na „udało się / nie udało". Przy kategoriach innych niż `scored` wypisuj nazwy — agregat bez identyfikatorów nie pozwala zauważyć, że ta sama spółka wypada codziennie. Pytanie kontrolne: czy ten licznik pokazałby, że coś jest nie tak, gdyby było nie tak?
+- **Applies to**: każdy skrypt wsadowy w `bin/`.
+
+## Dwie implementacje jednej reguły zawsze się rozjadą
+
+- **Context**: cztery niezależne defekty z 15–16.08.2026, wszystkie tej samej klasy.
+- **Problem**: `FairPriceCalculator` czytał statyczny benchmark, a `ValuationPillar` medianę grupy — ta sama wycena, dwa komparatory, sprzeczny wynik obok siebie na ekranie (ASB.WA: „wyceniona uczciwie" i „+722%"). Szablon analizy miał własną kopię wzoru na wartość godziwą zamiast wołać kalkulator. `PeerCoverage` wnioskował pokrycie z `ev_fcf`, choć spółki wariantu B używają `ev_sales`. `ScreenerRepository` miał dwie gałęzie zapytania dla dwóch kontekstów.
+- **Rule**: gdy dwa miejsca odpowiadają na to samo pytanie, jedno z nich jest źródłem, a drugie musi je zawołać — nawet jeśli kopia wygląda na trywialną i wygodniejszą. Dotyczy szczególnie szablonów: „to tylko wzór w widoku" to sposób, w jaki kopia powstaje. Praktycznie: benchmark rozwiązuje wyłącznie `MedianResolver` (budowany przez `fromConfig()`), a jeżeli obliczenie *musi* być powtórzone gdzie indziej, zapisz wynik pierwszego przy danych i czytaj go, zamiast wyprowadzać ponownie.
+- **Applies to**: plan, implement, impl-review.
+
+## Konwersja walut: wielkości „na akcję" idą kursem ceny, nie kursem sprawozdań
+
+- **Context**: `FinancialDataFetcher`. Dwa wystąpienia: ASBIS (2026-08-15) i `book_value_per_share` (2026-08-16).
+- **Problem**: waluta notowania i waluta sprawozdań to dwie różne rzeczy i Yahoo podaje obie. ASBIS notowany w PLN raportuje w USD — cena 135,20 PLN traktowana jak $135,20 zawyżała EV 3,7×. Ten sam błąd wracał przy wartości księgowej na akcję: gdyby przeszedł, każdy warszawski bank porównywałby księgową w PLN do ceny w USD.
+- **Rule**: przed użyciem dowolnej wielkości per-share sprawdź, z czym będzie zestawiana. Jeżeli z `current_price` — konwertuj kursem ceny (`currency`), nie kursem sprawozdań (`financialCurrency`). Test kontrolny jest tani: spółka notowana poza swoją walutą sprawozdawczą (ASB.WA, LPP.WA, 005930.KS) musi dawać sensowny wynik.
+- **Applies to**: implement, impl-review — każde nowe pole liczbowe z Yahoo.
+
+## Kanarek podwójnego notowania: trzymaj w uniwersum tę samą spółkę na dwóch giełdach
+
+- **Context**: SK hynix jako `000660.KS` (Seul) i `HY9H.F` (Frankfurt). Sprawdzone 2026-08-15.
+- **Problem/zysk**: to jedna spółka, więc *musi* scorować identycznie we wszystkim poza momentum, które słusznie zależy od rynku notowania. Każdy rozjazd w wycenie czy jakości jest z definicji błędem — waluty, liczby akcji, klasyfikacji. Sonda wyłapała skalę napraw obiektywnie: 15,2 pkt rozjazdu przed, 1,2 pkt po, a reszta to czyste momentum.
+- **Rule**: zostaw ten test na stałe i sprawdzaj go po każdej zmianie w warstwie danych lub w filarach. Tani, samoweryfikujący się test regresji, którego nie da się oszukać dopasowaniem oczekiwań — bo prawidłowa odpowiedź („obie mają być równe") jest znana z góry, bez znajomości modelu.
+- **Applies to**: impl-review, każda zmiana w `FinancialDataFetcher` i `Pillars/`.
