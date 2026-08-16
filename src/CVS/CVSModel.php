@@ -158,6 +158,11 @@ class CVSModel
             'bucket'       => $this->valuation->lastBucketKey(),
             'value'        => $valuationSteps['ev_fcf'] ?? $valuationSteps['ev_sales_adj'] ?? $valuationSteps['pb'] ?? null,
             'variant'      => $valuationSteps['variant'] ?? null,
+            // Variant C conditions the book multiple on ROE, but falls back to
+            // the plain multiple when ROE is not positive. Downstream prose has
+            // to know which happened or it describes the wrong arithmetic — the
+            // AI data block did exactly that for a day.
+            'roe_conditioned' => ($valuationSteps['pb_roe'] ?? null) !== null,
         ];
 
         // Step 6 — Overlay penalties (Phase 5, slice 1): SHADOW model_version (3.1).

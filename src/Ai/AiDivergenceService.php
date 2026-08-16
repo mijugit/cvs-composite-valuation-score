@@ -224,7 +224,8 @@ SYSTEM;
         // stopped using for that sector.
         $valVariant  = isset($valRef['variant']) ? (string) $valRef['variant'] : null;
         $isFinancial = ValuationNarrative::isFinancialSector($sector, $this->cvsConfig());
-        $metricName  = ValuationNarrative::metricName($valVariant);
+        $roeCond     = !empty($valRef['roe_conditioned']);
+        $metricName  = ValuationNarrative::metricName($valVariant, $roeCond);
 
         // Compute relative diff between subsector and sector benchmarks to decide if worth surfacing.
         // We use the pillar score as a proxy: if ValuationPillar used subsector, the score already
@@ -247,7 +248,15 @@ SYSTEM;
         $lines[] = "- Fundamental (6-12 month horizon): {$cvsFund}/100 → {$recoFund}";
         $lines[] = '';
         $lines[] = 'PILLAR BREAKDOWN (each 0-100):';
-        $lines[] = '- Valuation (' . ValuationNarrative::valuationLabel($valVariant) . "): {$pVal}/100";
+        $lines[] = '- Valuation (' . ValuationNarrative::valuationLabel($valVariant, $roeCond) . "): {$pVal}/100";
+        // A neutral 50 that means "the input was unusable" reads exactly like a
+        // neutral 50 that means "fairly valued". Say which, or the reviewer
+        // treats a declined score as a verdict.
+        if ($valSource === 'implausible_pb') {
+            $lines[] = '  ^ NOTE: that 50 is NOT a judgement. The reported price/book is far outside the peer'
+                . ' group (typically an ADR quote divided by an ordinary-share book value), so the model'
+                . ' declined to score it. Treat the Valuation pillar as ABSENT for this company, not neutral.';
+        }
         $lines[] = "- Momentum - Swing profile: {$pMomSwing}/100";
         $lines[] = "- Momentum - Fundamental profile: {$pMomFund}/100";
         $lines[] = '- Quality (' . ValuationNarrative::qualityLabel($isFinancial) . "): {$pQual}/100";
@@ -280,7 +289,8 @@ SYSTEM;
             $bm = $this->getSectorBenchmark($financials);
             foreach (ValuationNarrative::fairValueMethod(
                 $isFinancial,
-                isset($bm['median_ev_fcf']) ? (float) $bm['median_ev_fcf'] : null
+                isset($bm['median_ev_fcf']) ? (float) $bm['median_ev_fcf'] : null,
+                $roeCond
             ) as $methodLine) {
                 $lines[] = $methodLine;
             }

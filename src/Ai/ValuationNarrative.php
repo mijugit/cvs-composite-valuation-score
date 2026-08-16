@@ -29,12 +29,18 @@ final class ValuationNarrative
      *
      * @return string label for the pillar line, e.g. "P/B vs peer median"
      */
-    public static function valuationLabel(?string $variant): string
+    public static function valuationLabel(?string $variant, bool $roeConditioned = false): string
     {
         return match ($variant) {
             'A'     => 'forward EV/FCF vs peer median',
             'B'     => 'EV/Sales adjusted for growth, vs peer median',
-            'C'     => 'P/B vs peer median — this company is a financial, where EV and free cash flow are not meaningful',
+            'C'     => $roeConditioned
+                ? 'P/B ÷ ROE vs the peer median of the same — a financial, where EV and free cash flow measure '
+                    . 'nothing, and where the book multiple is a FUNCTION of the return that earns it '
+                    . '(Gordon-Shapiro: P/B = (ROE-g)/(COE-g)). Do NOT read the raw P/B against a peer median '
+                    . 'and conclude the company is expensive: the model has already divided that out'
+                : 'P/B vs peer median — a financial with no positive ROE, so the book multiple cannot be '
+                    . 'conditioned on returns',
             'D'     => 'EV/EBITDA vs peer median — this company is real estate, where free cash flow nets out property acquisitions',
             default => 'peer-median multiple (variant not recorded on this snapshot)',
         };
@@ -43,12 +49,12 @@ final class ValuationNarrative
     /**
      * The multiple itself, for prose that needs to name it in two words.
      */
-    public static function metricName(?string $variant): string
+    public static function metricName(?string $variant, bool $roeConditioned = false): string
     {
         return match ($variant) {
             'A'     => 'EV/FCF',
             'B'     => 'EV/Sales',
-            'C'     => 'P/B',
+            'C'     => $roeConditioned ? 'P/B ÷ ROE' : 'P/B',
             'D'     => 'EV/EBITDA',
             default => 'the valuation multiple',
         };
@@ -71,13 +77,18 @@ final class ValuationNarrative
      * @param  float|null $medianEvFcf cold-start/sector EV/FCF, for the A path
      * @return list<string> lines to append, empty when nothing can be said
      */
-    public static function fairValueMethod(bool $isFinancial, ?float $medianEvFcf): array
+    public static function fairValueMethod(bool $isFinancial, ?float $medianEvFcf, bool $roeConditioned = false): array
     {
         if ($isFinancial) {
             return [
-                '- Calculation method: Fair Price = peer_median_P/B × book value per share.',
-                '- This is the price at which the company would trade at its peer group\'s book multiple '
-                    . '(Valuation pillar = 50/100). It is NOT an EV/FCF or DCF-derived figure.',
+                $roeConditioned
+                    ? '- Calculation method: Fair Price = peer_median(P/B ÷ ROE) × this company\'s ROE × book value per share.'
+                    : '- Calculation method: Fair Price = peer_median_P/B × book value per share (no positive ROE to condition on).',
+                $roeConditioned
+                    ? '- The ROE term is deliberate: a bank earns its book multiple through its return on equity, so fair '
+                        . 'value sits on the same axis as the pillar. It is NOT an EV/FCF or DCF-derived figure.'
+                    : '- This is the price at which the company would trade at its peer group\'s book multiple '
+                        . '(Valuation pillar = 50/100). It is NOT an EV/FCF or DCF-derived figure.',
             ];
         }
 

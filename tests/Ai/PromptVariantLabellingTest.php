@@ -74,18 +74,81 @@ class PromptVariantLabellingTest extends TestCase
     {
         return $this->service()->buildDataBlock(
             'ALR.WA',
-            $this->cvsResult(['source' => 'subsector', 'bucket' => 'Banks - Diversified', 'variant' => 'C']),
+            $this->cvsResult([
+                'source'          => 'subsector',
+                'bucket'          => 'Banks - Diversified',
+                'variant'         => 'C',
+                'roe_conditioned' => true,
+            ]),
             $this->bank(),
             46.52,
             null
         );
     }
 
+    /**
+     * Variant C divides the book multiple by ROE. Saying "P/B vs peer median"
+     * invites the reviewer to re-read the raw 2.96 against a ~1.7 median and
+     * conclude the bank is expensive — the very reasoning the model stopped
+     * doing. The prompt lagged the pillar by a day when this was added.
+     */
+    public function test_roe_conditioning_is_named_in_the_block(): void
+    {
+        $block = $this->block();
+
+        $this->assertStringContainsString('P/B ÷ ROE vs the peer median', $block);
+        $this->assertStringContainsString('its P/B ÷ ROE was compared to peers', $block);
+        $this->assertStringContainsString('peer_median(P/B ÷ ROE) × this company\'s ROE × book value per share', $block);
+    }
+
+    public function test_bank_without_positive_roe_says_so(): void
+    {
+        $block = $this->service()->buildDataBlock(
+            'XYZ.WA',
+            $this->cvsResult([
+                'source'          => 'subsector',
+                'bucket'          => 'Banks - Regional',
+                'variant'         => 'C',
+                'roe_conditioned' => false,
+            ]),
+            $this->bank(),
+            10.0,
+            null
+        );
+
+        $this->assertStringContainsString('no positive ROE', $block);
+        $this->assertStringNotContainsString('P/B ÷ ROE vs the peer median', $block);
+    }
+
+    /**
+     * A declined score and a "fairly valued" score are both 50. Without the
+     * note they read identically, which is the neutral-value blind spot that
+     * hid the missing share counts for weeks.
+     */
+    public function test_declined_score_is_not_presented_as_a_verdict(): void
+    {
+        $block = $this->service()->buildDataBlock(
+            'HSBC',
+            $this->cvsResult([
+                'source'          => 'implausible_pb',
+                'bucket'          => 'Banks - Diversified',
+                'variant'         => 'C',
+                'roe_conditioned' => true,
+            ]),
+            $this->bank(),
+            null,
+            null
+        );
+
+        $this->assertStringContainsString('that 50 is NOT a judgement', $block);
+        $this->assertStringContainsString('Treat the Valuation pillar as ABSENT', $block);
+    }
+
     public function test_a_bank_is_not_described_as_scored_on_ev_fcf(): void
     {
         $block = $this->block();
 
-        $this->assertStringContainsString('P/B vs peer median', $block);
+        $this->assertStringContainsString('P/B ÷ ROE vs the peer median', $block);
         // The block may still say the words "EV/FCF" — it does, to rule the
         // multiple OUT — so assert on the claims, not on the substring.
         $this->assertStringNotContainsString('Valuation (EV/FCF', $block);
@@ -105,7 +168,7 @@ class PromptVariantLabellingTest extends TestCase
     {
         $block = $this->block();
 
-        $this->assertStringContainsString('peer_median_P/B × book value per share', $block);
+        $this->assertStringContainsString('× this company\'s ROE × book value per share', $block);
         $this->assertStringNotContainsString('Forward_FCF', $block);
     }
 
@@ -125,7 +188,7 @@ class PromptVariantLabellingTest extends TestCase
 
     public function test_peer_group_note_names_the_right_multiple(): void
     {
-        $this->assertStringContainsString('its P/B was compared to peers', $this->block());
+        $this->assertStringContainsString('its P/B ÷ ROE was compared to peers', $this->block());
     }
 
     /** An ordinary company must be unaffected. */
