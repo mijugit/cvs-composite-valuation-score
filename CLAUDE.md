@@ -36,6 +36,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Never persist a snapshot from an incomplete payload. `PayloadCompleteness::missingEssentialFields()` gates this — a scoreless row becomes the ticker's newest and hides its last usable one.
 - Per-share figures converted for comparison against `current_price` must use the PRICE FX rate, not the statement rate (see `book_value_per_share`).
 - Share counts resolve through `ShareCount::resolve()` and nowhere else. `sharesOutstanding` covers only the QUOTED class — 9.5% of this universe diverges by more than 5% (VG +370%, IBKR +276%, GOOGL +108%) — and for 4.8% Yahoo returns no count at all. Never substitute `floatShares`: it excludes closely-held stock, so it undercounts, and every share-count error runs towards "looks cheap".
+- Where Yahoo has no count and the ticker is a US domestic primary listing, the count comes from SEC EDGAR (`SecShareCountClient`). It is a FALLBACK, never an override — Yahoo is current, SEC filings run up to a quarter behind. ADRs must never use it: the SEC counts ordinary shares while we price the receipt (JD files 2.978B ordinary against ~1.489B ADRs), and no API publishes the ratio. `SecFacts::isUsDomesticPrimary()` is the gate.
 
 ### Disclaimer — mandatory on every result
 

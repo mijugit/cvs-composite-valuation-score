@@ -278,6 +278,39 @@ pozycji portfela — i wynik, którego model wcześniej po prostu nie umiał pol
 **Lekcja o widoczności.** Ten błąd przetrwał, bo neutralne 50 wygląda jak *opinia*, nie jak
 *brak odpowiedzi*. Pusty licznik krzyczy; neutralny wynik milczy.
 
+### 10a. SEC EDGAR — bo derywacja miała tę samą chorobę
+
+Sprawdzenie fallbacku wobec danych regulatora pokazało, że `revenue / revenuePerShare` niesie
+**łagodniejszą wersję problemu, który miał leczyć**. Dla spółek wieloklasowych potrafi zgubić klasę,
+a że jest **średnią okresową**, przy agresywnym skupie akcji zostaje w tyle:
+
+| | SEC (kwartalnie) | `rev/rps` | błąd |
+|---|---|---|---|
+| EL | 0,365 mld | 0,246 mld | **−32,7%** |
+| KR | 0,615 mld | 0,793 mld | **+28,9%** |
+| HEI | 0,141 mld | 0,124 mld | −12,1% |
+| MU | 1,145 mld | 1,125 mld | −1,7% |
+
+Trzydzieści procent zaniżenia liczby akcji EL to trzydzieści procent zaniżenia EV — znowu w stronę
+„tanio".
+
+**Źródło:** `data.sec.gov/api/xbrl/companyconcept/CIK…/us-gaap/WeightedAverageNumberOfDilutedSharesOutstanding`.
+Darmowe, bez klucza, składane kwartalnie. Koncept *rozwodniony*, bo obejmuje wszystkie klasy —
+`dei:EntityCommonStockSharesOutstanding` (okładka raportu) odrzucony: jest per klasa, dawał HEI
+0,027 mld zamiast 0,141 mld, 404 dla EL i wartość z 2015 roku.
+
+**Zakres wąski nie z powodu pokrycia, tylko JEDNOSTEK.** Dla ADR-a SEC liczy akcje **zwykłe**,
+a my wyceniamy **kwit depozytowy**: JD składa 2,978 mld akcji zwykłych wobec ~1,489 mld ADR-ów.
+Użycie liczby z SEC zawyżyłoby EV dwukrotnie, a stosunku konwersji nie publikuje żadne z tych API.
+Dlatego kwalifikują się wyłącznie amerykańskie notowania pierwotne (`financialCurrency = USD`
+**i** kraj = USA); ADR-y i Europa zostają na derywacji, która jest w poprawnej jednostce.
+
+**To fallback, nie nadpisanie.** Dane Yahoo są bieżące, dane SEC do kwartału wstecz — więc SEC
+pytany jest wyłącznie wtedy, gdy Yahoo nie ma nic. To kilka wywołań na przebieg rescore,
+cache 7 dni na spółkę i 30 dni na mapę CIK. Wszystko zawodzi miękko: niedostępny SEC zostawia
+poprzednie zachowanie, a przeterminowany cache jest podawany zamiast powrotu do liczby znanej
+jako 30% błędna.
+
 ## Migracje
 
 | Nr | Co dodaje |
