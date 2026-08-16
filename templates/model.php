@@ -370,9 +370,15 @@
             <td>Spółka bez przychodów (np. startup przed IPO z zerową sprzedażą) jest zbyt niepewna, żeby ją oceniać.</td>
         </tr>
         <tr>
-            <td>Marża brutto ≥ 10 %</td>
-            <td>≥ 10 %</td>
-            <td>Spółki ze skrajnie niską marżą brutto mają niemal zerowy bufor bezpieczeństwa.</td>
+            <td>Marża brutto ≥ 4 %</td>
+            <td>≥ 4 %</td>
+            <td>
+                Spółki ze skrajnie niską marżą brutto mają niemal zerowy bufor bezpieczeństwa.
+                Próg jest niski celowo: dystrybutorzy IT (AB SA, ALSO, ASBIS) prowadzą zdrowy
+                biznes przy 5–7 % marży, a przy progu 10 % wypadali z modelu jako „niezdatni".
+                Sektor Financial Services jest z tego warunku zwolniony — Yahoo raportuje zysk
+                brutto banku jako 0.
+            </td>
         </tr>
         <tr>
             <td>Dług / Kapitał własny ≤ 5×</td>
@@ -431,9 +437,11 @@
     tym spółka jest „tańsza" w sensie ile płacimy za każdą złotówkę generowanej gotówki.
 </p>
 <p>
-    Model porównuje obliczony EV/FCF spółki z <strong>medianą sektora</strong> (np. dla
-    Technologii medialna EV/FCF wynosi ok. 32×). Wynik > 50 oznacza, że spółka jest tańsza
-    niż mediana sektora; wynik &lt; 50 — droższa.
+    Model porównuje obliczony EV/FCF spółki z <strong>medianą jej grupy porównawczej</strong> —
+    najchętniej branży, a gdy ta jest za płytka, sektora (drabina opisana niżej). Wynik > 50
+    oznacza, że spółka jest tańsza niż jej grupa; wynik &lt; 50 — droższa. To, z czym akurat
+    porównujemy, ma ogromne znaczenie: mediana branży dystrybutorów elektroniki to ok. 10×,
+    a całego sektora Technologii ok. 32×.
 </p>
 
 <h4 style="font-size:var(--text-sm);font-weight:600;margin:.75rem 0 .25rem;">Jak liczone jest EV?</h4>
@@ -820,11 +828,13 @@
     <li>Wyniki CVS (Swing i Fundamentalny) wraz z rekomendacjami</li>
     <li>Rozbicie na filary (wynik każdego z 0–100)</li>
     <li>Sektor i branża spółki</li>
-    <li>Źródło benchmarku Wyceny (sektor lub peer group branży)</li>
+    <li>Źródło benchmarku Wyceny — który szczebel drabiny zadziałał (branża, sektor, cold-start
+        lub własna grupa administratora) oraz wariant wyceny (A / B / C)</li>
     <li>Dane analityków: konsensus, cel cenowy (min/średni/max), upside/downside</li>
     <li>Prognozowane przychody i EPS na kolejny rok</li>
     <li>Szacunkowa „uczciwa cena" modelu CVS (<em>CVS Implied Fair Value</em>) —
-        cena, przy której EV/FCF spółki równałby się medianie sektora</li>
+        cena, przy której wskaźnik wyceny spółki równałby się medianie jej grupy porównawczej
+        (EV/FCF dla zwykłej spółki, P/B dla banku)</li>
 </ul>
 <p>
     AI generuje analizę w czterech sekcjach:
@@ -920,7 +930,7 @@
         </tr>
         <tr>
             <td>Brak danych peer group (< 5 spółek w branży)</td>
-            <td>Fallback na statyczny benchmark sektora</td>
+            <td>Zejście na medianę sektora (empiryczną), a dopiero przy jej braku na statyczny benchmark; w screenerze znacznik <strong>◍ brak peerów</strong></td>
             <td>Niszowe subindustrie</td>
         </tr>
         <tr>
@@ -929,9 +939,14 @@
             <td>Każda spółka w oknie ±5 sesji</td>
         </tr>
         <tr>
-            <td>Finansowe i Real Estate</td>
-            <td>EV/FCF często nieodpowiednie (banki = FCF to kapitał regulacyjny); model działa, ale z niższą dokładnością</td>
-            <td>JPM, BAC, Realty Income</td>
+            <td>Sektor finansowy (banki, ubezpieczyciele)</td>
+            <td>Wariant C: wycena na P/B, jakość na ROE/ROA/wypłacie — zamiast EV/FCF i marży brutto, które dla banku nic nie mierzą</td>
+            <td>JPM, BAC, PKO.WA, ALR.WA</td>
+        </tr>
+        <tr>
+            <td>Real Estate (REIT-y)</td>
+            <td>Nadal EV/FCF — model działa, ale z niższą dokładnością. REIT-y raportują sensowne przepływy, więc nie kwalifikują się do wariantu C; własnej metodyki (FFO/AFFO) jeszcze nie ma.</td>
+            <td>Realty Income, Simon Property</td>
         </tr>
     </tbody>
 </table>
@@ -955,9 +970,17 @@
         zmian w modelu biznesowym.
     </li>
     <li>
-        <strong>Statyczne benchmarki sektora.</strong> Mediany EV/FCF i EV/Sales sektorów są
-        wyliczone ze zbioru historycznego i mogą nie odzwierciedlać obecnych wycen rynkowych
-        (np. AI-premium w Technologii zmienia co roku, co oznacza co jest „tanio").
+        <strong>Mediana jest tak dobra jak uniwersum, z którego powstaje.</strong> Empiryczne
+        mediany liczy się wyłącznie ze spółek obserwowanych w tej instancji — nie z całego rynku.
+        Płytka branża daje medianę, którą przesuwa jedna spółka, a cold-startowe benchmarki są
+        wyliczone historycznie i nie nadążają za rynkiem (AI-premium w Technologii co roku
+        przesuwa granicę tego, co jest „tanio").
+    </li>
+    <li>
+        <strong>Dane po zmianie modelu nie są przeliczane wstecz.</strong> Poprawki metodologii
+        działają od momentu wdrożenia; starsze snapshoty zostają takie, jakie były. Porównując
+        wynik spółki sprzed kilku miesięcy z dzisiejszym, porównujesz dwa różne reżimy — dlatego
+        każdy snapshot niesie wersję modelu i użytą grupę porównawczą.
     </li>
     <li>
         <strong>Momentum jest opóźnionym wskaźnikiem.</strong> Kurs, który przez 6 miesięcy rósł
@@ -965,9 +988,16 @@
         przewiduje odwrócenia.
     </li>
     <li>
-        <strong>Niska dokładność dla sektora Finansowego i Real Estate.</strong> EV/FCF nie jest
-        standardową metryką dla banków (FCF to tam zysk regulacyjny, nie gotówka operacyjna)
-        ani REIT-ów. Używaj wyników z tych sektorów z dużą ostrożnością.
+        <strong>Real Estate nadal bez własnej metodyki.</strong> EV/FCF nie jest standardową
+        metryką dla REIT-ów — wycenia się je przez FFO/AFFO, których model nie liczy. Sektor
+        finansowy dostał wariant C, Real Estate na swój wciąż czeka. Używaj wyników z tego
+        sektora z ostrożnością.
+    </li>
+    <li>
+        <strong>Model nie zna wskaźników nadzorczych banku.</strong> Wariant C ocenia bank
+        zwrotami i mnożnikiem księgowym, ale Yahoo nie udostępnia CET1 (adekwatność kapitału),
+        NPL (kredyty zagrożone) ani NIM (marża odsetkowa) — czyli tego, na co realnie patrzy
+        analityk sektora. Wysoki wynik nie wyklucza problemu z jakością portfela kredytowego.
     </li>
     <li>
         <strong>Wyniki kwartalne = punkt nieciągłości.</strong> Jedne zaskakujące wyniki mogą
@@ -1095,6 +1125,13 @@
             Dla precyzyjnego porównania model potrzebuje minimum 5 spółek z tej samej branży w bazie.
             Dla niszowych subindustrii może być ich mniej — model automatycznie wraca do porównania
             z całym sektorem (mniej precyzyjne, ale zawsze dostępne).
+            <br><br>
+            <strong>Traktuj to jako ostrzeżenie, nie drobiazg.</strong> Sektor miesza różne modele
+            biznesowe, więc wynik takiej spółki bywa mocno zawyżony albo zaniżony — dystrybutor
+            porównany do median software'u wygląda na okazję życia. Dlatego w screenerze taka
+            spółka nosi znacznik <strong>◍ brak peerów</strong>, a autonomiczne portfele nie biorą
+            jej pod uwagę jako kandydata. Lekarstwo jest proste: dodaj do obserwowanych kilku jej
+            realnych konkurentów i odśwież sektor.
         </div>
     </details>
     <details>
@@ -1119,19 +1156,27 @@
     <details>
         <summary>Spółka finansowa (bank) dostała bardzo niski CVS — czy to błąd?</summary>
         <div class="faq__body">
-            Nie błąd, ale ograniczenie modelu. EV/FCF nie jest standardową metryką dla banków
-            — FCF banku to nie to samo co FCF firmy produkcyjnej (regulowany kapitał,
-            rezerwy). Model sygnalizuje to na stronie analizy. Dla banków i REIT-ów lepszym
-            podejściem są wskaźniki branżowe (P/BV, Dividend Yield), których CVS nie używa.
+            Do sierpnia 2026 był to najczęściej artefakt: banki szły przez EV/FCF i marżę
+            brutto, czyli metryki, które dla nich nic nie znaczą. Dziś sektor finansowy jest
+            liczony <strong>wariantem C</strong> — wycena na P/B wobec mediany grupy, jakość
+            na ROE, ROA i rozsądku wypłaty dywidendy — więc niski wynik jest realną oceną, nie
+            niedopasowaniem metryki. Pamiętaj jednak, czego model nadal nie widzi: CET1, NPL
+            i NIM nie są dostępne w Yahoo.
         </div>
     </details>
     <details>
         <summary>Co to jest „CVS Implied Fair Value"?</summary>
         <div class="faq__body">
-            To teoretyczna cena akcji, przy której wskaźnik EV/FCF spółki byłby równy
-            medianie jej sektora. Innymi słowy: „ile powinna kosztować akcja, żeby spółka
-            była wyceniana dokładnie jak typowa firma w branży". To przybliżenie —
-            nie jest to prognoza kursu, lecz punkt odniesienia dla rozmów AI o wycenie.
+            To teoretyczna cena akcji, przy której wskaźnik wyceny spółki byłby równy medianie
+            <strong>tej samej grupy porównawczej</strong>, której użył filar Wyceny — EV/FCF dla
+            zwykłej spółki, P/B dla banku. Innymi słowy: „ile powinna kosztować akcja, żeby
+            spółka była wyceniana dokładnie jak typowa firma w jej branży". To przybliżenie —
+            nie prognoza kursu, lecz punkt odniesienia.
+            <br><br>
+            Do 16.08.2026 kolumna liczyła to ze <em>statycznego</em> benchmarku sektora, przez co
+            potrafiła zaprzeczać filarowi obok siebie: ASB.WA miał wycenę „uczciwą" wobec mediany
+            branży 10,3×, a FV obiecywało +722%, bo używało 32× dla całej Technologii. Teraz oba
+            czytają ten sam komparator.
         </div>
     </details>
 </div>
