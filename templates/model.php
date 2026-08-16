@@ -466,6 +466,27 @@
     nie generują jeszcze dodatniego FCF.
 </p>
 
+<h4 style="font-size:var(--text-sm);font-weight:600;margin:.75rem 0 .25rem;">Wariant C — spółki finansowe (banki, ubezpieczyciele)</h4>
+<p>
+    Dla sektora <strong>Financial Services</strong> obie powyższe metody mierzą szum. Depozyty
+    i dług są dla banku <em>surowcem</em>, a nie roszczeniem wobec majątku, więc Enterprise Value
+    nie jest wielkością, którą ktokolwiek wycenia. „Wolne przepływy pieniężne" banku również nie
+    są miarą niczego — Yahoo raportuje jego zysk brutto jako 0.
+</p>
+<p>
+    Dlatego finansowe idą <strong>wariantem C: cena/wartość księgowa (P/B)</strong> —
+    wskaźnikiem, którym ten sektor faktycznie jest wyceniany. Mechanika pozostaje identyczna:
+    stosunek P/B spółki do mediany grupy porównawczej trafia do tej samej sigmoidy, z tą samą
+    kotwicą sektorową i tym samym kierunkiem (poniżej mediany = tanio = wyższy wynik).
+</p>
+<div class="formula">wynik_wyceny = sigmoid( P/B spółki ÷ mediana P/B grupy )</div>
+<div class="callout callout--tip">
+    <strong>Dlaczego to miało znaczenie.</strong> Zanim wariant C powstał, kubełek
+    „Banks - Regional" miał <strong>zero</strong> spółek z policzalnym EV/FCF, mimo że
+    w uniwersum siedziało sześć dużych banków amerykańskich. Na P/B ten sam kubełek ma 22 spółki.
+    Metryka była niedopasowana do typu spółki, nie dane.
+</div>
+
 <h4 style="font-size:var(--text-sm);font-weight:600;margin:.75rem 0 .25rem;">Funkcja sigmoid — zamiana wskaźnika w punkty</h4>
 <p>
     Stosunek EV/FCF spółki do mediany sektora trafia do <strong>funkcji sigmoid</strong>, która
@@ -488,6 +509,52 @@
     <em>zakotwiczenie</em> (anchor): ostateczny wynik to minimum(wynik subsektora, wynik sektora),
     co chroni przed zawyżaniem oceny gdy cały subszektor jest przewartościowany.
 </p>
+<p>
+    Drabina jest trzystopniowa i model zapisuje przy każdym wyniku, na którym szczeblu wylądował:
+</p>
+<table class="mode-table">
+    <thead><tr><th>Szczebel</th><th>Kiedy</th><th>Co to znaczy dla wyniku</th></tr></thead>
+    <tbody>
+        <tr><td><strong>Branża</strong></td><td>≥ 5 spółek w kubełku</td><td>Prawdziwe porównanie z konkurentami — najmocniejszy wariant.</td></tr>
+        <tr><td><strong>Sektor</strong></td><td>za mało spółek w branży</td><td>Porównanie zgrubne. Wynik bywa zawyżony lub zaniżony, bo sektor miesza różne modele biznesowe.</td></tr>
+        <tr><td><strong>Cold-start</strong></td><td>brak danych empirycznych</td><td>Statyczna wartość z konfiguracji — punkt wyjścia, zanim crawl zbierze dane.</td></tr>
+    </tbody>
+</table>
+<div class="callout callout--warn">
+    <strong>Dlaczego to widać w interfejsie.</strong> Spółka, której branża jest zbyt płytka,
+    dostaje w screenerze znacznik <strong>◍ brak peerów</strong> — jej wycena opiera się wtedy
+    na medianie sektora, nie na bezpośrednich konkurentach. Przykład z 15.08.2026: ASBIS
+    (ASB.WA) był <em>jedynym</em> dystrybutorem elektroniki w uniwersum, więc porównywano go
+    do mnożników spółek software'owych (24,4×) i awansował na drugie miejsce rankingu z oceną
+    SILNE KUPUJ. Po dodaniu ośmiu realnych konkurentów mediana branży wyszła 10,3× — czyli
+    dokładnie tyle, ile wynosi jego własny wskaźnik. Spółka była wyceniona uczciwie,
+    a „okazja" była artefaktem złego komparatora. Autonomiczne portfele nie dostają
+    takich spółek jako kandydatów.
+</div>
+
+<h4 style="font-size:var(--text-sm);font-weight:600;margin:.75rem 0 .25rem;">Własne grupy porównawcze (nadpisania administratora)</h4>
+<p>
+    Klasyfikacja Yahoo idzie za <em>formą korporacyjną</em>, nie za tym, czym spółka realnie
+    konkuruje. Samsung jest pod „Consumer Electronics", Micron i SK hynix pod
+    „Semiconductors", a Seagate, WDC i SanDisk pod „Computer Hardware" — choć w tym cyklu
+    wszystkie żyją z cen pamięci. Podobnie polskie banki trafiają do globalnego kubełka
+    „Banks - Regional" razem z amerykańskimi, mimo że dzielą regulatora, rynek i otoczenie stóp.
+</p>
+<p>
+    Administrator może więc przypisać spółkę do własnej grupy porównawczej. Zasady, które temu
+    towarzyszą:
+</p>
+<ul>
+    <li><strong>Addytywnie</strong> — klasyfikacja Yahoo nigdy nie jest modyfikowana; nadpisanie
+        zmienia wyłącznie to, do czego porównywana jest wycena.</li>
+    <li><strong>Zapisywane przy wyniku</strong> — każdy snapshot niesie kubełek faktycznie użyty,
+        więc historyczna ocena pozostaje wytłumaczalna, a grupowanie <em>falsyfikowalne</em>:
+        track record można czytać per grupowanie zamiast mieszać reżimy.</li>
+    <li><strong>Z datą przeglądu</strong> dla grup zależnych od cyklu (dominacja segmentu bywa
+        przejściowa) i bez niej dla grup strukturalnych (region, regulator).</li>
+    <li><strong>To decyzja klasyfikacyjna</strong> („ta spółka konkuruje z tamtymi"),
+        nigdy wynikowa („ta spółka powinna mieć wyższy wynik"). Ślad audytowy pilnuje różnicy.</li>
+</ul>
 
 <!-- FILAR 2 -->
 <h3>Filar Momentum — czy rynek lubi tę spółkę?</h3>
@@ -577,6 +644,41 @@
 <p>
     Przykład: spółka z marżą 5 pp powyżej mediany (3 pkt), długiem netto/EBITDA = 1,8× (2 pkt)
     i prognozowanym wzrostem EPS 18% (3 pkt) uzyskuje 8/10 = 80 punktów.
+</p>
+
+<h4 style="font-size:var(--text-sm);font-weight:600;margin:1rem 0 .25rem;">Ścieżka finansowa — banki i ubezpieczyciele</h4>
+<p>
+    Marża brutto, dług netto/EBITDA i wzrost przychodów nie mówią o banku tego, co mówią
+    o spółce przemysłowej. Sektor <strong>Financial Services</strong> oceniany jest
+    <strong>zwrotami</strong>, na tej samej skali 0–10:
+</p>
+<table class="mode-table">
+    <thead><tr><th>Składowa</th><th>Maks. pkt</th><th>Jak jest obliczana</th></tr></thead>
+    <tbody>
+        <tr>
+            <td>ROE — zwrot z kapitału własnego</td>
+            <td>4 pkt</td>
+            <td>≥ 18% → 4 pkt; ≥ 12% → 2,5 pkt; > 0% → 1 pkt. Jak ciężko bank pracuje kapitałem akcjonariuszy.</td>
+        </tr>
+        <tr>
+            <td>ROA — zwrot z aktywów</td>
+            <td>4 pkt</td>
+            <td>≥ 1,5% → 4 pkt; ≥ 1,0% → 2,5 pkt; > 0% → 1 pkt. Jak zarabia na całym portfelu kredytowym.</td>
+        </tr>
+        <tr>
+            <td>Wskaźnik wypłaty dywidendy</td>
+            <td>2 pkt</td>
+            <td>
+                W przedziale (0; 80%] → 2 pkt; powyżej 80% → 0 pkt; brak danych → 1 pkt.<br>
+                Zbyt wysoka wypłata to <em>ostrzeżenie</em>, nie zaleta: może oznaczać, że bankowi
+                nie zostaje kapitał na rozwój ani na absorpcję strat.
+            </td>
+        </tr>
+    </tbody>
+</table>
+<p>
+    Przykład rzeczywisty (16.08.2026): <strong>PKO.WA</strong> z ROE 20,1% (4 pkt),
+    ROA 1,88% (4 pkt) i wypłatą 63% (2 pkt) uzyskuje 10/10 = <strong>100 punktów</strong> Jakości.
 </p>
 
 <!-- ══════════════════════════════════════════════════════════════════════ -->

@@ -10,14 +10,31 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Quality Gate is binary.** A company that fails returns `CVSResult::failed($ticker, $failures)` — not a CVS score of 0. Do not assign any numerical score when the gate rejects.
 - **CVS must be deterministic.** Same `$financials` input → identical CVS and recommendation. No randomness, no `date()`/`time()` calls inside scoring logic.
 - **S-05 dual-mode architecture (3 pillars):**
-  - `ValuationPillar` (EV/FCF vs sector medians from `config/cvs-weights.php → benchmarks`). Returns neutral 50 only when growth data is unavailable or `shares_outstanding` is null.
+  - `ValuationPillar` — three variants, chosen per company, all scored the same way (ratio vs a resolved peer median → sigmoid → sector anchor):
+    - **A** — forward EV/FCF, when FCF > 0.
+    - **B** — growth-adjusted EV/Sales, when FCF ≤ 0 or null.
+    - **C** — price/book, for sectors in `config → financials.sectors` (Financial Services). A bank's EV and free cash flow measure nothing; before variant C existed, `Banks - Regional` held **zero** tickers with a usable EV/FCF while the universe contained six large US banks.
+    Returns neutral 50 when its own metric is unavailable (missing growth, `shares_outstanding`, or `price_to_book`).
   - `MomentumPillar` — computed twice with different `roc_weights` per mode (swing vs fundamental).
-  - `QualityPillar` — GM vs sector median, leverage (net debt/EBITDA), forward growth.
+  - `QualityPillar` — two paths on the same 0–10 scale: the ordinary one (GM vs sector median, net debt/EBITDA, forward growth) and a **financial** one (ROE, ROA, payout sanity) for `config → financials.sectors`. Gross margin and leverage do not mean for a bank what they mean elsewhere — Yahoo reports bank gross profit as 0.
   - **Swing (1–4M):** valuation 40% / momentum 45% / quality 15%
   - **Fundamental (6–12M):** valuation 65% / momentum 15% / quality 20%
   - Both scores displayed simultaneously; `CVSResult::cvs()` returns swing for backward compat.
   - Golden signals: `strong` (both ≥58), `watchlist` (fund≥58 + swing<58), `momentum`, null.
-  - `Financial Services` and `Real Estate` sectors work but have lower model accuracy (known limitation).
+  - `Real Estate` works but has lower model accuracy (known limitation). `Financial Services` now has its own valuation and quality path (variants above) rather than being scored on inapplicable metrics.
+
+### Peer groups and benchmark resolution
+
+- `MedianResolver` is the ONLY place that decides which median a pillar uses. Ladder: **industry** (empirical, when `sample_count >= peer_group.min_sample_count`) → **sector** (empirical) → **cold-start** (static `benchmarks`).
+- Anything that needs a benchmark must resolve it through that ladder — never read `config → benchmarks` directly. `FairPriceCalculator` did exactly that and produced +722% upside for a company the Valuation pillar simultaneously called fairly valued. Build resolvers with `MedianResolver::fromConfig()` so every caller shares one configuration.
+- Every snapshot records which tier was used (`valuation_source`, migration 036). Downstream code MUST read that column rather than re-deriving coverage from `peer_medians.sample_count` — a company scored on variant B uses the `ev_sales` bucket, so an `ev_fcf` sample count answers the wrong question.
+- Admin peer-group overrides (`peer_bucket_override`, migration 037) substitute the bucket for benchmark resolution only. Yahoo's `industry` is never modified. A custom bucket must not span Yahoo sectors — the crawl flushes per sector and would overwrite it.
+
+### Snapshot writes
+
+- A Quality Gate rejection is still a versioned observation: `CVSResult::failed()` MUST carry the live `model_version`. A NULL version bypasses `uq_ticker_day_version` (MySQL treats each NULL as distinct) AND masks the ticker's last good snapshot from the screener's version-agnostic `MAX(score_date)`.
+- Never persist a snapshot from an incomplete payload. `PayloadCompleteness::missingEssentialFields()` gates this — a scoreless row becomes the ticker's newest and hides its last usable one.
+- Per-share figures converted for comparison against `current_price` must use the PRICE FX rate, not the statement rate (see `book_value_per_share`).
 
 ### Disclaimer — mandatory on every result
 
