@@ -25,12 +25,27 @@ $hint = static fn (string $text): string =>
 // of the JSON and never appear in the dropdown below.
 $tickersJsonPath    = dirname(__DIR__, 2) . '/public/data/tickers.json';
 $tickersJsonVersion = is_file($tickersJsonPath) ? filemtime($tickersJsonPath) : time();
+
+// Polish takes three plural forms, not two: 1 nadpisanie / 2 nadpisania /
+// 5 nadpisań, and the 2-4 form returns for 22-24, 32-34 and so on.
+$plural = static function (int $n, string $one, string $few, string $many): string {
+    $mod10  = $n % 10;
+    $mod100 = $n % 100;
+    if ($n === 1) {
+        return $one;
+    }
+    if ($mod10 >= 2 && $mod10 <= 4 && ($mod100 < 12 || $mod100 > 14)) {
+        return $few;
+    }
+    return $many;
+};
 ?>
 
 <div style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:1rem;">
     <h1 style="margin:0;">Tickery — uniwersum screenera</h1>
     <small style="color:var(--c-muted);font-size:var(--text-xs);">
-        <?= count($tickers) ?> spółek · <?= count($overrides) ?> nadpisań grup
+        <?= count($tickers) ?> <?= $plural(count($tickers), 'spółka', 'spółki', 'spółek') ?>
+        · <?= count($overrides) ?> <?= $plural(count($overrides), 'nadpisanie grupy', 'nadpisania grup', 'nadpisań grup') ?>
     </small>
 </div>
 
@@ -92,18 +107,14 @@ $tickersJsonVersion = is_file($tickersJsonPath) ? filemtime($tickersJsonPath) : 
     <form method="POST" action="/admin/tickers/peer-group" class="form" style="max-width:560px;margin-bottom:1.5rem;">
         <input type="hidden" name="_csrf" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
         <div class="form-group">
-            <label for="pg-ticker">Spółka <span style="color:var(--c-danger)">*</span></label>
+            <label for="pg-ticker">Spółka <span style="color:var(--c-danger)">*</span><?= $hint('Wybór z podpowiedzi, tak jak na pulpicie. Ticker wpisany z pamięci trafia w literówkę albo w spółkę spoza uniwersum, a formularz przyjąłby jedno i drugie.') ?></label>
             <input id="pg-ticker" type="text" name="ticker" placeholder="Zacznij pisać ticker lub nazwę…"
                    autocomplete="off" required
                    data-ticker-picker="single"
                    data-tickers-version="<?= $tickersJsonVersion ?>">
-            <p class="hint" style="margin-top:.35rem;">
-                Wybór z podpowiedzi, tak jak na pulpicie — ticker wpisany z pamięci trafia
-                w literówkę albo w spółkę spoza uniwersum, a formularz przyjąłby jedno i drugie.
-            </p>
         </div>
         <div class="form-group">
-            <label for="pg-bucket">Grupa porównawcza <span style="color:var(--c-danger)">*</span></label>
+            <label for="pg-bucket">Grupa porównawcza <span style="color:var(--c-danger)">*</span><?= $hint('Wybór z listy zamiast wpisywania — literówka stworzyłaby po cichu nową grupę z jedną spółką, która i tak wróciłaby do mediany sektorowej.') ?></label>
             <select id="pg-bucket" name="bucket_key" required>
                 <option value="">— wybierz grupę —</option>
                 <?php foreach ($bucketOptions as $b): ?>
@@ -115,10 +126,8 @@ $tickersJsonVersion = is_file($tickersJsonPath) ? filemtime($tickersJsonPath) : 
                 <option value="__new__">➕ nowa grupa…</option>
             </select>
             <p class="hint" style="margin-top:.35rem;">
-                Wybór z listy zamiast wpisywania — literówka stworzyłaby po cichu nową grupę
-                z jedną spółką, która i tak wróciłaby do mediany sektorowej.
                 <strong>n</strong> to liczba spółek w kubełku; poniżej <?= (int) $minSampleCount ?>
-                resolver użyje sektora niezależnie od przypisania.
+                resolver użyje mediany sektora niezależnie od przypisania.
             </p>
         </div>
 
@@ -211,8 +220,11 @@ $tickersJsonVersion = is_file($tickersJsonPath) ? filemtime($tickersJsonPath) : 
         <h2 style="margin:0;font-size:var(--text-lg);">
             Lista tickerów (<span id="tk-count" data-total="<?= count($tickers) ?>"><?= count($tickers) ?></span>)
         </h2>
-        <input type="search" id="tk-search" placeholder="Filtruj po tickerze lub nazwie…"
-               autocomplete="off" style="max-width:280px;">
+        <div class="form-group" style="max-width:280px;flex:1;min-width:180px;">
+            <label for="tk-search" class="u-sr-only">Filtruj listę tickerów</label>
+            <input type="search" id="tk-search" placeholder="Filtruj po tickerze lub nazwie…"
+                   autocomplete="off">
+        </div>
     </div>
 
     <div style="overflow-x:auto;">

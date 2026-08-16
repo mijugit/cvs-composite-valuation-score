@@ -6,6 +6,29 @@
 /* Design tokens live in tokens.css (loaded before this file). */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* The browser's own `[hidden] { display: none }` lives in the UA stylesheet,
+   and ANY author rule that sets `display` beats it regardless of specificity.
+   So every component here that declares its own display — .form-group is flex,
+   .watchlist-chip is inline-flex — silently ignored the `hidden` attribute,
+   and each one got patched separately as the bug was rediscovered. This is the
+   general fix: mark an element hidden and it is hidden, whatever it is. */
+[hidden] { display: none !important; }
+
+/* A label the screen reader reads and the layout does not: for controls whose
+   purpose is already obvious from the surrounding heading, where a visible
+   label would only add noise. */
+.u-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
 /* --- Scrollbars --------------------------------------------
    Default OS/browser scrollbars are light-themed and stand out hard
    against this dark navy app — most visibly on .screener-table-scroll's
@@ -694,12 +717,6 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
     transition: border-color .15s;
     user-select: none;
 }
-/* The chip's own `display: inline-flex` above has the same specificity as
-   the browser's built-in `[hidden] { display: none }` rule, and an author
-   stylesheet always wins over the UA stylesheet regardless — so without
-   this, setting `hidden` on a chip (the reco-filter) has zero visual
-   effect. */
-.watchlist-chip[hidden] { display: none; }
 
 /* Content source only — never shown in place. .watchlist-section carries
    the shared .accordion class (padding:0; overflow:hidden;), which clips
@@ -941,7 +958,6 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
     border-color: var(--c-muted);
     outline: none;
 }
-.accordion__summary-clear[hidden] { display: none; }
 
 .accordion__arrow {
     font-size: var(--text-sm);
@@ -958,7 +974,6 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
     padding: 1.25rem 1.5rem;
     border-top: 1px solid var(--c-border);
 }
-.accordion__body[hidden] { display: none; }
 
 /* --- Analysis detail (view-specific, moved from inline) --- */
 .analysis-detail__heading {
@@ -1214,7 +1229,6 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
     justify-content: center;
     z-index: 200;
 }
-.ai-modal[hidden] { display: none; }
 
 .ai-modal__inner {
     background: var(--c-surface);
