@@ -177,6 +177,7 @@
             <div class="form-group">
                 <label for="tickers">Tickery</label>
                 <textarea id="tickers" name="tickers" rows="3" placeholder="AAPL, MSFT, NVDA"
+                          data-ticker-picker="multi"
                           data-tickers-version="<?= $tickersJsonVersion ?>"></textarea>
             </div>
 

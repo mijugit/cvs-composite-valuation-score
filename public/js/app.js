@@ -764,9 +764,15 @@ function renderCvsNavChart(canvasId, chartSeries, palette, opts) {
 })();
 
 // ============================================================
-// Autocomplete — S-06
-// Targets: #tickers textarea on the dashboard.
-// Loads public/data/tickers.json once, filters in memory.
+// Ticker picker — S-06
+//
+// Targets any field carrying data-ticker-picker, and reads the whole
+// universe from public/data/tickers.json:
+//   "multi"  — comma-separated list (#tickers on the dashboard)
+//   "single" — one symbol, replaced outright (#pg-ticker in /admin/tickers)
+//
+// Distinct from the screener search below, which filters the rows already
+// rendered on the page and never loads the universe.
 // ============================================================
 
 (function () {
@@ -783,32 +789,35 @@ function renderCvsNavChart(canvasId, chartSeries, palette, opts) {
     // ------------------------------------------------------------------
 
     document.addEventListener('DOMContentLoaded', () => {
-        const textarea = document.getElementById('tickers');
-        if (!textarea) return;
+        const fields = Array.from(document.querySelectorAll('[data-ticker-picker]'));
+        if (fields.length === 0) return;
 
-        // Wrap textarea in a relative-positioned container so the dropdown
-        // can be positioned absolutely without disrupting layout.
-        const wrapper = document.createElement('div');
-        wrapper.className = 'ac-wrapper';
-        textarea.parentNode.insertBefore(wrapper, textarea);
-        wrapper.appendChild(textarea);
+        // Wrap synchronously so the layout never shifts when the fetch lands.
+        const mounted = fields.map(field => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'ac-wrapper';
+            field.parentNode.insertBefore(wrapper, field);
+            wrapper.appendChild(field);
 
-        const dropdown = document.createElement('div');
-        dropdown.className = 'ac-dropdown';
-        dropdown.hidden = true;
-        wrapper.appendChild(dropdown);
+            const dropdown = document.createElement('div');
+            dropdown.className = 'ac-dropdown';
+            dropdown.hidden = true;
+            wrapper.appendChild(dropdown);
 
-        // Cache-bust with the server-stamped file version (set by dashboard.php)
-        // so a ticker added via /admin/tickers shows up without a hard refresh —
-        // same problem class as the CSS/JS cache-busting in layout.php's $asset().
-        const version = textarea.dataset.tickersVersion;
+            return { field, dropdown, single: field.dataset.tickerPicker === 'single' };
+        });
+
+        // Cache-bust with the server-stamped file version so a ticker added via
+        // /admin/tickers shows up without a hard refresh — same problem class as
+        // the CSS/JS cache-busting in layout.php's $asset().
+        const version = mounted[0].field.dataset.tickersVersion;
         const url = version ? TICKERS_URL + '?v=' + version : TICKERS_URL;
 
         fetch(url)
             .then(r => r.json())
             .then(data => {
                 tickerList = data;
-                attachListeners(textarea, dropdown);
+                mounted.forEach(m => attachListeners(m.field, m.dropdown, m.single));
             })
             .catch(() => { /* autocomplete unavailable — degrade silently */ });
     });
@@ -817,17 +826,26 @@ function renderCvsNavChart(canvasId, chartSeries, palette, opts) {
     // Event listeners
     // ------------------------------------------------------------------
 
-    function attachListeners(textarea, dropdown) {
+    function attachListeners(textarea, dropdown, single) {
 
         textarea.addEventListener('input', () => {
-            const token = lastToken(textarea.value);
+            const token = single ? textarea.value.trim() : lastToken(textarea.value);
             if (token.length === 0) { hideDropdown(dropdown); return; }
 
             const matches = filterTickers(token);
             if (matches.length === 0) { hideDropdown(dropdown); return; }
 
-            renderDropdown(dropdown, matches, textarea);
+            renderDropdown(dropdown, matches, textarea, single);
         });
+
+        // A single-value picker is a lookup, not free text: showing the list on
+        // focus is what makes it feel like choosing rather than typing.
+        if (single) {
+            textarea.addEventListener('focus', () => {
+                if (textarea.value.trim() !== '') return;
+                renderDropdown(dropdown, tickerList.slice(0, MAX_SUGGESTIONS), textarea, single);
+            });
+        }
 
         // Keyboard navigation (ArrowDown/Up/Enter/Escape)
         textarea.addEventListener('keydown', (e) => {
@@ -889,7 +907,7 @@ function renderCvsNavChart(canvasId, chartSeries, palette, opts) {
     // Render
     // ------------------------------------------------------------------
 
-    function renderDropdown(dropdown, matches, textarea) {
+    function renderDropdown(dropdown, matches, textarea, single) {
         activeIndex = -1;
         dropdown.innerHTML = '';
 
@@ -903,13 +921,13 @@ function renderCvsNavChart(canvasId, chartSeries, palette, opts) {
             btn.addEventListener('mousedown', (e) => {
                 // mousedown fires before blur; prevent textarea losing focus
                 e.preventDefault();
-                selectSuggestion(textarea, dropdown, m.symbol);
+                selectSuggestion(textarea, dropdown, m.symbol, single);
             });
 
             btn.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') {
                     e.preventDefault();
-                    selectSuggestion(textarea, dropdown, m.symbol);
+                    selectSuggestion(textarea, dropdown, m.symbol, single);
                 }
             });
 
@@ -929,7 +947,17 @@ function renderCvsNavChart(canvasId, chartSeries, palette, opts) {
     // Selection — replace last token, append separator
     // ------------------------------------------------------------------
 
-    function selectSuggestion(textarea, dropdown, symbol) {
+    function selectSuggestion(textarea, dropdown, symbol, single) {
+        // One symbol, replaced outright — no separator, nothing to append to.
+        if (single) {
+            textarea.value = symbol;
+            hideDropdown(dropdown);
+            textarea.dispatchEvent(new Event('input', { bubbles: true }));
+            // Move on to the next field rather than reopening the list.
+            textarea.blur();
+            return;
+        }
+
         const val   = textarea.value;
         const parts = splitTokens(val);
 

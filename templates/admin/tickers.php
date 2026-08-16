@@ -14,9 +14,25 @@ use CVS\Screener\MarketResolver;
  *   $bucketOptions  — array<int, array{key: string, count: int, custom: bool}> selectable peer groups
  *   $minSampleCount — int, peer_group.min_sample_count
  */
+
+// Same tooltip affordance the screener uses, so the long "why" text can live
+// behind a marker instead of as a wall above every form.
+$hint = static fn (string $text): string =>
+    ' <span class="chart-hint" tabindex="0">&#9432;<span class="chart-hint__tooltip">' . htmlspecialchars($text) . '</span></span>';
+
+// Cache-busting for the ticker-picker fetch (app.js), mirroring dashboard.php:
+// without it a ticker added on this very page can sit in a stale browser cache
+// of the JSON and never appear in the dropdown below.
+$tickersJsonPath    = dirname(__DIR__, 2) . '/public/data/tickers.json';
+$tickersJsonVersion = is_file($tickersJsonPath) ? filemtime($tickersJsonPath) : time();
 ?>
 
-<h1 style="margin-bottom:1rem;">Tickery — uniwersum screenera</h1>
+<div style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:1rem;">
+    <h1 style="margin:0;">Tickery — uniwersum screenera</h1>
+    <small style="color:var(--c-muted);font-size:var(--text-xs);">
+        <?= count($tickers) ?> spółek · <?= count($overrides) ?> nadpisań grup
+    </small>
+</div>
 
 <?php if (!empty($flash)): ?>
     <div class="alert alert--success" style="margin-bottom:1rem;">
@@ -55,16 +71,14 @@ use CVS\Screener\MarketResolver;
     <h2 style="margin-bottom:.5rem;font-size:var(--text-lg);">Grupy porównawcze</h2>
     <p style="color:var(--c-muted);font-size:.875rem;margin-bottom:1rem;max-width:70ch;">
         Yahoo klasyfikuje po formie korporacyjnej, nie po tym, z kim spółka realnie konkuruje.
-        Tu przypiszesz ją do własnej grupy. Wpisanie <strong>istniejącej nazwy branży</strong>
-        przeklasyfikowuje spółkę; wpisanie <strong>nowej</strong> tworzy własną grupę.
-        Klasyfikacja Yahoo pozostaje nietknięta — zmienia się wyłącznie mediana, do której
-        porównywany jest filar Wyceny, a każdy snapshot zapisuje użyty kubełek.
+        Tu przypiszesz ją do własnej grupy — wybierając istniejącą branżę albo tworząc nową.
+        Klasyfikacja Yahoo pozostaje nietknięta<?= $hint('Nadpisanie jest addytywne: kolumna „Branża (Yahoo)" niżej nadal pokazuje oryginalne przypisanie, a snapshot zapisuje kubełek faktycznie użyty do wyceny. Dzięki temu historyczny wynik pozostaje wytłumaczalny.') ?>
+        — zmienia się wyłącznie mediana, do której porównywany jest filar Wyceny.
     </p>
     <p style="color:var(--c-warn,#f59e0b);font-size:.8rem;margin-bottom:1rem;max-width:70ch;">
-        ⚠ Grupa musi mieścić się w <strong>jednym sektorze Yahoo</strong>. Crawl median liczy
-        kubełki sektor po sektorze i nadpisuje je po każdym przebiegu, więc grupa rozpięta na
-        dwa sektory byłaby naprzemiennie kasowana. Potrzebne jest też min. 5 spółek — poniżej
-        progu resolver i tak wróci do mediany sektorowej.
+        ⚠ Grupa musi mieścić się w <strong>jednym sektorze Yahoo</strong><?= $hint('Crawl median liczy kubełki sektor po sektorze i nadpisuje je po każdym przebiegu, więc grupa rozpięta na dwa sektory byłaby naprzemiennie kasowana.') ?>
+        i liczyć min. <?= (int) $minSampleCount ?> spółek — poniżej progu resolver i tak wróci do
+        mediany sektorowej.
     </p>
 
     <?php if (!empty($dueForReview)): ?>
@@ -78,8 +92,15 @@ use CVS\Screener\MarketResolver;
     <form method="POST" action="/admin/tickers/peer-group" class="form" style="max-width:560px;margin-bottom:1.5rem;">
         <input type="hidden" name="_csrf" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
         <div class="form-group">
-            <label for="pg-ticker">Ticker <span style="color:var(--c-danger)">*</span></label>
-            <input id="pg-ticker" type="text" name="ticker" placeholder="MU" required>
+            <label for="pg-ticker">Spółka <span style="color:var(--c-danger)">*</span></label>
+            <input id="pg-ticker" type="text" name="ticker" placeholder="Zacznij pisać ticker lub nazwę…"
+                   autocomplete="off" required
+                   data-ticker-picker="single"
+                   data-tickers-version="<?= $tickersJsonVersion ?>">
+            <p class="hint" style="margin-top:.35rem;">
+                Wybór z podpowiedzi, tak jak na pulpicie — ticker wpisany z pamięci trafia
+                w literówkę albo w spółkę spoza uniwersum, a formularz przyjąłby jedno i drugie.
+            </p>
         </div>
         <div class="form-group">
             <label for="pg-bucket">Grupa porównawcza <span style="color:var(--c-danger)">*</span></label>
@@ -159,7 +180,8 @@ use CVS\Screener\MarketResolver;
                         <?= $o['review_date'] !== null ? htmlspecialchars((string) $o['review_date']) : 'strukturalne' ?>
                     </td>
                     <td>
-                        <form method="POST" action="/admin/tickers/peer-group/delete" style="margin:0;">
+                        <form method="POST" action="/admin/tickers/peer-group/delete" style="margin:0;"
+                              onsubmit="return confirm('Usunąć nadpisanie dla <?= htmlspecialchars((string) $o['ticker'], ENT_QUOTES) ?>? Spółka wróci do klasyfikacji Yahoo przy następnym przeliczeniu.');">
                             <input type="hidden" name="_csrf" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
                             <input type="hidden" name="ticker" value="<?= htmlspecialchars((string) $o['ticker']) ?>">
                             <button type="submit" class="btn btn--ghost btn--sm">Usuń</button>
@@ -185,16 +207,21 @@ use CVS\Screener\MarketResolver;
     }
 ?>
 <div class="card">
-    <h2 style="margin-bottom:1rem;font-size:var(--text-lg);">
-        Lista tickerów (<?= count($tickers) ?>)
-    </h2>
+    <div style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:.75rem;margin-bottom:1rem;">
+        <h2 style="margin:0;font-size:var(--text-lg);">
+            Lista tickerów (<span id="tk-count" data-total="<?= count($tickers) ?>"><?= count($tickers) ?></span>)
+        </h2>
+        <input type="search" id="tk-search" placeholder="Filtruj po tickerze lub nazwie…"
+               autocomplete="off" style="max-width:280px;">
+    </div>
 
+    <div style="overflow-x:auto;">
     <table class="pillar-table" style="width:100%;">
         <thead>
             <tr>
                 <th style="width:12%;">Ticker</th>
                 <th>Nazwa</th>
-                <th style="width:16%;">Sektor</th>
+                <th style="width:16%;">Sektor<?= $hint('Czytane z ostatniego snapshotu, nie z pliku uniwersum. Myślnik znaczy, że spółka nie była jeszcze przeliczana — najczęściej dlatego, że nikt jej nie obserwuje, a rescore chodzi po listach obserwowanych.') ?></th>
                 <th style="width:20%;">Branża (Yahoo)</th>
                 <th style="width:14%;">Rynek</th>
             </tr>
@@ -208,7 +235,7 @@ use CVS\Screener\MarketResolver;
                 // against; the Yahoo column keeps showing the untouched source.
                 $ovrB = $overrideMap[$sym] ?? null;
             ?>
-            <tr>
+            <tr data-ticker="<?= htmlspecialchars($sym) ?>" data-name="<?= htmlspecialchars(mb_strtoupper((string) $t['name'])) ?>">
                 <td><code><?= htmlspecialchars((string) $t['symbol']) ?></code></td>
                 <td><?= htmlspecialchars((string) $t['name']) ?></td>
                 <td style="color:var(--c-muted);font-size:var(--text-sm);">
@@ -231,6 +258,47 @@ use CVS\Screener\MarketResolver;
                 </td>
             </tr>
             <?php endforeach; ?>
+            <tr id="tk-empty" hidden>
+                <td colspan="5" style="text-align:center;color:var(--c-muted);padding:1.5rem;">
+                    Żaden ticker nie pasuje do filtra.
+                </td>
+            </tr>
         </tbody>
     </table>
+    </div>
 </div>
+
+<script>
+(function () {
+    'use strict';
+    // Client-side filter over the rows already rendered — the same scope as the
+    // screener's search box, and for the same reason: 590 rows is past the point
+    // where scanning by eye works.
+    var input = document.getElementById('tk-search');
+    var count = document.getElementById('tk-count');
+    var empty = document.getElementById('tk-empty');
+    if (!input || !count) return;
+
+    var rows = Array.prototype.map.call(
+        document.querySelectorAll('tbody tr[data-ticker]'),
+        function (row) {
+            return { row: row, ticker: row.dataset.ticker || '', name: row.dataset.name || '' };
+        }
+    );
+    var total = parseInt(count.dataset.total || '0', 10);
+
+    input.addEventListener('input', function () {
+        var q = input.value.trim().toUpperCase();
+        var shown = 0;
+
+        rows.forEach(function (r) {
+            var match = q === '' || r.ticker.indexOf(q) !== -1 || r.name.indexOf(q) !== -1;
+            r.row.hidden = !match;
+            if (match) shown++;
+        });
+
+        count.textContent = q === '' ? String(total) : shown + ' z ' + total;
+        if (empty) empty.hidden = shown !== 0;
+    });
+}());
+</script>
