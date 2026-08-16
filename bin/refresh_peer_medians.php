@@ -69,6 +69,7 @@ use CVS\CVS\CVSModel;
 use CVS\CVS\Valuation\PeerMedianRepository;
 use CVS\CVS\Valuation\ValuationMetrics;
 use CVS\Core\Database;
+use CVS\CVS\Valuation\PeerBucketOverrideRepository;
 use CVS\TrackRecord\CorpusScorer;
 use CVS\TrackRecord\SnapshotWriter;
 
@@ -155,6 +156,7 @@ foreach ($todaysSectors as $targetSector) {
      * @var array<string, array<string, array<string, float[]|string>>> $buckets
      */
     $buckets = [];
+    $peerOverrides = (new PeerBucketOverrideRepository())->findBucketMap();
 
     // --- Fetch all tickers for this sector ---
     foreach ($allTickers as $entry) {
@@ -173,6 +175,17 @@ foreach ($todaysSectors as $targetSector) {
 
         $sector   = $financials['sector']   ?? null;
         $industry = $financials['industry'] ?? null;
+
+        // Admin-defined peer group (migration 037). The crawl MUST bucket by the
+        // same key the Valuation pillar will benchmark against, or a custom group
+        // would never accumulate a median and the override would resolve to
+        // nothing. Yahoo's own industry is not written anywhere here — buckets
+        // are derived, not stored per ticker — so this stays additive.
+        $ovr = $peerOverrides[strtoupper($ticker)] ?? null;
+        if ($ovr !== null && $ovr !== '') {
+            $industry = $ovr;
+            $financials['peer_bucket_override'] = $ovr;
+        }
 
         if ($sector !== $targetSector) {
             $totalSkipped++;

@@ -9,6 +9,7 @@ use CVS\Auth\AuthController;
 use CVS\Auth\UserRepository;
 use CVS\Core\Request;
 use CVS\Core\Response;
+use CVS\CVS\Valuation\PeerBucketOverrideRepository;
 use CVS\Screener\MarketResolver;
 
 /**
@@ -24,6 +25,7 @@ class TickersController
     private const TICKERS_FILE = '/public/data/tickers.json';
 
     private UserRepository       $users;
+    private PeerBucketOverrideRepository $overrides;
     private FinancialDataFetcher $fetcher;
 
     /** @var array{default_label?: string, labels?: array<string, string>} */
@@ -32,6 +34,7 @@ class TickersController
     public function __construct()
     {
         $this->users  = new UserRepository();
+        $this->overrides = new PeerBucketOverrideRepository();
         $config       = require dirname(__DIR__, 2) . '/config/cvs-weights.php';
         $this->fetcher = new FinancialDataFetcher($config['data_source']);
         $this->marketsConfig = $config['markets'] ?? [];
@@ -50,6 +53,9 @@ class TickersController
             'tickers'      => $tickers,
             'flash'        => $flash,
             'marketsConfig' => $this->marketsConfig,
+            // Admin-defined peer groups (migration 037).
+            'overrides'    => $this->overrides->findAll(),
+            'dueForReview' => $this->overrides->findDueForReview(date('Y-m-d')),
         ]);
     }
 
@@ -109,6 +115,78 @@ class TickersController
      * Extract a ticker symbol from a Yahoo Finance quote URL
      * (e.g. https://finance.yahoo.com/quote/PKN.WA/) or a bare symbol.
      */
+    /**
+     * Assigns a ticker to an admin-defined peer bucket.
+     *
+     * The bucket is a free-text key on purpose: typing an existing Yahoo
+     * industry reclassifies the company into it, typing a new name creates a
+     * custom group. One mechanism covers both, because both are the same
+     * operation — choosing which median this company is measured against.
+     */
+    public function setOverride(Request $req): void
+    {
+        AuthController::requireAuth();
+        $this->requireAdmin();
+
+        if (!$req->verifyCsrf()) {
+            Response::redirect('/admin/tickers');
+            return;
+        }
+
+        $symbol = self::extractSymbol(trim((string) ($req->input('ticker') ?? '')));
+        $bucket = trim((string) ($req->input('bucket_key') ?? ''));
+        $reason = trim((string) ($req->input('reason') ?? ''));
+        $review = trim((string) ($req->input('review_date') ?? ''));
+
+        if ($symbol === null || $bucket === '') {
+            $_SESSION['_flash'] = 'Podaj ticker oraz nazwę grupy porównawczej.';
+            Response::redirect('/admin/tickers');
+            return;
+        }
+
+        // A reason is mandatory: the override is a classification decision, and
+        // the next person to look at it (including a later you) needs to know
+        // what the claim was in order to judge whether it still holds.
+        if ($reason === '') {
+            $_SESSION['_flash'] = 'Uzasadnienie jest wymagane — nadpisanie grupy to decyzja modelowa, nie kosmetyka.';
+            Response::redirect('/admin/tickers');
+            return;
+        }
+
+        $this->overrides->upsert(
+            $symbol,
+            $bucket,
+            $reason,
+            $review !== '' ? $review : null,
+            (int) ($_SESSION['user_id'] ?? 0) ?: null
+        );
+
+        $_SESSION['_flash'] = sprintf(
+            '%s przypisany do grupy „%s". Zadziała po najbliższym przeliczeniu median i rescore.',
+            $symbol,
+            $bucket
+        );
+        Response::redirect('/admin/tickers');
+    }
+
+    public function deleteOverride(Request $req): void
+    {
+        AuthController::requireAuth();
+        $this->requireAdmin();
+
+        if (!$req->verifyCsrf()) {
+            Response::redirect('/admin/tickers');
+            return;
+        }
+
+        $symbol = self::extractSymbol(trim((string) ($req->input('ticker') ?? '')));
+        if ($symbol !== null) {
+            $this->overrides->delete($symbol);
+            $_SESSION['_flash'] = sprintf('Nadpisanie grupy dla %s usunięte — wraca klasyfikacja Yahoo.', $symbol);
+        }
+        Response::redirect('/admin/tickers');
+    }
+
     public static function extractSymbol(string $input): ?string
     {
         $input = trim($input);

@@ -31,6 +31,8 @@ use CVS\CVS\Valuation\ValuationMetrics;
 class ValuationPillar
 {
     private string $lastSource       = 'cold_start';
+    /** True when an admin-defined peer bucket replaced Yahoo's industry for this scoring run. */
+    private bool   $lastOverrideActive = false;
     private string $lastBucketKey    = '';
     /** @var array<string, mixed> */
     private array  $lastSteps        = [];
@@ -94,6 +96,21 @@ class ValuationPillar
         $sector   = is_string($financials['sector']   ?? null) ? (string) $financials['sector']   : 'DEFAULT';
         $industry = is_string($financials['industry'] ?? null) ? (string) $financials['industry'] : '';
 
+        // Admin-defined peer group (migration 037) substitutes the bucket for
+        // BENCHMARK RESOLUTION ONLY. $financials['industry'] is left alone, so
+        // the snapshot still records Yahoo's own classification and the override
+        // stays additive and reversible. Yahoo files Samsung under Consumer
+        // Electronics and Micron under Semiconductors even while both live on
+        // memory pricing; this is where an operator's judgement about who
+        // actually competes with whom enters the model.
+        $override = is_string($financials['peer_bucket_override'] ?? null)
+            ? trim((string) $financials['peer_bucket_override'])
+            : '';
+        if ($override !== '') {
+            $industry = $override;
+        }
+        $this->lastOverrideActive = $override !== '';
+
         // Growth (needed for both variants).
         $growthPct = ValuationMetrics::extractForwardGrowth($financials);
         if ($growthPct === null) {
@@ -156,7 +173,12 @@ class ValuationPillar
 
         $score = $this->blend($subScore, $anchorScore);
 
-        $this->lastSource    = $subResolution->source;
+        // A resolved override is a REAL peer comparison, not a fallback — record it
+        // distinctly so the screener badge and the wallet guards can tell
+        // "operator grouped these deliberately" from "nothing to compare against".
+        $this->lastSource    = ($this->lastOverrideActive && $subResolution->isSubsector())
+            ? 'override'
+            : $subResolution->source;
         $this->lastBucketKey = $subResolution->bucketKey;
         $this->lastSteps     = [
             'variant'       => 'A',
@@ -200,7 +222,12 @@ class ValuationPillar
 
         $score = $this->blend($subScore, $anchorScore);
 
-        $this->lastSource    = $subResolution->source;
+        // A resolved override is a REAL peer comparison, not a fallback — record it
+        // distinctly so the screener badge and the wallet guards can tell
+        // "operator grouped these deliberately" from "nothing to compare against".
+        $this->lastSource    = ($this->lastOverrideActive && $subResolution->isSubsector())
+            ? 'override'
+            : $subResolution->source;
         $this->lastBucketKey = $subResolution->bucketKey;
         $this->lastSteps     = [
             'variant'       => 'B',

@@ -49,7 +49,11 @@ final class PeerCoverage
     public function isThin(?string $industry, ?string $valuationSource = null): bool
     {
         if ($valuationSource !== null && $valuationSource !== '') {
-            return $valuationSource !== 'subsector';
+            // 'override' is an admin-defined peer group that actually resolved —
+            // a deliberate comparison, not an absence of one. Treated exactly
+            // like 'subsector'; if the override bucket had been too thin the
+            // resolver would have reported the fallback instead.
+            return !in_array($valuationSource, ['subsector', 'override'], true);
         }
 
         // Pre-migration row: fall back to the sample-count estimate. An unknown

@@ -68,6 +68,7 @@ use CVS\Auth\UserRepository;
 use CVS\Execution\AtrZoneCalculator;
 use CVS\CVS\CVSModel;
 use CVS\CVS\Valuation\MedianResolver;
+use CVS\CVS\Valuation\PeerBucketOverrideRepository;
 use CVS\Mail\MailService;
 use CVS\TrackRecord\CvsSnapshotRepository;
 use CVS\TrackRecord\SnapshotWriter;
@@ -113,6 +114,11 @@ if (count($tickers) === 0) {
 // in adjacent screener columns.
 $medianResolver = MedianResolver::fromConfig($config);
 
+// Admin-defined peer groups (migration 037), read once for the whole run.
+// Injected per ticker below; the pillar swaps the benchmark bucket only and
+// leaves Yahoo's industry on the snapshot untouched.
+$peerOverrides = (new PeerBucketOverrideRepository())->findBucketMap();
+
 // Three outcomes, counted separately. The old pair (success/failed) incremented
 // `failed` only when fetch() returned null, so a Quality Gate REJECTION counted
 // as a success — MU was rejected five times a day for four days while every run
@@ -152,6 +158,11 @@ foreach ($tickers as $ticker) {
         $skipped++;
         $skippedTickers[] = $ticker;
         continue;
+    }
+
+    $ovr = $peerOverrides[strtoupper($ticker)] ?? null;
+    if ($ovr !== null && $ovr !== '') {
+        $financials['peer_bucket_override'] = $ovr;
     }
 
     $result         = $model->calculate($ticker, $financials);

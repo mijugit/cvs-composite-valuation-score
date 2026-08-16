@@ -124,6 +124,8 @@ $router->post('/admin/sectors/refresh', fn($req) => $sectors->refresh($req));
 
 $router->get('/admin/tickers',      fn($req) => $tickersAdmin->index($req));
 $router->post('/admin/tickers/add', fn($req) => $tickersAdmin->add($req));
+$router->post('/admin/tickers/peer-group',        fn($req) => $tickersAdmin->setOverride($req));
+$router->post('/admin/tickers/peer-group/delete', fn($req) => $tickersAdmin->deleteOverride($req));
 $router->post('/pro/activate',            fn($req) => $pro->activate($req));
 $router->post('/pro/request',             fn($req) => $pro->sendRequest($req));
 
