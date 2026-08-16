@@ -198,6 +198,22 @@ foreach ($todaysSectors as $targetSector) {
             continue;
         }
 
+        // Price/book needs no growth estimate, so it is collected BEFORE the
+        // growth gate below. Banks frequently have no usable forward growth
+        // figure, and gating their book multiple behind one would leave the
+        // financial buckets permanently empty — the exact failure that left
+        // "Banks - Regional" at n=0 while holding six large US banks.
+        $pb = isset($financials['price_to_book']) && (float) $financials['price_to_book'] > 0
+            ? (float) $financials['price_to_book']
+            : null;
+        if ($pb !== null) {
+            $buckets['sector'][$sector]['pb'][] = $pb;
+            if ($industry !== null) {
+                $buckets['industry'][$industry]['pb'][]    = $pb;
+                $buckets['industry'][$industry]['_sector'] = $sector;
+            }
+        }
+
         $growthPct = ValuationMetrics::extractForwardGrowth($financials);
         if ($growthPct === null) {
             $totalSkipped++;
@@ -269,7 +285,7 @@ foreach ($todaysSectors as $targetSector) {
                 $parentSector = null;
             }
 
-            foreach (['ev_fcf', 'ev_sales', 'gm'] as $metric) {
+            foreach (['ev_fcf', 'ev_sales', 'gm', 'pb'] as $metric) {
                 /** @var float[] $values */
                 $values = array_filter(
                     (array) ($data[$metric] ?? []),

@@ -220,7 +220,7 @@ return [
         'Basic Materials'        => ['median_ev_fcf' => 14, 'median_ev_sales' =>  2.0, 'median_gm' => 35, 'max_growth' => 12],
         'Real Estate'            => ['median_ev_fcf' => 22, 'median_ev_sales' =>  8.0, 'median_gm' => 55, 'max_growth' => 10],
         'Utilities'              => ['median_ev_fcf' => 14, 'median_ev_sales' =>  2.0, 'median_gm' => 30, 'max_growth' =>  5],
-        'Financial Services'     => ['median_ev_fcf' => 18, 'median_ev_sales' =>  3.0, 'median_gm' => 70, 'max_growth' => 12],
+        'Financial Services'     => ['median_ev_fcf' => 18, 'median_ev_sales' =>  3.0, 'median_gm' => 70, 'max_growth' => 12, 'median_pb' => 1.2],
         'DEFAULT'                => ['median_ev_fcf' => 20, 'median_ev_sales' =>  3.0, 'median_gm' => 40, 'max_growth' => 20],
     ],
 
@@ -239,6 +239,34 @@ return [
         // the standing caveat (CLAUDE.md) that the pillars are calibrated for
         // industrials, so financial-sector scores carry lower confidence.
         'skip_gross_margin_sectors' => ['Financial Services'],
+    ],
+
+    // --- Financial sector (variant C) ---
+    // A bank's free cash flow and gross profit are not measures of anything an
+    // investor prices, so EV/FCF and EV/Sales score them on noise. The sector is
+    // valued on price/book and judged on returns instead. Observed live
+    // 2026-08-16: Polish banks sit at P/B 2.07-2.96 with ROE 14-24%, US regionals
+    // at 1.68-1.79 with ROE ~12.6% — which is also why the peer bucket for these
+    // wants to be regional rather than Yahoo's single global "Banks - Regional".
+    'financials' => [
+        // Sectors scored through variant C. Real Estate is deliberately NOT here:
+        // REITs do report meaningful cash flow, and CLAUDE.md's accuracy caveat
+        // for them is a separate matter from the metric being inapplicable.
+        'sectors' => ['Financial Services'],
+
+        // Quality scoring for financials, replacing gross margin / leverage /
+        // growth — none of which mean for a bank what they mean elsewhere.
+        // Thresholds are the conventional reading of a solid regional bank:
+        // ROE above ~12% and ROA above ~1%.
+        'quality' => [
+            'roe_good'    => 0.12,
+            'roe_strong'  => 0.18,
+            'roa_good'    => 0.010,
+            'roa_strong'  => 0.015,
+            // A payout above this is a caution, not a virtue: it can mean the
+            // bank has no capital left for growth or loss absorption.
+            'payout_max'  => 0.80,
+        ],
     ],
 
     // --- CVS recommendation thresholds ---

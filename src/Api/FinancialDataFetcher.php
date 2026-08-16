@@ -1043,6 +1043,20 @@ class FinancialDataFetcher implements LatestPriceSource
 
             // Quality ratios (dimensionless — no conversion)
             'return_on_equity'           => $v($fin['returnOnEquity']    ?? []),
+
+            // --- Financial-sector metrics (variant C) ---
+            // Banks report no meaningful gross profit or free cash flow, so the
+            // ordinary EV/FCF and EV/Sales paths measure nothing for them. These
+            // are the fields the sector is actually priced on. Ratios and
+            // per-share book value need no FX conversion — the ratio is
+            // currency-neutral, and book value is per share in the same currency
+            // as the quote.
+            'price_to_book'              => $v($ks['priceToBook']         ?? []),
+            'book_value_per_share'       => $v($ks['bookValue']           ?? []),
+            'return_on_assets'           => $v($fin['returnOnAssets']     ?? []),
+            'trailing_pe'                => $v($sd['trailingPE']          ?? []),
+            'dividend_yield'             => $v($sd['dividendYield']       ?? []),
+            'payout_ratio'               => $v($sd['payoutRatio']         ?? []),
             'operating_margin'           => $v($fin['operatingMargins']  ?? []),
             'profit_margin'              => $v($fin['profitMargins']      ?? []),
 

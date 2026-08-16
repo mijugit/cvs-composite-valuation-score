@@ -53,6 +53,18 @@ class QualityPillar
     {
         $steps = [];
 
+        // Financials take a different route entirely. Gross margin, net debt to
+        // EBITDA and forward revenue growth are not what makes a bank good or
+        // bad: deposits and debt are its raw material, and Yahoo reports its
+        // gross profit as 0. The sector is judged on returns instead — ROE and
+        // ROA — with a payout sanity check, on the same 0-10 scale so the
+        // aggregate weighting upstream is untouched.
+        $sectors = is_array($this->config['sectors'] ?? null) ? $this->config['sectors'] : [];
+        $sector  = is_string($financials['sector'] ?? null) ? (string) $financials['sector'] : '';
+        if ($sectors !== [] && in_array($sector, $sectors, true)) {
+            return $this->scoreFinancial($financials);
+        }
+
         // ------------------------------------------------------------------
         // 1. Gross margin vs sector median
         // ------------------------------------------------------------------
@@ -127,6 +139,73 @@ class QualityPillar
         // ------------------------------------------------------------------
         $raw   = $ptsGm + $ptsLeverage + $ptsGrowth;   // 0–10
         $score = ($raw / 10.0) * 100.0;                  // 0–100
+
+        $steps['score_raw'] = round($raw, 2);
+
+        $this->lastRawScore = $raw;
+        $this->lastSteps    = $steps;
+
+        return round(min(100.0, max(0.0, $score)), 2);
+    }
+
+    /**
+     * Quality for financials: returns, not margins (0-10 scale, same as the
+     * ordinary path so the pillar weighting upstream needs no special case).
+     *
+     *   ROE   — how hard the bank works shareholders' capital (0-4 pts)
+     *   ROA   — how well it earns on the whole loan/investment book (0-4 pts)
+     *   payout— a payout above the configured ceiling is a caution, not a
+     *           virtue: it can mean nothing is left for growth or losses (0-2 pts)
+     *
+     * Missing inputs score 0 for their component rather than sinking the whole
+     * pillar, matching how the ordinary path treats an absent metric.
+     *
+     * @param array<string, mixed> $financials
+     */
+    private function scoreFinancial(array $financials): float
+    {
+        $cfg   = is_array($this->config['quality'] ?? null) ? $this->config['quality'] : [];
+        $steps = ['variant' => 'financial'];
+
+        $roeGood   = (float) ($cfg['roe_good']   ?? 0.12);
+        $roeStrong = (float) ($cfg['roe_strong'] ?? 0.18);
+        $roaGood   = (float) ($cfg['roa_good']   ?? 0.010);
+        $roaStrong = (float) ($cfg['roa_strong'] ?? 0.015);
+        $payoutMax = (float) ($cfg['payout_max'] ?? 0.80);
+
+        $roe = isset($financials['return_on_equity']) ? (float) $financials['return_on_equity'] : null;
+        $ptsRoe = 0.0;
+        if ($roe !== null) {
+            if ($roe >= $roeStrong)    { $ptsRoe = 4.0; }
+            elseif ($roe >= $roeGood)  { $ptsRoe = 2.5; }
+            elseif ($roe > 0.0)        { $ptsRoe = 1.0; }
+        }
+        $steps['roe']     = $roe !== null ? round($roe, 4) : null;
+        $steps['pts_roe'] = $ptsRoe;
+
+        $roa = isset($financials['return_on_assets']) ? (float) $financials['return_on_assets'] : null;
+        $ptsRoa = 0.0;
+        if ($roa !== null) {
+            if ($roa >= $roaStrong)    { $ptsRoa = 4.0; }
+            elseif ($roa >= $roaGood)  { $ptsRoa = 2.5; }
+            elseif ($roa > 0.0)        { $ptsRoa = 1.0; }
+        }
+        $steps['roa']     = $roa !== null ? round($roa, 4) : null;
+        $steps['pts_roa'] = $ptsRoa;
+
+        $payout = isset($financials['payout_ratio']) ? (float) $financials['payout_ratio'] : null;
+        // Unknown payout scores the neutral middle rather than zero: absence of
+        // the field is not evidence of an overstretched dividend.
+        $ptsPayout = 1.0;
+        if ($payout !== null) {
+            $ptsPayout = ($payout > 0.0 && $payout <= $payoutMax) ? 2.0
+                : (($payout <= 0.0) ? 1.0 : 0.0);
+        }
+        $steps['payout_ratio'] = $payout !== null ? round($payout, 3) : null;
+        $steps['pts_payout']   = $ptsPayout;
+
+        $raw   = $ptsRoe + $ptsRoa + $ptsPayout;  // 0-10
+        $score = ($raw / 10.0) * 100.0;
 
         $steps['score_raw'] = round($raw, 2);
 

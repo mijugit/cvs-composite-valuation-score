@@ -134,6 +134,10 @@ class MedianResolver
                 'ev_fcf'   => isset($bm['median_ev_fcf'])   ? (float) $bm['median_ev_fcf']   : null,
                 'ev_sales' => isset($bm['median_ev_sales'])  ? (float) $bm['median_ev_sales']  : null,
                 'gm'       => isset($bm['median_gm'])        ? (float) $bm['median_gm']        : null,
+                // Price/book — the valuation metric for financials, where
+                // EV/FCF is meaningless (a bank's "free cash flow" is not a
+                // measure of anything an investor prices).
+                'pb'       => isset($bm['median_pb'])        ? (float) $bm['median_pb']        : null,
                 default    => null,
             };
 

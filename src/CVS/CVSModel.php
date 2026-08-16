@@ -61,6 +61,7 @@ class CVSModel
                 anchorBlend:     (string) ($peerConfig['anchor_blend']  ?? 'min'),
                 anchorWeight:    (float)  ($peerConfig['anchor_weight'] ?? 0.3),
                 valuationConfig: $config['valuation'] ?? [],
+                financialsConfig: $config['financials'] ?? [],
             );
         } else {
             // Legacy / peer_group disabled — static benchmarks only.
@@ -112,7 +113,9 @@ class CVSModel
         $momSwing = $this->momentum->score($financials, $sw['roc_weights']);
         $momFund  = $this->momentum->score($financials, $fn['roc_weights']);
 
-        $qualScore = (new QualityPillar($bm))->score($financials);
+        // QualityPillar needs the financials config too: gross margin, leverage
+        // and forward growth are not what makes a bank good or bad.
+        $qualScore = (new QualityPillar($bm, $this->config['financials'] ?? []))->score($financials);
 
         // Step 3 — Weighted aggregate per mode.
         $swingCvs = round(
@@ -148,7 +151,7 @@ class CVSModel
         $valuationReference = [
             'source'       => $this->valuation->lastSource(),
             'bucket'       => $this->valuation->lastBucketKey(),
-            'value'        => $valuationSteps['ev_fcf'] ?? $valuationSteps['ev_sales_adj'] ?? null,
+            'value'        => $valuationSteps['ev_fcf'] ?? $valuationSteps['ev_sales_adj'] ?? $valuationSteps['pb'] ?? null,
             'variant'      => $valuationSteps['variant'] ?? null,
         ];
 

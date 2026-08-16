@@ -50,6 +50,8 @@ class ValuationPillar
         private readonly string          $anchorBlend     = 'min',
         private readonly float           $anchorWeight    = 0.3,
         private readonly array           $valuationConfig = [],
+        /** @var array<string, mixed> config['financials'] — sectors scored on price/book */
+        private readonly array           $financialsConfig = [],
     ) {}
 
     /**
@@ -111,6 +113,19 @@ class ValuationPillar
         }
         $this->lastOverrideActive = $override !== '';
 
+        // --- Variant C: financials, priced on book value ---
+        // Checked BEFORE growth and enterprise value, because neither means for
+        // a bank what it means elsewhere: deposits and debt are a bank's raw
+        // material rather than a claim on its assets, so EV is not a number
+        // anyone prices, and "free cash flow" is not a measure of anything.
+        // Price/book is what the sector is actually valued on.
+        $financialSectors = is_array($this->financialsConfig['sectors'] ?? null)
+            ? $this->financialsConfig['sectors']
+            : [];
+        if (in_array($sector, $financialSectors, true)) {
+            return $this->scoreVariantC($financials, $sector, $industry);
+        }
+
         // Growth (needed for both variants).
         $growthPct = ValuationMetrics::extractForwardGrowth($financials);
         if ($growthPct === null) {
@@ -139,6 +154,65 @@ class ValuationPillar
 
         // --- Variant B: growth-adjusted EV/Sales ---
         return $this->scoreVariantB($financials, $growthPct, $sector, $industry);
+    }
+
+    /**
+     * Price/book against the peer median — the valuation path for financials.
+     *
+     * Same shape as variants A and B: ratio against a resolved median, sigmoid,
+     * sector anchor, identical direction (below the median = cheap = higher
+     * score). Only the metric changes, so nothing about determinism, the
+     * peer-group ladder or the override mechanism behaves differently here.
+     */
+    private function scoreVariantC(
+        array  $financials,
+        string $sector,
+        string $industry
+    ): float {
+        assert($this->resolver !== null);
+
+        $pb = isset($financials['price_to_book']) ? (float) $financials['price_to_book'] : null;
+        if ($pb === null || $pb <= 0.0) {
+            // No book multiple → no opinion, same neutral convention the other
+            // variants use when their own metric is unavailable.
+            $this->lastSource    = 'missing_pb';
+            $this->lastBucketKey = '';
+            $this->lastSteps     = ['variant' => 'C'];
+            return 50.0;
+        }
+
+        $subResolution    = $this->resolver->resolve($industry, $sector, 'pb');
+        $anchorResolution = $this->resolver->resolveSector($sector, 'pb');
+
+        if (!$subResolution->isValid()) {
+            $this->lastSource    = $subResolution->source;
+            $this->lastBucketKey = $subResolution->bucketKey;
+            $this->lastSteps     = ['variant' => 'C', 'pb' => round($pb, 4)];
+            return 50.0;
+        }
+
+        $subScore    = $this->sigmoid($pb / $subResolution->value);
+        $anchorScore = $anchorResolution->isValid()
+            ? $this->sigmoid($pb / $anchorResolution->value)
+            : $subScore;
+
+        $score = $this->blend($subScore, $anchorScore);
+
+        $this->lastSource    = ($this->lastOverrideActive && $subResolution->isSubsector())
+            ? 'override'
+            : $subResolution->source;
+        $this->lastBucketKey = $subResolution->bucketKey;
+        $this->lastSteps     = [
+            'variant'       => 'C',
+            'pb'            => round($pb, 4),
+            'sub_median'    => round($subResolution->value, 4),
+            'sub_score'     => round($subScore, 2),
+            'anchor_median' => $anchorResolution->isValid() ? round($anchorResolution->value, 4) : null,
+            'anchor_score'  => round($anchorScore, 2),
+            'final'         => round($score, 2),
+        ];
+
+        return $score;
     }
 
     private function scoreVariantA(
