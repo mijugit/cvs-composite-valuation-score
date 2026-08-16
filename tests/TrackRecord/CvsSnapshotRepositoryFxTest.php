@@ -60,7 +60,10 @@ class CvsSnapshotRepositoryFxTest extends TestCase
                 fx_rate_to_usd        REAL NULL,
                 native_currency       TEXT NULL,
                 native_price          REAL NULL,
-                fair_value_price      REAL NULL
+                fair_value_price      REAL NULL,
+                valuation_source  TEXT NULL,
+                valuation_bucket  TEXT NULL,
+                valuation_variant TEXT NULL
             )
         ');
 

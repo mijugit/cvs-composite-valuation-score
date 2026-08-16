@@ -95,6 +95,13 @@ class CvsSnapshotRepository
         // no `calendarEvents` coverage at all, or quality gate failed; see EarningsGuard).
         $et = $result['earnings_timing'] ?? [];
 
+        // Which tier of the peer-group ladder the Valuation pillar landed on.
+        // Persisted (migration 036) because it is the authoritative answer to
+        // "did this company get a real peer comparison?" — downstream code was
+        // previously reconstructing it from peer_medians.sample_count for
+        // ev_fcf alone, which mislabels every variant-B (EV/Sales) company.
+        $vr = is_array($result['valuation_reference'] ?? null) ? $result['valuation_reference'] : [];
+
         $params = [
             ':ticker'                => $ticker,
             ':company_name'          => $companyName,
@@ -122,6 +129,9 @@ class CvsSnapshotRepository
             ':native_currency'       => $nativeCurrency,
             ':native_price'          => $nativePrice,
             ':fair_value_price'      => $fairValuePrice,
+            ':valuation_source'      => isset($vr['source'])  && $vr['source']  !== '' ? (string) $vr['source']  : null,
+            ':valuation_bucket'      => isset($vr['bucket'])  && $vr['bucket']  !== '' ? (string) $vr['bucket']  : null,
+            ':valuation_variant'     => isset($vr['variant']) && $vr['variant'] !== '' ? (string) $vr['variant'] : null,
         ];
 
         try {
@@ -131,13 +141,15 @@ class CvsSnapshotRepository
                      price_at_snapshot, cvs_swing, cvs_fund, reco_swing, reco_fund,
                      golden_signal, quality_gate, gate_failures, pillar_scores, signals,
                      days_since_earnings, days_to_earnings, earnings_state, earnings_guard_active,
-                     fx_rate_to_usd, native_currency, native_price, fair_value_price)
+                     fx_rate_to_usd, native_currency, native_price, fair_value_price,
+                     valuation_source, valuation_bucket, valuation_variant)
                 VALUES
                     (:ticker, :company_name, :sector, :industry, :model_version, :origin, :score_date, :scored_at,
                      :price_at_snapshot, :cvs_swing, :cvs_fund, :reco_swing, :reco_fund,
                      :golden_signal, :quality_gate, :gate_failures, :pillar_scores, :signals,
                      :days_since_earnings, :days_to_earnings, :earnings_state, :earnings_guard_active,
-                     :fx_rate_to_usd, :native_currency, :native_price, :fair_value_price)
+                     :fx_rate_to_usd, :native_currency, :native_price, :fair_value_price,
+                     :valuation_source, :valuation_bucket, :valuation_variant)
             ');
             $stmt->execute($params);
         } catch (PDOException $e) {
@@ -176,7 +188,10 @@ class CvsSnapshotRepository
                         fx_rate_to_usd        = :fx_rate_to_usd,
                         native_currency       = :native_currency,
                         native_price          = :native_price,
-                        fair_value_price      = :fair_value_price
+                        fair_value_price      = :fair_value_price,
+                        valuation_source      = :valuation_source,
+                        valuation_bucket      = :valuation_bucket,
+                        valuation_variant     = :valuation_variant
                     WHERE ticker = :ticker AND score_date = :score_date
                       AND (model_version = :model_version_match
                            OR (model_version IS NULL AND :model_version_match_null IS NULL))

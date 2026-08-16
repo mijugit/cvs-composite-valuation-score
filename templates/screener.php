@@ -179,8 +179,8 @@ $staleBadge = static function (?string $scoreDate, string $ticker) use ($todayDa
 // against, so its Valuation pillar rests on a SECTOR fallback. Worth saying out
 // loud — ASB.WA (only distributor in the universe, n=1) was judged against
 // software multiples and ranked second overall until someone noticed by eye.
-$peerBadge = static function (?string $industry) use ($peerCoverage): string {
-    if (!$peerCoverage->isThin($industry)) {
+$peerBadge = static function (?string $industry, ?string $valuationSource) use ($peerCoverage): string {
+    if (!$peerCoverage->isThin($industry, $valuationSource)) {
         return '';
     }
     $n = $peerCoverage->sampleCount($industry);
@@ -454,7 +454,7 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
                         <?= htmlspecialchars((string) $row['ticker']) ?>
                     </a>
                     <?= $tickerHint((string) $row['ticker'], $row) ?>
-                </span><?= $heldBadge((string) $row['ticker'], $recoStr) ?><?= $staleBadge(isset($row['score_date']) ? (string) $row['score_date'] : null, (string) $row['ticker']) ?><?= $peerBadge(isset($row['industry']) ? (string) $row['industry'] : null) ?>
+                </span><?= $heldBadge((string) $row['ticker'], $recoStr) ?><?= $staleBadge(isset($row['score_date']) ? (string) $row['score_date'] : null, (string) $row['ticker']) ?><?= $peerBadge(isset($row['industry']) ? (string) $row['industry'] : null, isset($row['valuation_source']) ? (string) $row['valuation_source'] : null) ?>
             </td>
             <td style="color:var(--c-primary);"><?= $swing ?></td>
             <td style="color:var(--c-fund);"><?= $fund ?></td>

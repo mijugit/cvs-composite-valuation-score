@@ -219,7 +219,10 @@ $screenerRows = array_values(array_filter($screenerRows, static function (array 
     if (in_array($t, $heldTickers, true)) {
         return true;
     }
-    if ($peerCoverage->isThin(isset($r['industry']) ? (string) $r['industry'] : null)) {
+    if ($peerCoverage->isThin(
+        isset($r['industry']) ? (string) $r['industry'] : null,
+        isset($r['valuation_source']) ? (string) $r['valuation_source'] : null
+    )) {
         $thinDropped[] = $t;
         return false;
     }

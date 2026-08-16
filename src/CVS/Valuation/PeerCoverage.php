@@ -34,14 +34,27 @@ final class PeerCoverage
     ) {}
 
     /**
-     * True when this company's industry bucket is too thin to benchmark against,
-     * so its valuation rests on a sector fallback rather than on real peers.
+     * True when this company's valuation rests on a sector fallback rather than
+     * on real industry peers.
      *
-     * An unknown or empty industry counts as thin: absence of a bucket is the
-     * same situation as an under-populated one, and both end at the sector.
+     * Prefers the resolution the Valuation pillar actually recorded at scoring
+     * time (snapshot column `valuation_source`, migration 036). That is
+     * authoritative and, crucially, per-metric correct: the pillar scores a
+     * company on EV/FCF (variant A) or EV/Sales (variant B) and resolves the
+     * matching bucket, so reading its verdict cannot mismatch the two. The
+     * sample-count path below is a fallback for pre-migration rows only — it
+     * inspects ev_fcf alone and therefore mislabels every variant-B company,
+     * which is exactly the bug this parameter exists to retire.
      */
-    public function isThin(?string $industry): bool
+    public function isThin(?string $industry, ?string $valuationSource = null): bool
     {
+        if ($valuationSource !== null && $valuationSource !== '') {
+            return $valuationSource !== 'subsector';
+        }
+
+        // Pre-migration row: fall back to the sample-count estimate. An unknown
+        // or empty industry counts as thin — absence of a bucket lands at the
+        // sector just as an under-populated one does.
         if ($industry === null || $industry === '') {
             return true;
         }

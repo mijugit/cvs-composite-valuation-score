@@ -61,6 +61,33 @@ class PeerCoverageTest extends TestCase
         $this->assertSame(0, $this->coverage()->sampleCount(null));
     }
 
+    // -----------------------------------------------------------------------
+    // Persisted valuation_source (migration 036) — authoritative when present
+    // -----------------------------------------------------------------------
+
+    public function testPersistedSubsectorSourceMeansNotThin(): void
+    {
+        // Sample counts say thin, but the pillar recorded that it DID resolve a
+        // subsector median. The recorded verdict wins.
+        $this->assertFalse($this->coverage()->isThin('Specialty Retail', 'subsector'));
+    }
+
+    public function testPersistedFallbackSourceMeansThin(): void
+    {
+        // Sample counts say fine, but the pillar recorded a fallback — e.g. the
+        // company was scored on EV/Sales, whose bucket is the thin one.
+        $this->assertTrue($this->coverage()->isThin('Semiconductors', 'sector_fallback'));
+        $this->assertTrue($this->coverage()->isThin('Semiconductors', 'cold_start'));
+    }
+
+    public function testEmptySourceFallsBackToSampleCounts(): void
+    {
+        // Pre-migration rows carry no source; the estimate is all we have.
+        $this->assertFalse($this->coverage()->isThin('Semiconductors', null));
+        $this->assertFalse($this->coverage()->isThin('Semiconductors', ''));
+        $this->assertTrue($this->coverage()->isThin('Specialty Retail', null));
+    }
+
     public function testThresholdIsExposed(): void
     {
         $this->assertSame(5, $this->coverage()->minSampleCount());

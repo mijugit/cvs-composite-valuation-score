@@ -52,6 +52,9 @@ class CvsSnapshotRepositoryTest extends TestCase
                 native_currency    TEXT    NULL,
                 native_price       REAL    NULL,
                 fair_value_price   REAL    NULL,
+                valuation_source  TEXT NULL,
+                valuation_bucket  TEXT NULL,
+                valuation_variant TEXT NULL,
                 UNIQUE (ticker, score_date)
             )
         ');
@@ -479,6 +482,9 @@ class CvsSnapshotRepositoryTest extends TestCase
                 native_currency    TEXT    NULL,
                 native_price       REAL    NULL,
                 fair_value_price   REAL    NULL,
+                valuation_source  TEXT NULL,
+                valuation_bucket  TEXT NULL,
+                valuation_variant TEXT NULL,
                 UNIQUE (ticker, score_date, model_version, origin)
             )
         ');
