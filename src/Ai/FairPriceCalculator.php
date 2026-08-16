@@ -18,16 +18,18 @@ use CVS\CVS\Valuation\MedianResolver;
 final class FairPriceCalculator
 {
     /**
-     * Implied fair price for a financial: peer-median price/book applied to the
-     * company's own book value per share.
+     * Implied fair price for a financial: the peer-median book multiple applied
+     * to the company's own book value per share.
      *
-     *   Fair Price = median_pb × book_value_per_share
+     *   Fair Price = median_pb_roe × ROE × book_value_per_share
      *
-     * The direct analogue of the EV/FCF path — the multiple the sector is
-     * actually valued on, times the per-share quantity it is a multiple OF —
-     * and it resolves that multiple through the same peer-group ladder the
-     * Valuation pillar uses, so the FV column and the pillar cannot contradict
-     * each other the way they did before.
+     * The ROE term is what keeps this honest. A bank's book multiple is a
+     * function of the return that earns it, so the pillar equates it at
+     * P/B ÷ ROE = peer median; fair value has to sit on the same axis or the two
+     * disagree in adjacent screener columns — the failure this class was already
+     * fixed for once. Without it, ING.WA's fair value read $70.55 against a
+     * $120.32 price (-41%) purely for being the most profitable bank in its
+     * group. A bank with no positive ROE falls back to the plain median P/B.
      *
      * @param array<string, mixed> $financials
      * @param array<string, mixed> $cvsConfig
@@ -47,19 +49,34 @@ final class FairPriceCalculator
 
         $benchmarks = $cvsConfig['benchmarks'] ?? [];
         $bm         = $benchmarks[$sector] ?? $benchmarks['DEFAULT'] ?? [];
-        $medianPb   = (float) ($bm['median_pb'] ?? 0);
+
+        // Match the pillar's axis or the two contradict each other in adjacent
+        // screener columns — the exact failure this class was fixed for once
+        // already. Since the pillar equates a bank at P/B ÷ ROE = peer median,
+        // the fair book multiple is that median TIMES the company's own ROE.
+        $roe      = isset($financials['return_on_equity']) ? (float) $financials['return_on_equity'] : null;
+        $pbRoeCfg = is_array($cvsConfig['financials']['pb_roe'] ?? null) ? $cvsConfig['financials']['pb_roe'] : [];
+        $useRoe   = !empty($pbRoeCfg['enabled']) && $roe !== null && $roe > 0.0;
+
+        $metric   = $useRoe ? 'pb_roe' : 'pb';
+        $medianMx = (float) ($bm[$useRoe ? 'median_pb_roe' : 'median_pb'] ?? 0);
 
         if ($resolver !== null) {
             $resolved = $resolver->resolve(
                 (string) ($financials['industry'] ?? ''),
                 $sector,
-                'pb'
+                $metric
             );
             if ($resolved->isValid()) {
-                $medianPb = (float) $resolved->value;
+                $medianMx = (float) $resolved->value;
             }
         }
 
+        if ($medianMx <= 0) {
+            return null;
+        }
+
+        $medianPb = $useRoe ? $medianMx * $roe : $medianMx;
         if ($medianPb <= 0) {
             return null;
         }
