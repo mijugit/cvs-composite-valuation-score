@@ -311,6 +311,42 @@ cache 7 dni na spółkę i 30 dni na mapę CIK. Wszystko zawodzi miękko: niedos
 poprzednie zachowanie, a przeterminowany cache jest podawany zamiast powrotu do liczby znanej
 jako 30% błędna.
 
+## 11. Wariant D — nieruchomości (16.08, wieczór)
+
+Subtelniejszy przypadek niż banki. REIT **ma** przepływy pieniężne, więc EV/FCF zwraca liczbę —
+tylko zniekształconą. Wolne przepływy odejmują wszystkie nakłady inwestycyjne, a u REIT-u mieszczą
+się w nich **zakupy nieruchomości**: wydatek na wzrost, nie na utrzymanie. Fundusz, który kupił
+budynki, wygląda na drogi wyłącznie dlatego, że zainwestował.
+
+Pomiar na wszystkich 18 REIT-ach w uniwersum pokazał, że to zmienia **kolejność**, nie odcień:
+
+| | EV/FCF vs mediana | EV/EBITDA vs mediana |
+|---|---|---|
+| O (Realty Income) | 1,64× — drogo (⬇ REDUKUJ) | **0,86× — tanio** |
+| IRM | 2,03× | 1,17× |
+| DLR | 0,70× | **1,48×** |
+
+**Dlaczego EV/EBITDA, a nie P/FFO**, którym branża realnie się posługuje: Yahoo nie zwraca
+amortyzacji dla **żadnego** z 18 REIT-ów, a to z niej buduje się FFO. EBITDA jest dostępna dla
+wszystkich 18, niesie ten sam zamysł (amortyzacja doliczona, capex poza rachunkiem) i jako mnożnik
+od wartości przedsiębiorstwa jest neutralna wobec struktury kapitału — co pasuje do sektora
+zadłużonego z założenia.
+
+**Dźwignia.** Przy okazji wyszło, że **każdy** REIT dostawał 0 z 3 punktów za dźwignię, bo ogólna
+skala uznaje wszystko powyżej 4× długu netto/EBITDA za zagrożone, a 5–6× to dla REIT-u norma.
+Składnik, który nigdy się nie zmienia w obrębie sektora, nie mówi nic o żadnej ze spółek. Progi dla
+nieruchomości: 5× / 6,5× / 8×.
+
+**Znane ograniczenie — kubełki są płytkie.** Po crawlu: `REIT - Diversified` n=8 (działa,
+`subsector`), ale `REIT - Retail` n=2, `REIT - Healthcare Facilities` n=2, `REIT - Industrial` n=3,
+`REIT - Specialty` n=4 — wszystkie poniżej progu, więc lecą na medianę sektora. To ten sam wzorzec
+co ASB.WA i to samo lekarstwo: dosypać peerów. Dopóki tego nie zrobimy, Welltower (0,2) jest
+porównywany do mediany zdominowanej przez inne typy REIT-ów, a nie do funduszy ochrony zdrowia.
+
+**Artefakt pierwszego cyklu.** Crawl median scoruje korpus **przed** zapisaniem nowych median, więc
+przy zupełnie nowej metryce pierwszy przebieg zapisuje `valuation_source = cold_start`. Samo się
+naprawia przy następnym cyklu — świeże przeliczenie już pokazuje `subsector` / `sector_fallback`.
+
 ## Migracje
 
 | Nr | Co dodaje |
