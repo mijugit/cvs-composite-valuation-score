@@ -14,14 +14,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
     - **A** — forward EV/FCF, when FCF > 0.
     - **B** — growth-adjusted EV/Sales, when FCF ≤ 0 or null.
     - **C** — price/book, for sectors in `config → financials.sectors` (Financial Services). A bank's EV and free cash flow measure nothing; before variant C existed, `Banks - Regional` held **zero** tickers with a usable EV/FCF while the universe contained six large US banks.
-    Returns neutral 50 when its own metric is unavailable (missing growth, `shares_outstanding`, or `price_to_book`).
+    - **D** — EV/EBITDA, for sectors in `config → real_estate.sectors` (Real Estate). A REIT's free cash flow is not meaningless, only distorted: capex includes property ACQUISITIONS, so a REIT is penalised for investing. EV/EBITDA carries the FFO intent (depreciation back, capex out) and is computable — Yahoo returns no depreciation for any of the 18 REITs here, so P/FFO is not.
+    Returns neutral 50 when its own metric is unavailable (missing growth, `shares_outstanding`, `price_to_book`, or `ebitda`).
   - `MomentumPillar` — computed twice with different `roc_weights` per mode (swing vs fundamental).
   - `QualityPillar` — two paths on the same 0–10 scale: the ordinary one (GM vs sector median, net debt/EBITDA, forward growth) and a **financial** one (ROE, ROA, payout sanity) for `config → financials.sectors`. Gross margin and leverage do not mean for a bank what they mean elsewhere — Yahoo reports bank gross profit as 0.
   - **Swing (1–4M):** valuation 40% / momentum 45% / quality 15%
   - **Fundamental (6–12M):** valuation 65% / momentum 15% / quality 20%
   - Both scores displayed simultaneously; `CVSResult::cvs()` returns swing for backward compat.
   - Golden signals: `strong` (both ≥58), `watchlist` (fund≥58 + swing<58), `momentum`, null.
-  - `Real Estate` works but has lower model accuracy (known limitation). `Financial Services` now has its own valuation and quality path (variants above) rather than being scored on inapplicable metrics.
+  - `QualityPillar` leverage bands are sector-aware: Real Estate uses `config → real_estate.leverage` (5x / 6.5x / 8x). On the general scale every REIT scored 0 of 3 leverage points regardless of its balance sheet, and a term that is constant across a sector carries no information about the companies in it.
+  - `Financial Services` and `Real Estate` each have their own valuation path now, rather than being scored on metrics that do not fit them.
 
 ### Peer groups and benchmark resolution
 
