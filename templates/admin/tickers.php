@@ -10,6 +10,9 @@ use CVS\Screener\MarketResolver;
  *   $marketsConfig — array{default_label?: string, labels?: array<string, string>} (config/cvs-weights.php -> markets)
  *   $overrides     — array<int, array<string, mixed>> admin-defined peer groups (migration 037)
  *   $dueForReview  — array<int, array<string, mixed>> overrides whose review_date has passed
+ *   $classification — array<string, array{sector: ?string, industry: ?string, score_date: string}>
+ *   $bucketOptions  — array<int, array{key: string, count: int, custom: bool}> selectable peer groups
+ *   $minSampleCount — int, peer_group.min_sample_count
  */
 ?>
 
@@ -80,7 +83,27 @@ use CVS\Screener\MarketResolver;
         </div>
         <div class="form-group">
             <label for="pg-bucket">Grupa porównawcza <span style="color:var(--c-danger)">*</span></label>
-            <input id="pg-bucket" type="text" name="bucket_key" placeholder="Memory &amp; Storage" required>
+            <select id="pg-bucket" name="bucket_key" required>
+                <option value="">— wybierz grupę —</option>
+                <?php foreach ($bucketOptions as $b): ?>
+                <option value="<?= htmlspecialchars($b['key']) ?>">
+                    <?= htmlspecialchars($b['key']) ?>
+                    (n=<?= $b['count'] ?><?= $b['count'] < $minSampleCount ? ' — poniżej progu' : '' ?><?= $b['custom'] ? ', własna' : '' ?>)
+                </option>
+                <?php endforeach; ?>
+                <option value="__new__">➕ nowa grupa…</option>
+            </select>
+            <p class="hint" style="margin-top:.35rem;">
+                Wybór z listy zamiast wpisywania — literówka stworzyłaby po cichu nową grupę
+                z jedną spółką, która i tak wróciłaby do mediany sektorowej.
+                <strong>n</strong> to liczba spółek w kubełku; poniżej <?= (int) $minSampleCount ?>
+                resolver użyje sektora niezależnie od przypisania.
+            </p>
+        </div>
+
+        <div class="form-group" id="pg-new-wrap" hidden>
+            <label for="pg-bucket-new">Nazwa nowej grupy</label>
+            <input id="pg-bucket-new" type="text" name="bucket_key_new" placeholder="Memory &amp; Storage">
         </div>
         <div class="form-group">
             <label for="pg-reason">Uzasadnienie <span style="color:var(--c-danger)">*</span></label>
@@ -97,6 +120,21 @@ use CVS\Screener\MarketResolver;
         </div>
         <button type="submit" class="btn btn--primary btn--sm">Przypisz</button>
     </form>
+
+    <script>
+    (function () {
+        var sel  = document.getElementById('pg-bucket');
+        var wrap = document.getElementById('pg-new-wrap');
+        var txt  = document.getElementById('pg-bucket-new');
+        if (!sel || !wrap || !txt) return;
+        sel.addEventListener('change', function () {
+            var isNew = sel.value === '__new__';
+            wrap.hidden   = !isNew;
+            txt.required  = isNew;
+            if (isNew) txt.focus();
+        });
+    }());
+    </script>
 
     <?php if (empty($overrides)): ?>
     <p style="color:var(--c-muted);font-size:.875rem;">Brak nadpisań — wszystkie spółki używają klasyfikacji Yahoo.</p>
@@ -139,6 +177,13 @@ use CVS\Screener\MarketResolver;
 <!-- Lista tickerów                                         -->
 <!-- ====================================================== -->
 
+<?php
+    // ticker => custom bucket, for the "Branża" column below.
+    $overrideMap = [];
+    foreach ($overrides as $o) {
+        $overrideMap[strtoupper((string) $o['ticker'])] = (string) $o['bucket_key'];
+    }
+?>
 <div class="card">
     <h2 style="margin-bottom:1rem;font-size:var(--text-lg);">
         Lista tickerów (<?= count($tickers) ?>)
@@ -147,16 +192,40 @@ use CVS\Screener\MarketResolver;
     <table class="pillar-table" style="width:100%;">
         <thead>
             <tr>
-                <th style="width:15%;">Ticker</th>
+                <th style="width:12%;">Ticker</th>
                 <th>Nazwa</th>
-                <th style="width:20%;">Rynek</th>
+                <th style="width:16%;">Sektor</th>
+                <th style="width:20%;">Branża (Yahoo)</th>
+                <th style="width:14%;">Rynek</th>
             </tr>
         </thead>
         <tbody>
             <?php foreach ($tickers as $t): ?>
+            <?php
+                $sym  = strtoupper((string) $t['symbol']);
+                $cls  = $classification[$sym] ?? null;
+                // An override changes which bucket this company is benchmarked
+                // against; the Yahoo column keeps showing the untouched source.
+                $ovrB = $overrideMap[$sym] ?? null;
+            ?>
             <tr>
                 <td><code><?= htmlspecialchars((string) $t['symbol']) ?></code></td>
                 <td><?= htmlspecialchars((string) $t['name']) ?></td>
+                <td style="color:var(--c-muted);font-size:var(--text-sm);">
+                    <?= $cls !== null && $cls['sector'] !== null ? htmlspecialchars($cls['sector']) : '<span style="opacity:.5;">—</span>' ?>
+                </td>
+                <td style="font-size:var(--text-sm);">
+                    <?php if ($ovrB !== null): ?>
+                        <span style="color:var(--c-muted);text-decoration:line-through;">
+                            <?= $cls !== null && $cls['industry'] !== null ? htmlspecialchars($cls['industry']) : '—' ?>
+                        </span><br>
+                        <span class="peer-badge" style="margin-left:0;">◍ <?= htmlspecialchars($ovrB) ?></span>
+                    <?php else: ?>
+                        <span style="color:var(--c-muted);">
+                            <?= $cls !== null && $cls['industry'] !== null ? htmlspecialchars($cls['industry']) : '<span style="opacity:.5;">—</span>' ?>
+                        </span>
+                    <?php endif; ?>
+                </td>
                 <td style="color:var(--c-muted);font-size:var(--text-sm);">
                     <?= htmlspecialchars(MarketResolver::labelForTicker((string) $t['symbol'], $marketsConfig)) ?>
                 </td>

@@ -10,6 +10,8 @@ use CVS\Auth\UserRepository;
 use CVS\Core\Request;
 use CVS\Core\Response;
 use CVS\CVS\Valuation\PeerBucketOverrideRepository;
+use CVS\CVS\Valuation\PeerMedianRepository;
+use CVS\TrackRecord\CvsSnapshotRepository;
 use CVS\Screener\MarketResolver;
 
 /**
@@ -26,6 +28,8 @@ class TickersController
 
     private UserRepository       $users;
     private PeerBucketOverrideRepository $overrides;
+    private string $modelVersion;
+    private int    $minSampleCount;
     private FinancialDataFetcher $fetcher;
 
     /** @var array{default_label?: string, labels?: array<string, string>} */
@@ -33,11 +37,13 @@ class TickersController
 
     public function __construct()
     {
-        $this->users  = new UserRepository();
-        $this->overrides = new PeerBucketOverrideRepository();
         $config       = require dirname(__DIR__, 2) . '/config/cvs-weights.php';
-        $this->fetcher = new FinancialDataFetcher($config['data_source']);
-        $this->marketsConfig = $config['markets'] ?? [];
+        $this->users     = new UserRepository();
+        $this->overrides = new PeerBucketOverrideRepository();
+        $this->fetcher   = new FinancialDataFetcher($config['data_source']);
+        $this->marketsConfig  = $config['markets'] ?? [];
+        $this->modelVersion   = (string) ($config['model_version'] ?? '');
+        $this->minSampleCount = (int) ($config['peer_group']['min_sample_count'] ?? 5);
     }
 
     public function index(Request $req): void
@@ -56,6 +62,14 @@ class TickersController
             // Admin-defined peer groups (migration 037).
             'overrides'    => $this->overrides->findAll(),
             'dueForReview' => $this->overrides->findDueForReview(date('Y-m-d')),
+            // Current Yahoo classification per ticker, so the list shows what a
+            // company is filed under before anyone decides to override it.
+            'classification' => (new CvsSnapshotRepository())->findClassificationMap(),
+            // Selectable peer groups. Free text was the wrong control: a typo
+            // silently creates a fresh bucket with n=1, which then falls back to
+            // the sector and quietly does nothing at all.
+            'bucketOptions'  => $this->buildBucketOptions(),
+            'minSampleCount' => $this->minSampleCount,
         ]);
     }
 
@@ -116,6 +130,40 @@ class TickersController
      * (e.g. https://finance.yahoo.com/quote/PKN.WA/) or a bare symbol.
      */
     /**
+     * Every peer bucket an admin may pick, with how many companies back it.
+     *
+     * Union of the buckets that actually exist: Yahoo industries seen in the
+     * snapshot population, plus any custom group already in use. Sample counts
+     * come from peer_medians so the operator can see, at the moment of
+     * choosing, which buckets clear min_sample_count and which will fall back
+     * to the sector regardless.
+     *
+     * @return array<int, array{key: string, count: int, custom: bool}>
+     */
+    private function buildBucketOptions(): array
+    {
+        $counts = (new PeerMedianRepository())->findIndustrySampleCounts($this->modelVersion, 'ev_fcf');
+
+        $custom = [];
+        foreach ($this->overrides->findAll() as $o) {
+            $custom[(string) $o['bucket_key']] = true;
+        }
+
+        $keys = array_unique(array_merge(array_keys($counts), array_keys($custom)));
+        sort($keys, SORT_NATURAL | SORT_FLAG_CASE);
+
+        $out = [];
+        foreach ($keys as $k) {
+            $out[] = [
+                'key'    => (string) $k,
+                'count'  => (int) ($counts[$k] ?? 0),
+                'custom' => isset($custom[$k]) && !isset($counts[$k]),
+            ];
+        }
+        return $out;
+    }
+
+    /**
      * Assigns a ticker to an admin-defined peer bucket.
      *
      * The bucket is a free-text key on purpose: typing an existing Yahoo
@@ -135,6 +183,12 @@ class TickersController
 
         $symbol = self::extractSymbol(trim((string) ($req->input('ticker') ?? '')));
         $bucket = trim((string) ($req->input('bucket_key') ?? ''));
+        // The dropdown's "create new" option defers to a free-text field; every
+        // other path picks an existing bucket, so a typo can no longer invent a
+        // dead one-member group by accident.
+        if ($bucket === '__new__') {
+            $bucket = trim((string) ($req->input('bucket_key_new') ?? ''));
+        }
         $reason = trim((string) ($req->input('reason') ?? ''));
         $review = trim((string) ($req->input('review_date') ?? ''));
 

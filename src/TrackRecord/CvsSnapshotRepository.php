@@ -237,6 +237,53 @@ class CvsSnapshotRepository
      *
      * @return array<string, mixed>|null
      */
+    /**
+     * Latest known sector/industry per ticker, across every origin.
+     *
+     * Deliberately NOT filtered to ORIGIN_RESCORE: the admin ticker list covers
+     * the whole ~600-name crawl population, and most of those are only ever
+     * touched by the corpus crawl. Filtering to rescore would leave the column
+     * blank for the majority — and the whole point of showing it is to let an
+     * operator see which Yahoo bucket a company currently sits in before
+     * deciding whether to override it.
+     *
+     * @return array<string, array{sector: ?string, industry: ?string, score_date: string}>
+     */
+    public function findClassificationMap(): array
+    {
+        $stmt = $this->db->query('
+            SELECT s.ticker, s.sector, s.industry, s.score_date
+            FROM cvs_snapshots s
+            INNER JOIN (
+                SELECT ticker, MAX(score_date) AS max_date
+                FROM cvs_snapshots
+                GROUP BY ticker
+            ) latest ON s.ticker = latest.ticker AND s.score_date = latest.max_date
+        ');
+        $rows = $stmt !== false ? ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+
+        $out = [];
+        foreach ($rows as $r) {
+            $t = strtoupper((string) $r['ticker']);
+            // A ticker-day can carry several version rows; any of them answers
+            // the classification question, so first one wins.
+            if (isset($out[$t])) {
+                continue;
+            }
+            $out[$t] = [
+                'sector'     => $r['sector']   !== null ? (string) $r['sector']   : null,
+                'industry'   => $r['industry'] !== null ? (string) $r['industry'] : null,
+                'score_date' => (string) $r['score_date'],
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Most recent snapshot for one ticker.
+     *
+     * @return array<string, mixed>|null
+     */
     public function findLatestByTicker(string $ticker, ?string $liveModelVersion = null): ?array
     {
         if ($liveModelVersion !== null) {
