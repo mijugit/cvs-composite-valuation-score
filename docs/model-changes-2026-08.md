@@ -209,6 +209,37 @@ jedną konfigurację.
 
 ---
 
+## 9. Dopisek: tożsamość tickera (16.08, wieczór)
+
+Weryfikacja UI nadpisań odsłoniła coś, czego nie szukałem. `GOLD` w uniwersum nosił nazwę
+„Barrick Gold", ale symbol rozwiązywał się już na **Gold.com, Inc.** — inną spółkę, z sektora
+Financial Services. Barrick przeniósł się na `B`. Model liczył więc jedną spółkę i etykietował ją
+nazwą drugiej, a **każda warstwa potoku była zadowolona**, bo wszystkie ufały symbolowi.
+
+Sweep całego uniwersum (590 tickerów, porównanie nazwy zapisanej z nazwą zwracaną przez giełdę):
+
+```
+ok=580   drift=6   dead=3
+```
+
+Sześć rozjazdów, z czego **pięć to nasze własne skróty** — IBM Corp., BBVA, PSEG, Siemens AG,
+Bank of Nova Scotia. Realne przypisanie było dokładnie jedno. Trzy martwe: `ATVI`, `K`, `SQ`
+(Block siedzi już pod `XYZ`). To ważna proporcja: problem jest **rzadki, ale niewidoczny**, więc
+opłaca się wykrywać automatycznie, a nie sprzątać ręcznie.
+
+`TickerIdentity` porównuje tokeny znaczące i sprawdza akronim wobec inicjałów; rescore loguje
+rozjazd i **jedzie dalej** — repointować czy usuwać to decyzja operatora, a zgadnięcie mogłoby po
+cichu skasować pozycję.
+
+Przy okazji: „27 sierot" bez sektora okazało się w większości artefaktem wyświetlania. F, VOD,
+MCK, CAH, MRNA, MOS, FMC pobierają się poprawnie — po prostu nikt ich nie obserwuje, więc nie mają
+snapshotu, z którego admin czyta klasyfikację.
+
+Naprawiony też licznik `n=` w kubełkach: dropdown i badge „◍ brak peerów" pytały wyłącznie o
+`ev_fcf`, więc każdy kubełek wariantu B lub C czytał się jako pusty (`Banks - Regional` n=22 na
+`pb` pokazywał się jako poniżej progu). To **ta sama wada, co w `PeerCoverage`**, tylko w drugiej
+połowie tej samej funkcji — wzorzec z sekcji 8 uderzył piąty raz.
+
 ## Migracje
 
 | Nr | Co dodaje |
