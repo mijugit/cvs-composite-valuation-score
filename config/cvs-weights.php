@@ -350,6 +350,26 @@ return [
         'max_watchlist'   => 150,   // max watchlist entries per user (S-06)
         'max_history'     => 20,    // max analysis-history entries shown on dashboard (S-08)
 
+        // SEC EDGAR — the regulator's own diluted share count, used ONLY where
+        // Yahoo returns none. That is 28 tickers (4.8% of the universe: MU, HD,
+        // CRM, LOW, TGT, ADI, EL, HEI...), which otherwise fall back to
+        // revenue/revenuePerShare — a figure measured 32.7% low on EL and 28.9%
+        // high on KR, because it is a period average rather than a point count.
+        //
+        // Free and keyless; the SEC asks only for a User-Agent identifying the
+        // caller and caps requests at 10/second. Restricted to US domestic
+        // primary listings on purpose — see SecFacts::isUsDomesticPrimary() for
+        // why ADRs must NOT use it.
+        'sec_edgar' => [
+            'enabled'         => true,
+            // SEC policy requires a real contact. A generic agent gets blocked.
+            'user_agent'      => 'CVS Composite Valuation Score admin@amjsystem.eu',
+            'timeout_seconds' => 20,
+            // null => <repo>/tmp. Share counts change quarterly, so the cache
+            // is deliberately long-lived (7 days per company, 30 for the CIK map).
+            'cache_dir'       => null,
+        ],
+
         // MomentumPillar benchmark per ticker's home market (compare apples to
         // apples — a WSE-listed construction company shouldn't be scored on
         // momentum vs. the US market). Matched by ticker suffix; 'default' is

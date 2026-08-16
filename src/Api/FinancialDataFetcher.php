@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CVS\Api;
 
+use CVS\Api\Sec\SecFacts;
+use CVS\Api\Sec\SecShareCountClient;
 use CVS\Forecast\EarningsCalendarParser;
 use CVS\Forecast\EarningsSurpriseParser;
 use CVS\Forecast\EarningsTrendParser;
@@ -81,8 +83,42 @@ class FinancialDataFetcher implements LatestPriceSource
         'earningsHistory',
     ];
 
+    /** Built lazily from config so none of the 13 construction sites change. */
+    private ?SecShareCountClient $sec = null;
+    private bool $secResolved = false;
+
     /** @param array<string, mixed> $config  The 'data_source' section from cvs-weights.php */
     public function __construct(private readonly array $config) {}
+
+    /**
+     * SEC client, or null when disabled or unconfigured.
+     *
+     * Consulted only when Yahoo has no share count at all, so on a normal run
+     * this makes a handful of calls, not one per ticker.
+     */
+    private function sec(): ?SecShareCountClient
+    {
+        if ($this->secResolved) {
+            return $this->sec;
+        }
+        $this->secResolved = true;
+
+        $cfg = is_array($this->config['sec_edgar'] ?? null) ? $this->config['sec_edgar'] : [];
+        $ua  = is_string($cfg['user_agent'] ?? null) ? trim($cfg['user_agent']) : '';
+        if (empty($cfg['enabled']) || $ua === '') {
+            return $this->sec = null;
+        }
+
+        $cacheDir = is_string($cfg['cache_dir'] ?? null) && $cfg['cache_dir'] !== ''
+            ? $cfg['cache_dir']
+            : dirname(__DIR__, 2) . '/tmp';
+
+        return $this->sec = new SecShareCountClient(
+            userAgent: $ua,
+            cacheDir: $cacheDir,
+            timeoutSeconds: (int) ($cfg['timeout_seconds'] ?? 20),
+        );
+    }
 
     // ------------------------------------------------------------------
     // Public
@@ -884,11 +920,41 @@ class FinancialDataFetcher implements LatestPriceSource
         // in the MAJOR currency while a GBp price is not, which is why this sits
         // after the minor-unit resolution above rather than beside the other
         // fields.
+        $sharesReported     = $v($ks['sharesOutstanding']        ?? []);
+        $sharesImpliedField = $v($ks['impliedSharesOutstanding'] ?? []);
+        $marketCapRaw       = $v($raw['price']['marketCap'] ?? []) ?? $v($sd['marketCap'] ?? []);
+
+        // The regulator's figure, but only when Yahoo has nothing and only for
+        // US domestic primary listings. Gated this tightly for two reasons: it
+        // is a network call, and for an ADR the SEC counts ORDINARY shares while
+        // we price the receipt (see SecFacts::isUsDomesticPrimary).
+        $secShares = null;
+        $yahooHasCount = $sharesReported !== null
+            || $sharesImpliedField !== null
+            || $marketCapRaw !== null;
+        // The symbol Yahoo itself resolved, rather than the one asked for — if
+        // the two ever disagree, the payload is the company we are describing.
+        $symbol = is_string($raw['quoteType']['symbol'] ?? null)
+            ? (string) $raw['quoteType']['symbol']
+            : (is_string($raw['price']['symbol'] ?? null) ? (string) $raw['price']['symbol'] : '');
+
+        if ($symbol !== ''
+            && !$yahooHasCount
+            && SecFacts::isUsDomesticPrimary(
+                $symbol,
+                $financialCurrency,
+                is_string($ap['country'] ?? null) ? $ap['country'] : null
+            )
+        ) {
+            $secShares = $this->sec()?->dilutedShares($symbol)['count'] ?? null;
+        }
+
         $shares = ShareCount::resolve(
-            reported:        $v($ks['sharesOutstanding']        ?? []),
-            impliedField:    $v($ks['impliedSharesOutstanding'] ?? []),
-            marketCap:       $v($raw['price']['marketCap'] ?? []) ?? $v($sd['marketCap'] ?? []),
+            reported:        $sharesReported,
+            impliedField:    $sharesImpliedField,
+            marketCap:       $marketCapRaw,
             priceMajor:      $minorUnit ? $currentPrice / 100.0 : $currentPrice,
+            secDiluted:      $secShares,
             revenue:         $v($fin['totalRevenue']    ?? []),
             revenuePerShare: $v($fin['revenuePerShare'] ?? []),
         );

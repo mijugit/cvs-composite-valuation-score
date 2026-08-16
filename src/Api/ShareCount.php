@@ -37,6 +37,9 @@ final class ShareCount
      */
     public const SOURCE_ALL_CLASS = 'implied_market_cap';
 
+    /** Diluted count filed with the SEC. Authoritative, and correct across classes. */
+    public const SOURCE_SEC = 'sec_diluted';
+
     /** Arithmetic fallback: revenue / revenue-per-share. */
     public const SOURCE_DERIVED = 'revenue_per_share';
 
@@ -53,6 +56,9 @@ final class ShareCount
      * @param float|null $marketCap       price.marketCap (MAJOR currency)
      * @param float|null $priceMajor      quote in the MAJOR currency — a GBp price must
      *                                    already be divided by 100 or the quotient is 100x off
+     * @param float|null $secDiluted      SEC WeightedAverageNumberOfDilutedSharesOutstanding.
+     *                                    US domestic primary listings ONLY — for an ADR this
+     *                                    counts ordinary shares against a receipt price
      * @param float|null $revenue         financialData.totalRevenue
      * @param float|null $revenuePerShare financialData.revenuePerShare (same currency as revenue)
      *
@@ -63,6 +69,7 @@ final class ShareCount
         ?float $impliedField,
         ?float $marketCap,
         ?float $priceMajor,
+        ?float $secDiluted,
         ?float $revenue,
         ?float $revenuePerShare
     ): array {
@@ -88,9 +95,22 @@ final class ShareCount
             return ['count' => $reported, 'source' => self::SOURCE_REPORTED];
         }
 
-        // Last resort. revenuePerShare is computed on DILUTED shares, so the
-        // quotient covers every class; against tickers whose true figure is
-        // known it lands within ~1% (AAPL +0.9%, NVDA +0.4%, GOOGL -1.0%).
+        // Yahoo has nothing. The regulator's diluted count is the best figure
+        // available here: filed quarterly, and right across share classes where
+        // the derivation below is not — it reads Estée Lauder 32.7% low and
+        // HEICO 12.1% low, both multi-class.
+        $sec = self::positive($secDiluted);
+        if ($sec !== null) {
+            return ['count' => $sec, 'source' => self::SOURCE_SEC];
+        }
+
+        // Last resort, and the only option for non-US listings. revenuePerShare
+        // is computed on DILUTED shares, so the quotient spans share classes in
+        // principle and lands within ~1% for single-class companies (AAPL +0.9%,
+        // NVDA +0.4%, GOOGL -1.0%). Two known weaknesses, both recorded because
+        // they bound how far this figure can be trusted: it is a PERIOD AVERAGE,
+        // so heavy buybacks leave it high (Kroger +28.9% against the SEC), and
+        // it can miss a class outright (Estée Lauder -32.7%).
         //
         // floatShares is deliberately NOT a rung here, even though it is the
         // only field present for those 28 tickers: it excludes closely-held
