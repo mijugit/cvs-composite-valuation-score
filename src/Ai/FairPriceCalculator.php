@@ -18,6 +18,71 @@ use CVS\CVS\Valuation\MedianResolver;
 final class FairPriceCalculator
 {
     /**
+     * Implied fair price for a financial: peer-median price/book applied to the
+     * company's own book value per share.
+     *
+     *   Fair Price = median_pb × book_value_per_share
+     *
+     * The direct analogue of the EV/FCF path — the multiple the sector is
+     * actually valued on, times the per-share quantity it is a multiple OF —
+     * and it resolves that multiple through the same peer-group ladder the
+     * Valuation pillar uses, so the FV column and the pillar cannot contradict
+     * each other the way they did before.
+     *
+     * @param array<string, mixed> $financials
+     * @param array<string, mixed> $cvsConfig
+     */
+    private static function computeForFinancial(
+        array $financials,
+        array $cvsConfig,
+        ?MedianResolver $resolver,
+        string $sector
+    ): ?float {
+        $bvps = isset($financials['book_value_per_share'])
+            ? (float) $financials['book_value_per_share']
+            : 0.0;
+        if ($bvps <= 0) {
+            return null;
+        }
+
+        $benchmarks = $cvsConfig['benchmarks'] ?? [];
+        $bm         = $benchmarks[$sector] ?? $benchmarks['DEFAULT'] ?? [];
+        $medianPb   = (float) ($bm['median_pb'] ?? 0);
+
+        if ($resolver !== null) {
+            $resolved = $resolver->resolve(
+                (string) ($financials['industry'] ?? ''),
+                $sector,
+                'pb'
+            );
+            if ($resolved->isValid()) {
+                $medianPb = (float) $resolved->value;
+            }
+        }
+
+        if ($medianPb <= 0) {
+            return null;
+        }
+
+        $price = round($medianPb * $bvps, 2);
+        if ($price <= 0) {
+            return null;
+        }
+
+        // Same sanity band as the main path: a figure outside it means a data
+        // problem (currency mismatch, odd share structure), not an opportunity.
+        $currentPrice = (float) ($financials['current_price'] ?? 0);
+        if ($currentPrice > 0) {
+            $ratio = $price / $currentPrice;
+            if ($ratio > 10.0 || $ratio < 0.05) {
+                return null;
+            }
+        }
+
+        return $price;
+    }
+
+    /**
      * @param array<string, mixed> $financials
      * @param array<string, mixed> $cvsConfig  Full config/cvs-weights.php
      * @param MedianResolver|null  $resolver   Peer-group medians (phase 3). Pass it
@@ -30,6 +95,17 @@ final class FairPriceCalculator
     public static function compute(array $financials, array $cvsConfig, ?MedianResolver $resolver = null): ?float
     {
         $sector     = (string) ($financials['sector'] ?? 'DEFAULT');
+
+        // Financials get their own formula. The EV/FCF path below cannot produce
+        // a number for a bank — there is no meaningful free cash flow — so the FV
+        // column was simply blank for the whole sector.
+        $financialSectors = is_array($cvsConfig['financials']['sectors'] ?? null)
+            ? $cvsConfig['financials']['sectors']
+            : [];
+        if (in_array($sector, $financialSectors, true)) {
+            return self::computeForFinancial($financials, $cvsConfig, $resolver, $sector);
+        }
+
         $benchmarks = $cvsConfig['benchmarks'] ?? [];
         $bm         = $benchmarks[$sector] ?? $benchmarks['DEFAULT'] ?? [];
         $medEvFcf   = (float) ($bm['median_ev_fcf'] ?? 0);

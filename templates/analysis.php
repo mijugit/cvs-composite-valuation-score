@@ -727,7 +727,14 @@
                         ?>
                         <?php
                         $pillarRows = [
-                            ['key' => 'valuation',      'label' => 'Wycena (EV/FCF)',     'sw' => '40%', 'fn' => '65%', 'badge' => $valBadge],
+                            // Label follows the variant the pillar actually used. It read
+                            // "EV/FCF" for everything, which was already wrong for variant B
+                            // (EV/Sales) and became plainly false for banks scored on P/B.
+                            ['key' => 'valuation',      'label' => 'Wycena (' . match ($valVariant) {
+                                'B'     => 'EV/Sprzedaż',
+                                'C'     => 'P/B',
+                                default => 'EV/FCF',
+                            } . ')', 'sw' => '40%', 'fn' => '65%', 'badge' => $valBadge],
                             ['key' => 'momentum_swing', 'label' => 'Momentum (Swing)',     'sw' => '45%', 'fn' => '—',   'badge' => ''],
                             ['key' => 'momentum_fund',  'label' => 'Momentum (Fund)',      'sw' => '—',   'fn' => '15%', 'badge' => ''],
                             ['key' => 'quality',        'label' => 'Jakość fundamentalna', 'sw' => '15%', 'fn' => '20%', 'badge' => ''],

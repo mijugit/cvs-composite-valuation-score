@@ -1052,7 +1052,11 @@ class FinancialDataFetcher implements LatestPriceSource
             // currency-neutral, and book value is per share in the same currency
             // as the quote.
             'price_to_book'              => $v($ks['priceToBook']         ?? []),
-            'book_value_per_share'       => $v($ks['bookValue']           ?? []),
+            // Per SHARE, so it converts with the PRICE rate ($fxP), not the
+            // statement rate — it is compared against current_price, which is
+            // itself converted that way. Getting this wrong would compare a
+            // PLN book value to a USD price on every Warsaw-listed bank.
+            'book_value_per_share'       => $fxApply($v($ks['bookValue'] ?? []), $fxP),
             'return_on_assets'           => $v($fin['returnOnAssets']     ?? []),
             'trailing_pe'                => $v($sd['trailingPE']          ?? []),
             'dividend_yield'             => $v($sd['dividendYield']       ?? []),
