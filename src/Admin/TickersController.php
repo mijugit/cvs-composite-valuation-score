@@ -9,6 +9,7 @@ use CVS\Auth\AuthController;
 use CVS\Auth\UserRepository;
 use CVS\Core\Request;
 use CVS\Core\Response;
+use CVS\CVS\Valuation\MedianResolver;
 use CVS\CVS\Valuation\PeerBucketOverrideRepository;
 use CVS\CVS\Valuation\PeerMedianRepository;
 use CVS\TrackRecord\CvsSnapshotRepository;
@@ -142,7 +143,10 @@ class TickersController
      */
     private function buildBucketOptions(): array
     {
-        $counts = (new PeerMedianRepository())->findIndustrySampleCounts($this->modelVersion, 'ev_fcf');
+        $counts = (new PeerMedianRepository())->findIndustrySampleCounts(
+            $this->modelVersion,
+            MedianResolver::VALUATION_METRICS
+        );
 
         $custom = [];
         foreach ($this->overrides->findAll() as $o) {

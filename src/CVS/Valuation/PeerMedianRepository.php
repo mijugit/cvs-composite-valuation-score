@@ -182,26 +182,42 @@ class PeerMedianRepository
      * distributor in the universe, n=1) came to be judged against software
      * multiples and ranked second overall on a comparison that meant nothing.
      *
+     * Pass every metric the bucket's members might be scored on and the deepest
+     * one wins. Asking about a single metric answers the wrong question whenever
+     * the bucket's companies do not all use it: `Banks - Regional` has 22
+     * companies on `pb` and none on `ev_fcf`, because a bank has no meaningful
+     * free cash flow (variant C) — reading only `ev_fcf` reports a working
+     * bucket as empty. Same trap as variant B and `ev_sales`.
+     *
+     * @param string|list<string> $metricType One metric, or several to merge.
      * @return array<string, int> industry => sample_count
      */
-    public function findIndustrySampleCounts(string $modelVersion, string $metricType): array
+    public function findIndustrySampleCounts(string $modelVersion, string|array $metricType): array
     {
-        $stmt = $this->db->prepare('
+        $metrics = is_array($metricType) ? array_values($metricType) : [$metricType];
+        if ($metrics === []) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($metrics), '?'));
+        $stmt = $this->db->prepare("
             SELECT bucket_key, sample_count
             FROM   peer_medians
-            WHERE  level         = :level
-              AND  model_version = :model_version
-              AND  metric_type   = :metric_type
-        ');
-        $stmt->execute([
-            ':level'         => 'industry',
-            ':model_version' => $modelVersion,
-            ':metric_type'   => $metricType,
-        ]);
+            WHERE  level         = 'industry'
+              AND  model_version = ?
+              AND  metric_type   IN ($placeholders)
+        ");
+        $stmt->execute(array_merge([$modelVersion], $metrics));
 
         $out = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
-            $out[(string) $row['bucket_key']] = (int) $row['sample_count'];
+            $key   = (string) $row['bucket_key'];
+            $count = (int) $row['sample_count'];
+            // Deepest metric wins: the resolver needs only one bucket to clear
+            // min_sample_count for the comparison to be a real one.
+            if ($count > ($out[$key] ?? 0)) {
+                $out[$key] = $count;
+            }
         }
         return $out;
     }

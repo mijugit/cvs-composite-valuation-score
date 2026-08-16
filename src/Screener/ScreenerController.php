@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CVS\Screener;
 
+use CVS\CVS\Valuation\MedianResolver;
 use CVS\CVS\Valuation\PeerMedianRepository;
 use CVS\CVS\Valuation\PeerCoverage;
 use CVS\Auth\AuthController;
@@ -134,7 +135,10 @@ class ScreenerController
             // sector). One bulk read, resolved per row in the view.
             'peerCoverage'     => new PeerCoverage(
                 (new PeerMedianRepository(Database::connection()))
-                    ->findIndustrySampleCounts((string) ($this->cvsConfig['model_version'] ?? ''), 'ev_fcf'),
+                    ->findIndustrySampleCounts(
+                        (string) ($this->cvsConfig['model_version'] ?? ''),
+                        MedianResolver::VALUATION_METRICS
+                    ),
                 (int) ($this->cvsConfig['peer_group']['min_sample_count'] ?? 5)
             ),
         ]);

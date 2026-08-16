@@ -19,6 +19,16 @@ namespace CVS\CVS\Valuation;
 class MedianResolver
 {
     /**
+     * Every metric the Valuation pillar can land on, one per variant: A resolves
+     * `ev_fcf`, B `ev_sales`, C `pb`. Callers asking "does this bucket have real
+     * peers?" must weigh all three — a bucket is only empty when it is empty on
+     * every metric its members could be scored against.
+     *
+     * @var list<string>
+     */
+    public const VALUATION_METRICS = ['ev_fcf', 'ev_sales', 'pb'];
+
+    /**
      * @param PeerMedianRepository         $repo          Peer median store
      * @param array<string, array<string, float|int>> $benchmarks Static benchmarks (config['benchmarks'])
      * @param int                          $minSampleCount Threshold N below which subsector is too thin

@@ -294,4 +294,53 @@ class PeerMedianRepositoryTest extends TestCase
         )->fetchColumn();
         $this->assertSame(1, (int) $pm);
     }
+
+    // ------------------------------------------------------------------
+    // findIndustrySampleCounts — depth across variants
+    //
+    // The counts drive two operator-facing signals: the screener's "◍ brak
+    // peerów" badge and the admin peer-group dropdown. Reading a single metric
+    // makes both lie about any bucket whose members are not scored on it.
+    // ------------------------------------------------------------------
+
+    public function test_sample_counts_merge_metrics_so_a_bank_bucket_is_not_reported_empty(): void
+    {
+        // A real financial bucket: deep on price/book (variant C), absent from
+        // ev_fcf entirely, because a bank has no meaningful free cash flow.
+        $this->repo->upsertMedian('industry', 'Banks - Regional', 'Financial Services', '3.0', 'pb', 2.30, 22);
+
+        $evFcfOnly = $this->repo->findIndustrySampleCounts('3.0', 'ev_fcf');
+        $this->assertArrayNotHasKey('Banks - Regional', $evFcfOnly, 'precondition: invisible on ev_fcf alone');
+
+        $merged = $this->repo->findIndustrySampleCounts('3.0', ['ev_fcf', 'ev_sales', 'pb']);
+        $this->assertSame(22, $merged['Banks - Regional'] ?? 0);
+    }
+
+    public function test_sample_counts_take_the_deepest_metric_not_the_last_row(): void
+    {
+        // Mixed bucket: some members on variant A, fewer on variant B. One
+        // bucket clearing the threshold is enough for a real comparison, so the
+        // deeper count is the honest answer regardless of row order.
+        $this->repo->upsertMedian('industry', 'Semiconductors', 'Technology', '3.0', 'ev_sales', 4.1, 6);
+        $this->repo->upsertMedian('industry', 'Semiconductors', 'Technology', '3.0', 'ev_fcf', 28.0, 21);
+        $this->repo->upsertMedian('industry', 'Semiconductors', 'Technology', '3.0', 'pb', 3.4, 2);
+
+        $merged = $this->repo->findIndustrySampleCounts('3.0', ['ev_fcf', 'ev_sales', 'pb']);
+
+        $this->assertSame(21, $merged['Semiconductors'] ?? 0);
+    }
+
+    public function test_sample_counts_ignore_other_model_versions(): void
+    {
+        $this->repo->upsertMedian('industry', 'Gold', 'Basic Materials', '3.1', 'ev_fcf', 12.0, 9);
+
+        $this->assertSame([], $this->repo->findIndustrySampleCounts('3.0', ['ev_fcf', 'ev_sales', 'pb']));
+    }
+
+    public function test_sample_counts_with_no_metrics_returns_empty(): void
+    {
+        $this->repo->upsertMedian('industry', 'Gold', 'Basic Materials', '3.0', 'ev_fcf', 12.0, 9);
+
+        $this->assertSame([], $this->repo->findIndustrySampleCounts('3.0', []));
+    }
 }
