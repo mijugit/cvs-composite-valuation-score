@@ -75,13 +75,16 @@ Structure your response in exactly these 5 sections using the exact headers belo
 ## 1. Ocena modelu CVS
 Explain what the CVS Swing and Fundamental scores indicate. Interpret the pillar
 breakdown — which pillars are strong or weak, and how they drive the overall score.
-Connect the pillar scores to their real-world meaning (e.g., high Valuation pillar
-means the stock looks cheap relative to sector peers on EV/FCF basis).
-If CVS Model Implied Fair Value is provided, explain briefly what it means:
-it is the theoretical stock price at which the company's EV/FCF multiple would equal
-the sector median — i.e., the "sector-parity price" derived from the model's own
-inputs (Forward FCF², Net Debt, Shares Outstanding). Note whether the current price
-is at a premium or discount to this implied fair value.
+Connect the pillar scores to their real-world meaning (e.g., a high Valuation pillar
+means the stock looks cheap against its peer median).
+IMPORTANT: the Valuation pillar does not always use the same multiple. The data block
+names the one this company was actually scored on — EV/FCF, EV/Sales, P/B for
+financials, or EV/EBITDA for real estate. Use that name. Do not assume EV/FCF, and do
+not critique the model for using a multiple the data block does not claim it used.
+If CVS Model Implied Fair Value is provided, explain briefly what it means: the
+theoretical price at which that same multiple would equal the peer median — the
+"parity price" derived from the model's own inputs. Note whether the current price is
+at a premium or discount to it.
 When the premium exceeds 40%, go one step further: anchor the premium in the available
 fundamentals. For instance, if ROE is single-digit while the premium is 80%+, state
 plainly that justifying this price requires a dramatic, sustained FCF ramp-up — and
@@ -109,7 +112,7 @@ sprzeczności z tym kierunkiem.**" Do not soften or bury this observation; it is
 most decision-relevant tension in the entire analysis.
 Then explain concisely WHY the CVS model and analysts disagree. Identify the specific
 pillar or metric driving the gap. For example: the model may score Valuation high
-(cheap on EV/FCF) while analysts see a Growth risk that lowers their targets —
+(cheap on its peer multiple) while analysts see a Growth risk that lowers their targets —
 or Momentum is strong but analysts expect mean-reversion. Be specific and grounded
 in the numbers provided. If CVS Fair Value is available, reference it when discussing
 the valuation gap: compare the CVS implied fair value to analyst mean price target
@@ -213,6 +216,16 @@ SYSTEM;
         $valBucket = (string) ($valRef['bucket'] ?? '');
         $useSubsectorContext = $valSource === 'subsector' && $valBucket !== '' && $valBucket !== $sector;
 
+        // Which variant produced the Valuation score, so the block can name the
+        // metric the model actually used instead of assuming EV/FCF. Getting
+        // this wrong is not cosmetic: told that a bank's score came from EV/FCF,
+        // an external reviewer correctly explained why free cash flow is a poor
+        // measure for a bank — a critique of a method the model had already
+        // stopped using for that sector.
+        $valVariant  = isset($valRef['variant']) ? (string) $valRef['variant'] : null;
+        $isFinancial = ValuationNarrative::isFinancialSector($sector, $this->cvsConfig());
+        $metricName  = ValuationNarrative::metricName($valVariant);
+
         // Compute relative diff between subsector and sector benchmarks to decide if worth surfacing.
         // We use the pillar score as a proxy: if ValuationPillar used subsector, the score already
         // reflects it. We add the label when the source is confirmed subsector (threshold check
@@ -225,7 +238,7 @@ SYSTEM;
             $lines[] = "INDUSTRY (sub-sector): {$industry}";
             $lines[] = "NOTE: The CVS Valuation pillar for this company was benchmarked against its"
                 . " INDUSTRY PEER GROUP ('{$industry}') rather than the full sector ('{$sector}')."
-                . " This means the EV/FCF ratio was compared to peers with similar business models,"
+                . " This means its {$metricName} was compared to peers with similar business models,"
                 . " not to all companies in the sector. Factor this into your divergence analysis.";
         }
         $lines[] = '';
@@ -234,10 +247,10 @@ SYSTEM;
         $lines[] = "- Fundamental (6-12 month horizon): {$cvsFund}/100 → {$recoFund}";
         $lines[] = '';
         $lines[] = 'PILLAR BREAKDOWN (each 0-100):';
-        $lines[] = "- Valuation (EV/FCF vs sector median): {$pVal}/100";
+        $lines[] = '- Valuation (' . ValuationNarrative::valuationLabel($valVariant) . "): {$pVal}/100";
         $lines[] = "- Momentum - Swing profile: {$pMomSwing}/100";
         $lines[] = "- Momentum - Fundamental profile: {$pMomFund}/100";
-        $lines[] = "- Quality (gross margin, leverage, growth): {$pQual}/100";
+        $lines[] = '- Quality (' . ValuationNarrative::qualityLabel($isFinancial) . "): {$pQual}/100";
         // change: cvs-momentum-benchmark-per-market (2026-07-06) — the momentum
         // benchmark is no longer always the US market (SPY); it's resolved per
         // the ticker's home exchange (e.g. WIG20TR for .WA, KOSPI 200 for .KS).
@@ -265,12 +278,11 @@ SYSTEM;
                 );
             }
             $bm = $this->getSectorBenchmark($financials);
-            if ($bm !== null) {
-                $lines[] = '- Calculation method: Fair EV = sector_median_EV/FCF ('
-                    . $bm['median_ev_fcf'] . 'x) × Forward_FCF²; '
-                    . 'Fair Price = (Fair EV - Net Debt) / Shares Outstanding';
-                $lines[] = '- This represents the price at which the stock would be fairly valued '
-                    . 'relative to its sector peer median on an EV/FCF basis (Valuation pillar = 50/100).';
+            foreach (ValuationNarrative::fairValueMethod(
+                $isFinancial,
+                isset($bm['median_ev_fcf']) ? (float) $bm['median_ev_fcf'] : null
+            ) as $methodLine) {
+                $lines[] = $methodLine;
             }
         } else {
             $lines[] = '- Not calculable (insufficient FCF or growth data for this company).';
@@ -391,6 +403,15 @@ SYSTEM;
         $lines[] = '- Return on equity: '  . $pct($financials['return_on_equity'] ?? null);
         $lines[] = '- Net debt / EBITDA: ' . $netDebtEbitda;
 
+        // The figures the financial paths are actually built from. Without them
+        // a reviewer is asked to judge a price/book score without seeing the
+        // price/book, and a returns-based quality score without the returns.
+        if ($isFinancial) {
+            foreach (ValuationNarrative::financialMetrics($financials, $num, $pct) as $metricLine) {
+                $lines[] = $metricLine;
+            }
+        }
+
         $lines[] = '';
         $lines[] = 'MARKET STRUCTURE:';
         $lines[] = '- Beta (market sensitivity): ' . $num($financials['beta'] ?? null);
@@ -420,10 +441,28 @@ SYSTEM;
      */
     private function getSectorBenchmark(array $financials): ?array
     {
-        $sector     = (string) ($financials['sector'] ?? 'DEFAULT');
-        $benchmarks = require dirname(__DIR__, 2) . '/config/cvs-weights.php';
-        $bms        = $benchmarks['benchmarks'] ?? [];
+        $sector = (string) ($financials['sector'] ?? 'DEFAULT');
+        $bms    = $this->cvsConfig()['benchmarks'] ?? [];
         return $bms[$sector] ?? $bms['DEFAULT'] ?? null;
+    }
+
+    /** @var array<string, mixed>|null */
+    private ?array $cvsConfigCache = null;
+
+    /**
+     * Read once per instance — buildDataBlock consults it several times, and
+     * re-requiring the file for each is wasteful.
+     *
+     * @return array<string, mixed>
+     */
+    private function cvsConfig(): array
+    {
+        if ($this->cvsConfigCache === null) {
+            /** @var array<string, mixed> $cfg */
+            $cfg = require dirname(__DIR__, 2) . '/config/cvs-weights.php';
+            $this->cvsConfigCache = $cfg;
+        }
+        return $this->cvsConfigCache;
     }
 
     private function analystConsensusLabel(float $mean): string
