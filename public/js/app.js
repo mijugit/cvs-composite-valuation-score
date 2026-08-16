@@ -951,9 +951,12 @@ function renderCvsNavChart(canvasId, chartSeries, palette, opts) {
         // One symbol, replaced outright — no separator, nothing to append to.
         if (single) {
             textarea.value = symbol;
-            hideDropdown(dropdown);
+            // Notify first, close second. The notification is synchronous and
+            // our own input handler answers it by re-rendering the list — the
+            // chosen symbol matches itself — so closing before dispatching would
+            // leave the dropdown open over the rest of the form.
             textarea.dispatchEvent(new Event('input', { bubbles: true }));
-            // Move on to the next field rather than reopening the list.
+            hideDropdown(dropdown);
             textarea.blur();
             return;
         }
