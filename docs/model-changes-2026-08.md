@@ -347,6 +347,53 @@ porównywany do mediany zdominowanej przez inne typy REIT-ów, a nie do funduszy
 przy zupełnie nowej metryce pierwszy przebieg zapisuje `valuation_source = cold_start`. Samo się
 naprawia przy następnym cyklu — świeże przeliczenie już pokazuje `subsector` / `sector_fallback`.
 
+## 12. Wariant C v2 — mnożnik księgowy warunkowany rentownością (16.08, noc)
+
+Zewnętrzny recenzent (Gemini), oceniając ING.WA, wskazał to niezależnie: mnożnik księgowy banku
+jest **funkcją** ROE, więc porównywanie surowego P/B do mediany grupy karze bank za to, że dobrze
+zarabia. Gordon-Shapiro: `P/B = (ROE − g) / (COE − g)`.
+
+Zmierzone na 20 bankach — **korelacja ROE z wynikiem wyceny wynosiła −0,54**:
+
+| | ROE | P/B÷ROE | było | po zmianie |
+|---|---|---|---|---|
+| ING.WA | 24,1% | 12,3 | 10,8 | **56,5** |
+| PKO.WA | 20,1% | 11,5 | 26,7 | 60,5 |
+| ALR.WA | 16,8% | 8,2 | 67,1 | **81,8** |
+| FITB | 8,4% | 19,3 | 54,5 | **21,2** |
+| SHG | 8,9% | 10,7 | 79,5 | 65,0 |
+
+Wewnątrz wariantu C wycena i jakość były **mechanicznie przeciwstawne** — najlepsze „okazje" to
+były najsłabsze banki. Po zmianie korelacja **+0,27**. Ranking odpowiada teraz na pytanie „ile
+płacę za jednostkę rentowności".
+
+Wartość godziwa musiała pójść tą samą osią (`median_pb_roe × ROE × BVPS`), inaczej kolumna FV znów
+zaprzeczyłaby filarowi obok — ten sam błąd, co przy ASB.WA, po raz drugi. ING.WA: FV
+$70,55 → **$131,85**.
+
+**Jednostki ADR w P/B.** Yahoo dzieli cenę kwitu przez wartość księgową akcji **zwykłej** —
+HSBC czyta 8,24 zamiast ~1,65 (stosunek 1:5). Zamierzona naprawa (P/B z kapitalizacji ÷ kapitał
+własny) okazała się **niewykonalna**: moduł bilansu Yahoo zwraca dla banków wyłącznie `maxAge`
+i `endDate`. Zamiast tego ta sama metryka je demaskuje — HSBC ma P/B÷ROE = 62,9 przy medianie ~14,
+czyli 4,5× poza stawką mieszczącą się w 1,5×. Powyżej progu filar **odmawia oceny** i zwraca
+neutralne 50 ze źródłem `implausible_pb`. Pewne 0/100 na tanim banku jest gorsze niż brak zdania.
+
+**Czego to NIE rozwiązuje — założenie, które właśnie wbudowaliśmy:** zakładamy, że bieżące ROE się
+utrzyma. Zwrot z kapitału wraca do średniej, więc bank na szczycie cyklu zysków dostanie zawyżoną
+ocenę. Poprzednie podejście zakładało, że ROE nie znaczy nic; nowe — że znaczy wszystko. Prawda
+leży pomiędzy, a właściwym lekarstwem jest ROE znormalizowane przez cykl, którego w danych nie ma.
+Zapisane wprost na `/model`.
+
+### Otwarte: własna grupa dla polskich banków
+
+Gemini trafiło też w komparator: PEO.WA jest mierzony medianą globalnego kubełka
+`Banks - Regional`, zdominowanego przez banki amerykańskie. To przypadek „region + regulator"
+z migracji 037 — strukturalny, bez daty przeglądu. W uniwersum jest siedem polskich banków
+(PKO.WA, PEO.WA, ING.WA, MBK.WA, ALR.WA, EBP.WA, MIL.WA), czyli powyżej progu pięciu, wszystkie
+w jednym sektorze Yahoo. Kierunek zmiany wyceny **nie jest oczywisty**: polskie banki mają wyższe
+P/B (2,07–2,96 vs 1,68–1,79), ale też wyższe ROE (14–24% vs ~12,6%), a metryka `P/B ÷ ROE` tę
+różnicę częściowo skraca. Warto policzyć przed, nie po.
+
 ## Migracje
 
 | Nr | Co dodaje |
