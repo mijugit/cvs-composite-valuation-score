@@ -68,7 +68,8 @@ class SnapshotWriterTest extends TestCase
     private function rows(PDO $pdo, string $ticker): array
     {
         $stmt = $pdo->prepare(
-            'SELECT model_version, origin, cvs_swing, cvs_fund, reco_swing, quality_gate, signals
+            'SELECT model_version, origin, cvs_swing, cvs_fund, reco_swing, quality_gate, signals,
+                    valuation_source, valuation_bucket, valuation_variant
              FROM cvs_snapshots WHERE ticker = ? ORDER BY model_version ASC'
         );
         $stmt->execute([$ticker]);
@@ -204,6 +205,49 @@ class SnapshotWriterTest extends TestCase
         $this->assertEquals(57.0, $byVersion['3.1']['cvs_fund']);
         $this->assertSame('AKUMULUJ', $byVersion['3.1']['reco_swing']);
         $this->assertSame(1, (int) $byVersion['3.1']['quality_gate'], 'gate verdict carries over to the shadow row');
+    }
+
+    /**
+     * A shadow penalises the base scores after aggregation; it never re-runs the
+     * Valuation pillar. The bucket, the ladder tier and the variant are the same
+     * facts about the same company, so a shadow row must answer "was this built
+     * on real peers?" the same way the base row does. Every 3.1/3.2 row in
+     * production was NULL on all three before this.
+     */
+    public function test_shadow_rows_inherit_the_valuation_reference(): void
+    {
+        [$writer, $pdo] = $this->makeWriter();
+
+        $writer->persist(
+            CVSResult::passed(
+                ticker:                    'ALR.WA',
+                swingCvs:                  58.1,
+                fundamentalCvs:            65.0,
+                pillarScores:              ['valuation' => 67.1, 'momentum_swing' => 41.2, 'quality' => 85.0],
+                swingRecommendation:       'AKUMULUJ',
+                fundamentalRecommendation: 'AKUMULUJ',
+                modelVersion:              '3.0',
+                overlay:                   $this->overlayBlock(),
+                valuationReference:        [
+                    'source'  => 'subsector',
+                    'bucket'  => 'Banks - Diversified',
+                    'value'   => 1.38,
+                    'variant' => 'C',
+                ],
+            ),
+            35.48,
+            'Financial Services',
+            'Banks - Diversified',
+            CvsSnapshotRepository::ORIGIN_RESCORE
+        );
+
+        $byVersion = array_column($this->rows($pdo, 'ALR.WA'), null, 'model_version');
+
+        foreach (['3.0', '3.1'] as $version) {
+            $this->assertSame('subsector', $byVersion[$version]['valuation_source'] ?? null, "row {$version}");
+            $this->assertSame('Banks - Diversified', $byVersion[$version]['valuation_bucket'] ?? null, "row {$version}");
+            $this->assertSame('C', $byVersion[$version]['valuation_variant'] ?? null, "row {$version}");
+        }
     }
 
     public function test_persist_writes_only_base_row_when_overlay_null(): void

@@ -144,6 +144,14 @@ class SnapshotWriter
             'gate_failures' => $base['gate_failures'] ?? [],
             'pillar_scores' => $base['pillar_scores'] ?? null,
             'signals'       => $base['signals'] ?? null,
+            // A shadow applies post-aggregation penalties to the base scores; it
+            // never re-runs the Valuation pillar. The bucket, the tier of the
+            // ladder and the variant are therefore the same facts about the same
+            // company, and dropping them left every 3.1/3.2 row unable to answer
+            // "was this score built on real peers?" — the one question the
+            // column exists for. Carried through so a shadow row can be read on
+            // the same terms as the base it shadows.
+            'valuation_reference' => $base['valuation_reference'] ?? null,
         ];
     }
 }
