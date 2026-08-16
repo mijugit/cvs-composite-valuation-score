@@ -876,40 +876,24 @@ class FinancialDataFetcher implements LatestPriceSource
         }
 
         // ------------------------------------------------------------------
-        // Share count — prefer the figure implied by market cap.
+        // Share count. The ladder and the reasoning behind it live in
+        // ShareCount, which is pure and unit-tested against the figures
+        // measured across this universe; here we only hand it the raw fields.
         //
-        // defaultKeyStatistics.sharesOutstanding counts only the QUOTED class,
-        // while marketCap covers every class. For dual-class companies the two
-        // diverge badly (GOOGL +108%, DELL +99%, ABNB +43%, META +16% measured
-        // across this universe), and since EV = price x shares + debt - cash, an
-        // undercount understates enterprise value and makes the company look
-        // cheaper than it is — an error biased towards "buy", which is the worst
-        // direction for it to run.
-        //
-        // Both sides must be in the same unit first: marketCap is quoted in the
-        // MAJOR currency while a GBp price is not, which is why this sits after
-        // the minor-unit resolution above rather than beside the other fields.
-        $sharesReported = $v($ks['sharesOutstanding'] ?? []);
-        $marketCapRaw   = $v($raw['price']['marketCap'] ?? []) ?? $v($sd['marketCap'] ?? []);
-        $priceMajor     = $minorUnit ? $currentPrice / 100.0 : $currentPrice;
-        $sharesImplied  = ($marketCapRaw !== null && $priceMajor > 0.0)
-            ? $marketCapRaw / $priceMajor
-            : null;
-
-        // A small gap is rounding or a stale share count; a large one means the
-        // two figures are measuring different things. Only then does the implied
-        // value win, so single-class tickers keep the reported figure untouched.
-        $sharesOutstanding = $sharesReported;
-        $sharesSource      = $sharesReported !== null ? 'reported' : null;
-        if ($sharesImplied !== null && $sharesImplied > 0.0) {
-            $divergent = $sharesReported === null
-                || $sharesReported <= 0.0
-                || abs($sharesImplied / $sharesReported - 1.0) > 0.05;
-            if ($divergent) {
-                $sharesOutstanding = $sharesImplied;
-                $sharesSource      = 'implied_market_cap';
-            }
-        }
+        // Market cap and the quote must be in the same unit: marketCap is given
+        // in the MAJOR currency while a GBp price is not, which is why this sits
+        // after the minor-unit resolution above rather than beside the other
+        // fields.
+        $shares = ShareCount::resolve(
+            reported:        $v($ks['sharesOutstanding']        ?? []),
+            impliedField:    $v($ks['impliedSharesOutstanding'] ?? []),
+            marketCap:       $v($raw['price']['marketCap'] ?? []) ?? $v($sd['marketCap'] ?? []),
+            priceMajor:      $minorUnit ? $currentPrice / 100.0 : $currentPrice,
+            revenue:         $v($fin['totalRevenue']    ?? []),
+            revenuePerShare: $v($fin['revenuePerShare'] ?? []),
+        );
+        $sharesOutstanding = $shares['count'];
+        $sharesSource      = $shares['source'];
 
         /** Apply FX rate to a nullable float; preserves null when value is absent. */
         $fxApply = static fn (?float $val, float $rate): ?float =>
