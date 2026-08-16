@@ -494,7 +494,11 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
 <!-- Ticker "favourite links" right-click menu (desktop only) — markup is
      empty on load, filled/positioned by app.js on contextmenu; moved to a
      direct <body> child there too (see .ticker-link-menu CSS comment). -->
-<div id="ticker-link-menu" class="ticker-link-menu" hidden></div>
+<!-- Visibility is the .ticker-link-menu--visible class alone. The `hidden`
+     attribute used to sit here as well, describing the same state twice; app.js
+     only ever toggled the class, so once [hidden] started being enforced
+     globally the attribute won and the menu stopped opening. -->
+<div id="ticker-link-menu" class="ticker-link-menu"></div>
 
 <!-- Add-link modal — any authenticated user may add a link (removal is
      ownership/admin-gated, see .ticker-link-menu__remove in app.js); /screener
