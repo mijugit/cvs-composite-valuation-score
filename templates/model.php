@@ -495,6 +495,37 @@
     Metryka była niedopasowana do typu spółki, nie dane.
 </div>
 
+<h4 style="font-size:var(--text-sm);font-weight:600;margin:.75rem 0 .25rem;">Wariant D — nieruchomości (REIT-y)</h4>
+<p>
+    Tu problem jest subtelniejszy niż u banków. REIT <em>ma</em> przepływy pieniężne, więc EV/FCF
+    zwraca liczbę — tylko zniekształconą. Wolne przepływy odejmują <strong>wszystkie</strong>
+    nakłady inwestycyjne, a u REIT-u mieszczą się w nich <strong>zakupy nieruchomości</strong>.
+    To wydatek na wzrost, nie na utrzymanie. Fundusz, który w danym roku kupił budynki, wygląda
+    więc na drogi wyłącznie dlatego, że zainwestował.
+</p>
+<p>
+    Dokładnie po to branża raportuje FFO. My liczymy <strong>EV/EBITDA</strong>, bo Yahoo nie
+    zwraca amortyzacji — sprawdzone dla wszystkich 18 REIT-ów w uniwersum, pole jest puste
+    u każdego — a to z niej buduje się FFO. EBITDA jest dostępna dla wszystkich 18 i niesie ten
+    sam zamysł: amortyzacja doliczona z powrotem, nakłady inwestycyjne poza rachunkiem. Jako
+    mnożnik od wartości przedsiębiorstwa jest przy tym neutralna wobec struktury kapitału, co ma
+    znaczenie w sektorze zadłużonym z założenia.
+</p>
+<div class="formula">wynik_wyceny = sigmoid( EV/EBITDA spółki ÷ mediana EV/EBITDA grupy )</div>
+<div class="callout callout--tip">
+    <strong>Ile to zmienia.</strong> Pomiar z 16.08.2026 na 18 REIT-ach: Realty Income (O) —
+    podręcznikowy fundusz typu triple-net — wypadał na <strong>1,64× mediany</strong> na EV/FCF
+    (⬇ REDUKUJ), a na EV/EBITDA na <strong>0,86×</strong>, czyli poniżej grupy. Iron Mountain
+    spadł z 2,03× na 1,17×. To nie jest kosmetyka: zmienia się kolejność rankingu.
+</div>
+<div class="callout callout--warn">
+    <strong>Dźwignia liczona inaczej.</strong> REIT finansujący nieruchomości przy 5–6× dług
+    netto/EBITDA jest zwyczajnie prowadzony, a ogólna skala uznaje wszystko powyżej 4× za
+    zagrożone. Efekt: <strong>każdy</strong> REIT dostawał 0 z 3 punktów za dźwignię niezależnie
+    od tego, jak wygląda jego bilans — a składnik, który nigdy się nie zmienia, nie mówi nic
+    o żadnej ze spółek. Dla sektora nieruchomości progi to 5× / 6,5× / 8×.
+</div>
+
 <h4 style="font-size:var(--text-sm);font-weight:600;margin:.75rem 0 .25rem;">Funkcja sigmoid — zamiana wskaźnika w punkty</h4>
 <p>
     Stosunek EV/FCF spółki do mediany sektora trafia do <strong>funkcji sigmoid</strong>, która

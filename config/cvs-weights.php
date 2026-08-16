@@ -218,7 +218,9 @@ return [
         'Industrials'            => ['median_ev_fcf' => 20, 'median_ev_sales' =>  2.0, 'median_gm' => 35, 'max_growth' => 12],
         'Energy'                 => ['median_ev_fcf' => 12, 'median_ev_sales' =>  1.5, 'median_gm' => 30, 'max_growth' => 15],
         'Basic Materials'        => ['median_ev_fcf' => 14, 'median_ev_sales' =>  2.0, 'median_gm' => 35, 'max_growth' => 12],
-        'Real Estate'            => ['median_ev_fcf' => 22, 'median_ev_sales' =>  8.0, 'median_gm' => 55, 'max_growth' => 10],
+        // median_ev_ebitda is the variant-D cold start. 19.5 is the measured
+        // median across the 18 REITs in this universe on 2026-08-16.
+        'Real Estate'            => ['median_ev_fcf' => 22, 'median_ev_sales' =>  8.0, 'median_gm' => 55, 'max_growth' => 10, 'median_ev_ebitda' => 19.5],
         'Utilities'              => ['median_ev_fcf' => 14, 'median_ev_sales' =>  2.0, 'median_gm' => 30, 'max_growth' =>  5],
         'Financial Services'     => ['median_ev_fcf' => 18, 'median_ev_sales' =>  3.0, 'median_gm' => 70, 'max_growth' => 12, 'median_pb' => 1.2],
         'DEFAULT'                => ['median_ev_fcf' => 20, 'median_ev_sales' =>  3.0, 'median_gm' => 40, 'max_growth' => 20],
@@ -266,6 +268,39 @@ return [
             // A payout above this is a caution, not a virtue: it can mean the
             // bank has no capital left for growth or loss absorption.
             'payout_max'  => 0.80,
+        ],
+    ],
+
+    // Variant D — real estate.
+    //
+    // Unlike a bank, a REIT does report cash flow, so this is a subtler problem
+    // than variant C's: the metric produces a number, just a distorted one. Free
+    // cash flow subtracts ALL capital expenditure, and for a REIT that includes
+    // property ACQUISITIONS — growth spending, not maintenance. A REIT that
+    // bought buildings this year therefore looks expensive on EV/FCF purely for
+    // having invested. That distortion is the reason the industry reports FFO
+    // instead, and it is measurable here: on 2026-08-16 Realty Income read 1.64x
+    // the peer median on EV/FCF (⬇ REDUKUJ) and 0.86x on EV/EBITDA.
+    //
+    // EV/EBITDA is used rather than P/FFO because Yahoo does not return the
+    // depreciation figure FFO is built from (checked across all 18 REITs — the
+    // field is absent for every one), while EBITDA is present for all 18. It is
+    // a standard REIT multiple in its own right and carries the FFO intent:
+    // depreciation added back, capital spending excluded. Being an enterprise
+    // multiple it is also capital-structure-neutral, which matters for a sector
+    // that is deliberately leveraged.
+    'real_estate' => [
+        'sectors' => ['Real Estate'],
+
+        // Leverage bands replacing the general ones. A REIT financing property
+        // with 5-6x net debt/EBITDA is ordinary and healthy; the general scale
+        // treats anything above 4x as distressed, so every REIT in this universe
+        // scored zero of three leverage points regardless of how it was run —
+        // a constant, and a constant carries no information.
+        'leverage' => [
+            'good'     => 5.0,
+            'fair'     => 6.5,
+            'stretched' => 8.0,
         ],
     ],
 

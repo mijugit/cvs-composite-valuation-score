@@ -62,6 +62,7 @@ class CVSModel
                 anchorWeight:    (float)  ($peerConfig['anchor_weight'] ?? 0.3),
                 valuationConfig: $config['valuation'] ?? [],
                 financialsConfig: $config['financials'] ?? [],
+                realEstateConfig: $config['real_estate'] ?? [],
             );
         } else {
             // Legacy / peer_group disabled — static benchmarks only.
@@ -115,7 +116,11 @@ class CVSModel
 
         // QualityPillar needs the financials config too: gross margin, leverage
         // and forward growth are not what makes a bank good or bad.
-        $qualScore = (new QualityPillar($bm, $this->config['financials'] ?? []))->score($financials);
+        $qualScore = (new QualityPillar(
+            $bm,
+            $this->config['financials'] ?? [],
+            $this->config['real_estate'] ?? []
+        ))->score($financials);
 
         // Step 3 — Weighted aggregate per mode.
         $swingCvs = round(

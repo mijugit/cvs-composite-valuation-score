@@ -42,8 +42,41 @@ class QualityPillar
      */
     public function __construct(
         private readonly array $benchmark,
-        private readonly array $config = []
+        private readonly array $config = [],
+        /** @var array<string, mixed> config['real_estate'] — leverage bands for REITs */
+        private readonly array $realEstateConfig = []
     ) {}
+
+    /**
+     * Net-debt/EBITDA bands, in points, for the sector at hand.
+     *
+     * Real estate gets its own. A REIT financing property at 5-6x net debt to
+     * EBITDA is ordinary and well run; the general scale calls anything over 4x
+     * distressed, so every REIT in this universe scored zero of three leverage
+     * points whatever its balance sheet looked like. A term that is constant
+     * across a sector carries no information about companies within it.
+     *
+     * @return array{good: float, fair: float, stretched: float}
+     */
+    private function leverageBands(string $sector): array
+    {
+        $sectors = is_array($this->realEstateConfig['sectors'] ?? null)
+            ? $this->realEstateConfig['sectors']
+            : [];
+
+        if ($sectors !== [] && in_array($sector, $sectors, true)) {
+            $bands = is_array($this->realEstateConfig['leverage'] ?? null)
+                ? $this->realEstateConfig['leverage']
+                : [];
+            return [
+                'good'      => (float) ($bands['good']      ?? 5.0),
+                'fair'      => (float) ($bands['fair']      ?? 6.5),
+                'stretched' => (float) ($bands['stretched'] ?? 8.0),
+            ];
+        }
+
+        return ['good' => 1.0, 'fair' => 2.5, 'stretched' => 4.0];
+    }
 
     /**
      * @param array<string, mixed> $financials  Normalised financials from FinancialDataFetcher
@@ -101,12 +134,14 @@ class QualityPillar
 
         $ptsLeverage = 0.0;
         if ($ebitda !== null && $ebitda > 0.0) {
+            $bands = $this->leverageBands($sector);
             $ratio = max(0.0, $totalDebt - $cash) / $ebitda;
-            if ($ratio <= 1.0)       { $ptsLeverage = 3.0; }
-            elseif ($ratio <= 2.5)   { $ptsLeverage = 2.0; }
-            elseif ($ratio <= 4.0)   { $ptsLeverage = 1.0; }
-            else                     { $ptsLeverage = 0.0; }
+            if ($ratio <= $bands['good'])           { $ptsLeverage = 3.0; }
+            elseif ($ratio <= $bands['fair'])       { $ptsLeverage = 2.0; }
+            elseif ($ratio <= $bands['stretched'])  { $ptsLeverage = 1.0; }
+            else                                    { $ptsLeverage = 0.0; }
             $steps['net_debt_ebitda'] = round($ratio, 2);
+            $steps['leverage_bands']  = $bands;
         } elseif ($revenue !== null && $revenue > 0.0) {
             // Cash-burning company — use cash / revenue as runway proxy
             $cr = $cash / $revenue;

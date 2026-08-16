@@ -214,6 +214,23 @@ foreach ($todaysSectors as $targetSector) {
             }
         }
 
+        // EV/EBITDA, like price/book above, is collected BEFORE the growth gate.
+        // It needs no growth estimate, and gating it behind one would leave the
+        // real-estate buckets thin for the same reason the financial ones were
+        // empty. Variant D reads these.
+        $evForEbitda = ValuationMetrics::enterpriseValue($financials);
+        $ebitdaRaw   = isset($financials['ebitda']) ? (float) $financials['ebitda'] : null;
+        if ($evForEbitda !== null && $ebitdaRaw !== null && $ebitdaRaw > 0.0) {
+            $evEbitda = $evForEbitda / $ebitdaRaw;
+            if ($evEbitda > 0.0) {
+                $buckets['sector'][$sector]['ev_ebitda'][] = $evEbitda;
+                if ($industry !== null) {
+                    $buckets['industry'][$industry]['ev_ebitda'][] = $evEbitda;
+                    $buckets['industry'][$industry]['_sector']     = $sector;
+                }
+            }
+        }
+
         $growthPct = ValuationMetrics::extractForwardGrowth($financials);
         if ($growthPct === null) {
             $totalSkipped++;
@@ -285,7 +302,7 @@ foreach ($todaysSectors as $targetSector) {
                 $parentSector = null;
             }
 
-            foreach (['ev_fcf', 'ev_sales', 'gm', 'pb'] as $metric) {
+            foreach (['ev_fcf', 'ev_sales', 'gm', 'pb', 'ev_ebitda'] as $metric) {
                 /** @var float[] $values */
                 $values = array_filter(
                     (array) ($data[$metric] ?? []),

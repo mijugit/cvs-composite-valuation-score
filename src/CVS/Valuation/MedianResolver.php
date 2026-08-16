@@ -20,13 +20,13 @@ class MedianResolver
 {
     /**
      * Every metric the Valuation pillar can land on, one per variant: A resolves
-     * `ev_fcf`, B `ev_sales`, C `pb`. Callers asking "does this bucket have real
-     * peers?" must weigh all three — a bucket is only empty when it is empty on
-     * every metric its members could be scored against.
+     * `ev_fcf`, B `ev_sales`, C `pb`, D `ev_ebitda`. Callers asking "does this
+     * bucket have real peers?" must weigh all of them — a bucket is only empty
+     * when it is empty on every metric its members could be scored against.
      *
      * @var list<string>
      */
-    public const VALUATION_METRICS = ['ev_fcf', 'ev_sales', 'pb'];
+    public const VALUATION_METRICS = ['ev_fcf', 'ev_sales', 'pb', 'ev_ebitda'];
 
     /**
      * @param PeerMedianRepository         $repo          Peer median store
@@ -148,6 +148,10 @@ class MedianResolver
                 // EV/FCF is meaningless (a bank's "free cash flow" is not a
                 // measure of anything an investor prices).
                 'pb'       => isset($bm['median_pb'])        ? (float) $bm['median_pb']        : null,
+                // EV/EBITDA — the valuation metric for real estate, where free
+                // cash flow nets out property acquisitions and so penalises a
+                // REIT for investing.
+                'ev_ebitda' => isset($bm['median_ev_ebitda']) ? (float) $bm['median_ev_ebitda'] : null,
                 default    => null,
             };
 

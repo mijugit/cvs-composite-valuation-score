@@ -52,6 +52,8 @@ class ValuationPillar
         private readonly array           $valuationConfig = [],
         /** @var array<string, mixed> config['financials'] — sectors scored on price/book */
         private readonly array           $financialsConfig = [],
+        /** @var array<string, mixed> config['real_estate'] — sectors scored on EV/EBITDA */
+        private readonly array           $realEstateConfig = [],
     ) {}
 
     /**
@@ -124,6 +126,17 @@ class ValuationPillar
             : [];
         if (in_array($sector, $financialSectors, true)) {
             return $this->scoreVariantC($financials, $sector, $industry);
+        }
+
+        // --- Variant D: real estate, priced on EV/EBITDA ---
+        // Checked before growth and EV/FCF for the same reason as variant C: the
+        // ordinary metric is available but misleading here. Free cash flow nets
+        // out property acquisitions, so a REIT is penalised for investing.
+        $realEstateSectors = is_array($this->realEstateConfig['sectors'] ?? null)
+            ? $this->realEstateConfig['sectors']
+            : [];
+        if (in_array($sector, $realEstateSectors, true)) {
+            return $this->scoreVariantD($financials, $sector, $industry);
         }
 
         // Growth (needed for both variants).
@@ -205,6 +218,74 @@ class ValuationPillar
         $this->lastSteps     = [
             'variant'       => 'C',
             'pb'            => round($pb, 4),
+            'sub_median'    => round($subResolution->value, 4),
+            'sub_score'     => round($subScore, 2),
+            'anchor_median' => $anchorResolution->isValid() ? round($anchorResolution->value, 4) : null,
+            'anchor_score'  => round($anchorScore, 2),
+            'final'         => round($score, 2),
+        ];
+
+        return $score;
+    }
+
+    /**
+     * EV/EBITDA against the peer median — the valuation path for real estate.
+     *
+     * Same shape as the other three: ratio against a resolved median, sigmoid,
+     * sector anchor, same direction. Only the metric changes.
+     *
+     * Why not the FFO the sector actually reports: Yahoo returns no depreciation
+     * figure for any of the 18 REITs in this universe, and depreciation is what
+     * FFO is built from. EBITDA is present for all 18 and carries the same
+     * intent — depreciation added back, capital spending excluded — while being
+     * capital-structure-neutral, which suits a sector that is leveraged by
+     * design.
+     */
+    private function scoreVariantD(
+        array  $financials,
+        string $sector,
+        string $industry
+    ): float {
+        assert($this->resolver !== null);
+
+        $ev     = ValuationMetrics::enterpriseValue($financials);
+        $ebitda = isset($financials['ebitda']) ? (float) $financials['ebitda'] : null;
+
+        if ($ev === null || $ebitda === null || $ebitda <= 0.0) {
+            // No opinion rather than a guess — the same neutral convention every
+            // other variant uses when its own metric is unavailable.
+            $this->lastSource    = 'missing_ebitda';
+            $this->lastBucketKey = '';
+            $this->lastSteps     = ['variant' => 'D'];
+            return 50.0;
+        }
+
+        $evEbitda = $ev / $ebitda;
+
+        $subResolution    = $this->resolver->resolve($industry, $sector, 'ev_ebitda');
+        $anchorResolution = $this->resolver->resolveSector($sector, 'ev_ebitda');
+
+        if (!$subResolution->isValid()) {
+            $this->lastSource    = $subResolution->source;
+            $this->lastBucketKey = $subResolution->bucketKey;
+            $this->lastSteps     = ['variant' => 'D', 'ev_ebitda' => round($evEbitda, 4)];
+            return 50.0;
+        }
+
+        $subScore    = $this->sigmoid($evEbitda / $subResolution->value);
+        $anchorScore = $anchorResolution->isValid()
+            ? $this->sigmoid($evEbitda / $anchorResolution->value)
+            : $subScore;
+
+        $score = $this->blend($subScore, $anchorScore);
+
+        $this->lastSource    = ($this->lastOverrideActive && $subResolution->isSubsector())
+            ? 'override'
+            : $subResolution->source;
+        $this->lastBucketKey = $subResolution->bucketKey;
+        $this->lastSteps     = [
+            'variant'       => 'D',
+            'ev_ebitda'     => round($evEbitda, 4),
             'sub_median'    => round($subResolution->value, 4),
             'sub_score'     => round($subScore, 2),
             'anchor_median' => $anchorResolution->isValid() ? round($anchorResolution->value, 4) : null,
