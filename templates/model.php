@@ -487,7 +487,22 @@
     stosunek P/B spółki do mediany grupy porównawczej trafia do tej samej sigmoidy, z tą samą
     kotwicą sektorową i tym samym kierunkiem (poniżej mediany = tanio = wyższy wynik).
 </p>
-<div class="formula">wynik_wyceny = sigmoid( P/B spółki ÷ mediana P/B grupy )</div>
+<div class="formula">wynik_wyceny = sigmoid( (P/B ÷ ROE) spółki ÷ mediana (P/B ÷ ROE) grupy )</div>
+<div class="callout callout--warn">
+    <strong>Dlaczego dzielimy przez ROE.</strong> Mnożnik księgowy banku jest <em>funkcją</em>
+    rentowności, która go zarabia — model Gordona-Shapiro daje
+    <code>P/B = (ROE − g) / (COE − g)</code>, więc P/B i ROE rosną razem z definicji.
+    Porównywanie surowego P/B do mediany grupy karało więc bank <strong>za to, że dobrze
+    zarabia</strong>. Pomiar na 20 bankach (16.08.2026): korelacja ROE z wynikiem wyceny wynosiła
+    <strong>−0,54</strong>. ING.WA — najbardziej rentowny w stawce (ROE 24,1%, Jakość 100/100) —
+    dostawał 10,8, a Shinhan (ROE 8,9%, Jakość 40/100) dostawał 79,5. Wewnątrz wariantu wycena
+    i jakość były mechanicznie przeciwstawne. Po zmianie korelacja to <strong>+0,27</strong>.
+    <br><br>
+    <strong>Czego to nie rozwiązuje:</strong> zakładamy, że bieżące ROE się utrzyma. Zwrot
+    z kapitału wraca do średniej, więc bank na szczycie cyklu zysków dostanie zawyżoną ocenę.
+    Poprawnym lekarstwem jest ROE znormalizowane przez cykl, którego nie mamy w danych.
+    Bank bez dodatniego ROE wraca do samego P/B.
+</div>
 <div class="callout callout--tip">
     <strong>Dlaczego to miało znaczenie.</strong> Zanim wariant C powstał, kubełek
     „Banks - Regional" miał <strong>zero</strong> spółek z policzalnym EV/FCF, mimo że
