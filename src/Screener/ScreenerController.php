@@ -133,13 +133,9 @@ class ScreenerController
             // min_sample_count is benchmarked against its SECTOR instead, which
             // can flatter or punish it badly (ASB.WA: 10.3x industry vs 24.4x
             // sector). One bulk read, resolved per row in the view.
-            'peerCoverage'     => new PeerCoverage(
-                (new PeerMedianRepository(Database::connection()))
-                    ->findIndustrySampleCounts(
-                        (string) ($this->cvsConfig['model_version'] ?? ''),
-                        MedianResolver::VALUATION_METRICS
-                    ),
-                (int) ($this->cvsConfig['peer_group']['min_sample_count'] ?? 5)
+            'peerCoverage'     => PeerCoverage::fromConfig(
+                $this->cvsConfig,
+                new PeerMedianRepository(Database::connection())
             ),
         ]);
     }

@@ -156,13 +156,7 @@ if ($partitioned['dropped'] !== []) {
 // cannot, so thin-bucket tickers stay out of the candidate list. HELD tickers
 // are exempt for the same reason as stale ones: the executor prices trades from
 // these rows, so dropping a held ticker strands the position.
-$peerCoverage = new PeerCoverage(
-    (new PeerMedianRepository($db))->findIndustrySampleCounts(
-        (string) ($cvsConfig['model_version'] ?? ''),
-        'ev_fcf'
-    ),
-    (int) ($cvsConfig['peer_group']['min_sample_count'] ?? 5)
-);
+$peerCoverage = PeerCoverage::fromConfig($cvsConfig, new PeerMedianRepository($db));
 $thinDropped = [];
 $screenerRows = array_values(array_filter($screenerRows, static function (array $r) use ($peerCoverage, $heldTickers, &$thinDropped): bool {
     $t = strtoupper((string) ($r['ticker'] ?? ''));

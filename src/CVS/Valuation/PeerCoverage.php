@@ -46,6 +46,31 @@ final class PeerCoverage
      * inspects ev_fcf alone and therefore mislabels every variant-B company,
      * which is exactly the bug this parameter exists to retire.
      */
+    /**
+     * Build one straight from config, so no caller has to choose a metric list.
+     *
+     * Four call sites were each picking their own, and two of them were still
+     * asking about `ev_fcf` alone after variants C and D shipped — which reads a
+     * bank's or a REIT's bucket as empty and would withhold it from the
+     * autonomous portfolios. Harmless while every row carries a persisted
+     * `valuation_source` (the short-circuit in isThin below), and a silent trap
+     * the moment one does not. Same reasoning as MedianResolver::fromConfig().
+     *
+     * @param array<string, mixed> $cvsConfig config/cvs-weights.php
+     */
+    public static function fromConfig(array $cvsConfig, ?PeerMedianRepository $repo = null): self
+    {
+        $repo ??= new PeerMedianRepository();
+
+        return new self(
+            $repo->findIndustrySampleCounts(
+                (string) ($cvsConfig['model_version'] ?? ''),
+                MedianResolver::VALUATION_METRICS
+            ),
+            (int) ($cvsConfig['peer_group']['min_sample_count'] ?? 5)
+        );
+    }
+
     public function isThin(?string $industry, ?string $valuationSource = null): bool
     {
         if ($valuationSource !== null && $valuationSource !== '') {
