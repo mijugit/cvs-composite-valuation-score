@@ -70,6 +70,7 @@ use CVS\CVS\CVSModel;
 use CVS\CVS\Valuation\MedianResolver;
 use CVS\CVS\Valuation\PeerBucketOverrideRepository;
 use CVS\Mail\MailService;
+use CVS\Screener\TickerIdentity;
 use CVS\TrackRecord\CvsSnapshotRepository;
 use CVS\TrackRecord\SnapshotWriter;
 use CVS\Watchlist\WatchlistRepository;
@@ -119,6 +120,30 @@ $medianResolver = MedianResolver::fromConfig($config);
 // leaves Yahoo's industry on the snapshot untouched.
 $peerOverrides = (new PeerBucketOverrideRepository())->findBucketMap();
 
+// Names we believe each symbol stands for, read from the universe file the
+// admin screen maintains. Used only to notice when a symbol stops meaning what
+// it used to: `GOLD` was reassigned from Barrick (which moved to `B`) to
+// Gold.com, Inc., and the model happily scored the new company under the old
+// name for as long as the row sat there. Every layer trusted the symbol, so the
+// returned company name is the only witness. Missing file = check disabled, not
+// a run failure.
+/** @var array<string, string> $universeNames ticker => name we expect */
+$universeNames = [];
+$universeFile  = ROOT_PATH . '/public/data/tickers.json';
+if (is_readable($universeFile)) {
+    $parsed = json_decode((string) file_get_contents($universeFile), true);
+    if (is_array($parsed)) {
+        foreach ($parsed as $row) {
+            if (is_array($row) && isset($row['symbol'], $row['name'])) {
+                $universeNames[strtoupper((string) $row['symbol'])] = (string) $row['name'];
+            }
+        }
+    }
+}
+
+/** @var list<string> $driftWarnings */
+$driftWarnings = [];
+
 // Three outcomes, counted separately. The old pair (success/failed) incremented
 // `failed` only when fetch() returned null, so a Quality Gate REJECTION counted
 // as a success — MU was rejected five times a day for four days while every run
@@ -158,6 +183,22 @@ foreach ($tickers as $ticker) {
         $skipped++;
         $skippedTickers[] = $ticker;
         continue;
+    }
+
+    // Identity check. Deliberately does NOT skip the ticker: a name mismatch is
+    // a question for the operator (repoint or drop?), not a fact the job may act
+    // on, and guessing wrong would silently remove a position.
+    $expectedName = $universeNames[strtoupper($ticker)] ?? null;
+    if ($expectedName !== null) {
+        $warning = TickerIdentity::driftWarning(
+            $ticker,
+            $expectedName,
+            isset($financials['long_name']) ? (string) $financials['long_name'] : null
+        );
+        if ($warning !== null) {
+            $log('rescore: UWAGA — ' . $warning);
+            $driftWarnings[] = $ticker;
+        }
     }
 
     $ovr = $peerOverrides[strtoupper($ticker)] ?? null;
@@ -224,6 +265,12 @@ if ($rejectedTickers !== []) {
 }
 if ($skippedTickers !== []) {
     $log('rescore: skipped, no usable payload — ' . implode(', ', $skippedTickers));
+}
+if ($driftWarnings !== []) {
+    $log(
+        'rescore: tickery do sprawdzenia (nazwa nie zgadza się z giełdą) — '
+        . implode(', ', $driftWarnings)
+    );
 }
 
 exit(0);
