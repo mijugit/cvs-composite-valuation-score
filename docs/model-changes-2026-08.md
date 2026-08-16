@@ -240,6 +240,44 @@ Naprawiony też licznik `n=` w kubełkach: dropdown i badge „◍ brak peerów"
 `pb` pokazywał się jako poniżej progu). To **ta sama wada, co w `PeerCoverage`**, tylko w drugiej
 połowie tej samej funkcji — wzorzec z sekcji 8 uderzył piąty raz.
 
+## 10. Liczba akcji — liczba pod każdym werdyktem EV
+
+`EV = cena × akcje + dług − gotówka`, więc liczba akcji stoi pod każdym wnioskiem o wycenie.
+Zawodziła na dwa sposoby, oba po cichu i oba w stronę „to jest tanie".
+
+**Wiele klas akcji.** `sharesOutstanding` liczy tylko klasę notowaną. Pomiar na całym uniwersum:
+**56 z 587 spółek (9,5%)** rozjeżdża się o ponad 5%, a ogon jest ekstremalny — VG +370%,
+SYM +366%, LEVI +283%, IBKR +276%, GOOGL +108%. To znacznie więcej niż cztery znane przypadki.
+Yahoo publikuje `impliedSharesOutstanding` wprost i zgadza się co do cyfry z naszym dzieleniem
+`marketCap / cena`, więc jest teraz pierwszym szczeblem — bez zależności od świeżości ceny i od
+konwersji jednostek pomocniczych.
+
+**Brak liczby akcji w ogóle.** Dla **28 spółek (4,8%)** — MU, HD, CRM, LOW, TGT, ADI, MDT —
+Yahoo zwraca pustą tablicę dla `sharesOutstanding`, `impliedSharesOutstanding` **i** `marketCap`.
+EV wychodziło NULL, filar Wyceny zwracał neutralne 50, a to wyrzucało **65% wyniku
+fundamentalnego** dla spółek skądinąd w pełni policzalnych.
+
+Te dostają `revenue / revenuePerShare`. `revenuePerShare` liczy się na akcjach rozwodnionych, więc
+obejmuje wszystkie klasy, a wobec spółek o znanej liczbie akcji trafia w ~1%:
+
+| | prawdziwa | rev/revPerShare | float |
+|---|---|---|---|
+| AAPL | 14,594 mld | +0,9% | −0,2% |
+| NVDA | 24,221 mld | +0,4% | −4,1% |
+| GOOGL | 12,230 mld | **−1,0%** | **−10,6%** |
+
+**Dlaczego nie `floatShares`**, choć to jedyne pole obecne dla tych 28: wyklucza akcje w rękach
+zamkniętych, więc **zaniża** — na GOOGL o 10,6% — a zaniżanie to dokładnie ten kierunek błędu,
+któremu ta warstwa ma zapobiegać. `netIncomeToCommon / trailingEps` też odpadło: łamie się na ADR-ach
+raportujących EPS w innej walucie (JD: 9,93 mld wobec prawdziwych ~1,39 mld).
+
+**Skutek na żywej pozycji.** MU miał w snapshocie wycenę NULL i swing 75,0. Po naprawie:
+wycena **81,5** (źródło `subsector`), swing **87,6**. To ponad 12 punktów różnicy na największej
+pozycji portfela — i wynik, którego model wcześniej po prostu nie umiał policzyć.
+
+**Lekcja o widoczności.** Ten błąd przetrwał, bo neutralne 50 wygląda jak *opinia*, nie jak
+*brak odpowiedzi*. Pusty licznik krzyczy; neutralny wynik milczy.
+
 ## Migracje
 
 | Nr | Co dodaje |

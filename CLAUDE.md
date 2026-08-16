@@ -35,6 +35,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - A Quality Gate rejection is still a versioned observation: `CVSResult::failed()` MUST carry the live `model_version`. A NULL version bypasses `uq_ticker_day_version` (MySQL treats each NULL as distinct) AND masks the ticker's last good snapshot from the screener's version-agnostic `MAX(score_date)`.
 - Never persist a snapshot from an incomplete payload. `PayloadCompleteness::missingEssentialFields()` gates this — a scoreless row becomes the ticker's newest and hides its last usable one.
 - Per-share figures converted for comparison against `current_price` must use the PRICE FX rate, not the statement rate (see `book_value_per_share`).
+- Share counts resolve through `ShareCount::resolve()` and nowhere else. `sharesOutstanding` covers only the QUOTED class — 9.5% of this universe diverges by more than 5% (VG +370%, IBKR +276%, GOOGL +108%) — and for 4.8% Yahoo returns no count at all. Never substitute `floatShares`: it excludes closely-held stock, so it undercounts, and every share-count error runs towards "looks cheap".
 
 ### Disclaimer — mandatory on every result
 
