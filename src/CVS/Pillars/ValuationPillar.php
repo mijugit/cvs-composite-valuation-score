@@ -194,8 +194,24 @@ class ValuationPillar
             return 50.0;
         }
 
-        $subResolution    = $this->resolver->resolve($industry, $sector, 'pb');
-        $anchorResolution = $this->resolver->resolveSector($sector, 'pb');
+        // Condition the book multiple on the return that earns it. A bank trades
+        // above book BECAUSE it earns above its cost of equity — Gordon-Shapiro
+        // gives P/B = (ROE - g)/(COE - g) — so comparing raw P/B to a peer median
+        // scores profitability as expense. Measured across this universe the
+        // correlation between ROE and the resulting score was -0.54.
+        //
+        // ROE at or below zero cannot condition anything (the quotient flips or
+        // explodes), so those keep the plain book multiple: for a bank losing
+        // money, P/B is the only signal left.
+        $roe    = isset($financials['return_on_equity']) ? (float) $financials['return_on_equity'] : null;
+        $pbRoe  = is_array($this->financialsConfig['pb_roe'] ?? null) ? $this->financialsConfig['pb_roe'] : [];
+        $useRoe = !empty($pbRoe['enabled']) && $roe !== null && $roe > 0.0;
+
+        $metric    = $useRoe ? 'pb_roe' : 'pb';
+        $companyMx = $useRoe ? $pb / $roe : $pb;
+
+        $subResolution    = $this->resolver->resolve($industry, $sector, $metric);
+        $anchorResolution = $this->resolver->resolveSector($sector, $metric);
 
         if (!$subResolution->isValid()) {
             $this->lastSource    = $subResolution->source;
@@ -204,9 +220,33 @@ class ValuationPillar
             return 50.0;
         }
 
-        $subScore    = $this->sigmoid($pb / $subResolution->value);
+        $ratio = $companyMx / $subResolution->value;
+
+        // Out of family by this much is a broken input, not a valuation. HSBC
+        // reads 4.5x the peer median because Yahoo divides an ADR price by an
+        // ORDINARY-share book value, and nothing in the payload can undo the
+        // depositary ratio. A confident 0/100 on a cheap bank is worse than no
+        // opinion, so this returns the same neutral every other variant uses
+        // when its own metric is unusable.
+        $maxRatio = (float) ($pbRoe['implausible_multiple'] ?? 0.0);
+        if ($maxRatio > 0.0 && $ratio > $maxRatio) {
+            $this->lastSource    = 'implausible_pb';
+            $this->lastBucketKey = $subResolution->bucketKey;
+            $this->lastSteps     = [
+                'variant'    => 'C',
+                'pb'         => round($pb, 4),
+                'pb_roe'     => $useRoe ? round($companyMx, 4) : null,
+                'sub_median' => round($subResolution->value, 4),
+                'ratio'      => round($ratio, 2),
+            ];
+            return 50.0;
+        }
+
+        $subScore    = $this->sigmoid($ratio);
+        // The anchor has to be measured on the same axis as the sub-score, or
+        // the blend compares a ROE-conditioned ratio against a raw one.
         $anchorScore = $anchorResolution->isValid()
-            ? $this->sigmoid($pb / $anchorResolution->value)
+            ? $this->sigmoid($companyMx / $anchorResolution->value)
             : $subScore;
 
         $score = $this->blend($subScore, $anchorScore);
@@ -218,6 +258,8 @@ class ValuationPillar
         $this->lastSteps     = [
             'variant'       => 'C',
             'pb'            => round($pb, 4),
+            'roe'           => $useRoe ? round((float) $roe, 4) : null,
+            'pb_roe'        => $useRoe ? round($companyMx, 4) : null,
             'sub_median'    => round($subResolution->value, 4),
             'sub_score'     => round($subScore, 2),
             'anchor_median' => $anchorResolution->isValid() ? round($anchorResolution->value, 4) : null,

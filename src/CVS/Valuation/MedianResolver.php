@@ -26,7 +26,7 @@ class MedianResolver
      *
      * @var list<string>
      */
-    public const VALUATION_METRICS = ['ev_fcf', 'ev_sales', 'pb', 'ev_ebitda'];
+    public const VALUATION_METRICS = ['ev_fcf', 'ev_sales', 'pb', 'ev_ebitda', 'pb_roe'];
 
     /**
      * @param PeerMedianRepository         $repo          Peer median store
@@ -152,6 +152,9 @@ class MedianResolver
                 // cash flow nets out property acquisitions and so penalises a
                 // REIT for investing.
                 'ev_ebitda' => isset($bm['median_ev_ebitda']) ? (float) $bm['median_ev_ebitda'] : null,
+                // Book multiple per unit of return on equity — variant C's real
+                // metric, since a bank's P/B is a function of its ROE.
+                'pb_roe'    => isset($bm['median_pb_roe'])    ? (float) $bm['median_pb_roe']    : null,
                 default    => null,
             };
 

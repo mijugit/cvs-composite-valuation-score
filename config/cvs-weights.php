@@ -222,7 +222,9 @@ return [
         // median across the 18 REITs in this universe on 2026-08-16.
         'Real Estate'            => ['median_ev_fcf' => 22, 'median_ev_sales' =>  8.0, 'median_gm' => 55, 'max_growth' => 10, 'median_ev_ebitda' => 19.5],
         'Utilities'              => ['median_ev_fcf' => 14, 'median_ev_sales' =>  2.0, 'median_gm' => 30, 'max_growth' =>  5],
-        'Financial Services'     => ['median_ev_fcf' => 18, 'median_ev_sales' =>  3.0, 'median_gm' => 70, 'max_growth' => 12, 'median_pb' => 1.2],
+        // median_pb_roe (14.0) is the measured centre of the P/B ÷ ROE band across
+        // the 20 banks in this universe on 2026-08-16; the pack sat at 10-20.
+        'Financial Services'     => ['median_ev_fcf' => 18, 'median_ev_sales' =>  3.0, 'median_gm' => 70, 'max_growth' => 12, 'median_pb' => 1.2, 'median_pb_roe' => 14.0],
         'DEFAULT'                => ['median_ev_fcf' => 20, 'median_ev_sales' =>  3.0, 'median_gm' => 40, 'max_growth' => 20],
     ],
 
@@ -268,6 +270,33 @@ return [
             // A payout above this is a caution, not a virtue: it can mean the
             // bank has no capital left for growth or loss absorption.
             'payout_max'  => 0.80,
+        ],
+
+        // Price/book conditioned on return on equity.
+        //
+        // A bank's book multiple is a FUNCTION of its profitability — Gordon-
+        // Shapiro gives P/B = (ROE - g) / (COE - g), so at first order P/B rises
+        // with ROE and P/B ÷ ROE is roughly constant across peers of similar
+        // risk. Comparing raw P/B to a peer median therefore punishes a bank for
+        // earning well. Measured across 20 banks on 2026-08-16 the correlation
+        // between ROE and the Valuation score was -0.54: ING.WA (ROE 24.1%,
+        // Quality 100/100) scored 10.8, while Shinhan (ROE 8.9%, Quality 40)
+        // scored 79.5. Inside variant C, valuation and quality were mechanically
+        // opposed.
+        //
+        // The measured P/B ÷ ROE band for that same group was 10-20.
+        'pb_roe' => [
+            'enabled' => true,
+
+            // Above this multiple of the peer median the figure is out of family
+            // and is far more likely to be a unit error than a valuation. HSBC
+            // reads 62.9 against a ~14 median because Yahoo divides an ADR price
+            // by an ORDINARY-share book value — the depositary ratio again, this
+            // time inside price_to_book, and not recoverable: Yahoo returns no
+            // balance sheet for banks, so equity cannot be used to rebuild the
+            // ratio. Scoring it 0/100 states a confident falsehood about a bank
+            // that is actually cheap; the model declines to score instead.
+            'implausible_multiple' => 3.0,
         ],
     ],
 

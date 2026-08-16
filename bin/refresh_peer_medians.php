@@ -212,6 +212,19 @@ foreach ($todaysSectors as $targetSector) {
                 $buckets['industry'][$industry]['pb'][]    = $pb;
                 $buckets['industry'][$industry]['_sector'] = $sector;
             }
+
+            // P/B per unit of ROE — what variant C actually compares, because a
+            // bank's book multiple is a function of the return that earns it.
+            // Collected here, beside pb and ahead of the growth gate, for the
+            // same reason: banks often have no forward growth estimate.
+            $roeRaw = isset($financials['return_on_equity']) ? (float) $financials['return_on_equity'] : null;
+            if ($roeRaw !== null && $roeRaw > 0.0) {
+                $pbRoe = $pb / $roeRaw;
+                $buckets['sector'][$sector]['pb_roe'][] = $pbRoe;
+                if ($industry !== null) {
+                    $buckets['industry'][$industry]['pb_roe'][] = $pbRoe;
+                }
+            }
         }
 
         // EV/EBITDA, like price/book above, is collected BEFORE the growth gate.
@@ -302,7 +315,7 @@ foreach ($todaysSectors as $targetSector) {
                 $parentSector = null;
             }
 
-            foreach (['ev_fcf', 'ev_sales', 'gm', 'pb', 'ev_ebitda'] as $metric) {
+            foreach (['ev_fcf', 'ev_sales', 'gm', 'pb', 'ev_ebitda', 'pb_roe'] as $metric) {
                 /** @var float[] $values */
                 $values = array_filter(
                     (array) ($data[$metric] ?? []),
