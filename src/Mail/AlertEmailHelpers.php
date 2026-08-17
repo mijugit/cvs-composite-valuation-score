@@ -87,6 +87,60 @@ class AlertEmailHelpers
     }
 
     /**
+     * Solid-fill recommendation pill for the digest table's dense rows.
+     *
+     * Same hue mapping as the app's own watchlist-chip classes
+     * (SILNE KUPUJ=green, AKUMULUJ=blue, NEUTRALNIE=gray, REDUKUJ=amber,
+     * UNIKAJ=red — public/css/app.css .reco--*), matched the same way the
+     * screener already does it (str_contains against the label, see
+     * templates/screener.php $recoColor). Re-expressed as a solid tint
+     * background with dark saturated text rather than the app's
+     * translucent-fill-on-dark-navy tokens: those read as a barely-visible
+     * wash on the white background an email needs — client dark-mode support
+     * is too inconsistent to risk a dark card — so this is the same brand hue
+     * for a light medium, not a different palette.
+     */
+    public static function recoBadge(?string $reco): string
+    {
+        if ($reco === null || $reco === '') {
+            return '<span style="color:#64748b;font-size:12px;">—</span>';
+        }
+
+        [$bg, $fg] = match (true) {
+            str_contains($reco, 'SILNE KUPUJ') => ['#dcfce7', '#15803d'],
+            str_contains($reco, 'AKUMULUJ')    => ['#dbeafe', '#1d4ed8'],
+            str_contains($reco, 'REDUKUJ')     => ['#fef3c7', '#92400e'],
+            str_contains($reco, 'UNIKAJ')      => ['#fee2e2', '#b91c1c'],
+            default                            => ['#f1f5f9', '#475569'], // NEUTRALNIE
+        };
+
+        // Strip the leading arrow glyph — the pill's colour already carries
+        // the direction, so repeating it as a second glyph inside a small
+        // badge is noise, not information.
+        $label = trim((string) preg_replace('/^[⬆⬇→]+\s*/u', '', $reco));
+
+        return '<span style="display:inline-block;background:' . $bg . ';color:' . $fg . ';'
+            . 'font-size:11px;font-weight:700;letter-spacing:.02em;padding:3px 9px;'
+            . 'border-radius:999px;white-space:nowrap;">' . htmlspecialchars($label) . '</span>';
+    }
+
+    /**
+     * Compact signal label for the digest table — no full "old → new" prose,
+     * just the current glyph+word (the row's presence in the digest already
+     * signals "this changed"; a table read top-to-bottom does not need every
+     * cell to repeat that framing).
+     */
+    public static function signalLabel(?string $signal): string
+    {
+        return match ($signal) {
+            'strong'    => '⭐⭐ Silny',
+            'watchlist' => '⭐ Obserwuj',
+            'momentum'  => '↑ Momentum',
+            default     => '<span style="color:#64748b;">—</span>',
+        };
+    }
+
+    /**
      * Footer offering to mute just this ticker (deep-link to the analysis page,
      * which already carries the per-ticker mute toggle) plus, optionally, the
      * global unsubscribe link.

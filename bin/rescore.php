@@ -234,12 +234,14 @@ foreach ($tickers as $ticker) {
         }
     }
 
-    // S-04: check for state change and notify watching users.
+    // S-04: check for state change and queue a digest row for watching users.
     // companyName/price/zone are already computed above (zero extra fetches) —
-    // enrich the alert mail beyond the bare reco/signal change.
-    $alerted = $alertSvc->checkAndNotify($ticker, $result->toArray(), $companyName, $price, $zone);
-    if ($alerted > 0) {
-        $log(sprintf('rescore: alert sent for %s to %d user(s)', $ticker, $alerted));
+    // enrich the alert mail beyond the bare reco/signal change. Nothing is
+    // sent yet — flushDigests() below sends one email per user after the
+    // whole ticker loop finishes, batching every change from this run.
+    $queued = $alertSvc->checkAndNotify($ticker, $result->toArray(), $companyName, $price, $zone);
+    if ($queued > 0) {
+        $log(sprintf('rescore: alert queued for %s for %d user(s)', $ticker, $queued));
     }
 
     if ($result->qualityGatePassed) {
@@ -248,6 +250,13 @@ foreach ($tickers as $ticker) {
         $rejected++;
         $rejectedTickers[] = $ticker;
     }
+}
+
+// S-04: send the batched per-user digests now that every ticker in this run
+// has been checked — one email per affected user instead of one per ticker.
+$digestsSent = $alertSvc->flushDigests();
+if ($digestsSent > 0) {
+    $log(sprintf('rescore: sent %d digest email(s)', $digestsSent));
 }
 
 $log(sprintf(
