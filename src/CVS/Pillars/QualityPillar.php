@@ -208,22 +208,32 @@ class QualityPillar
         $roaStrong = (float) ($cfg['roa_strong'] ?? 0.015);
         $payoutMax = (float) ($cfg['payout_max'] ?? 0.80);
 
+        // Unknown ROE/ROA score the neutral middle (half of the 4-point max),
+        // mirroring the payout convention below: absence of the field is not
+        // evidence of a weak bank. A MEASURED loss or sub-zero return (roe/roa
+        // <= 0) is still scored 0 — that is real information, not a gap. Yahoo
+        // omits returnOnEquity for a measurable slice of Financial Services
+        // tickers (e.g. XTB.WA) even when it is recoverable from P/B ÷ P/E —
+        // FinancialDataFetcher fills that gap upstream (ProfitabilityMetrics),
+        // so a null reaching here means neither Yahoo nor derivation had it.
         $roe = isset($financials['return_on_equity']) ? (float) $financials['return_on_equity'] : null;
-        $ptsRoe = 0.0;
+        $ptsRoe = 2.0;
         if ($roe !== null) {
             if ($roe >= $roeStrong)    { $ptsRoe = 4.0; }
             elseif ($roe >= $roeGood)  { $ptsRoe = 2.5; }
             elseif ($roe > 0.0)        { $ptsRoe = 1.0; }
+            else                       { $ptsRoe = 0.0; }
         }
         $steps['roe']     = $roe !== null ? round($roe, 4) : null;
         $steps['pts_roe'] = $ptsRoe;
 
         $roa = isset($financials['return_on_assets']) ? (float) $financials['return_on_assets'] : null;
-        $ptsRoa = 0.0;
+        $ptsRoa = 2.0;
         if ($roa !== null) {
             if ($roa >= $roaStrong)    { $ptsRoa = 4.0; }
             elseif ($roa >= $roaGood)  { $ptsRoa = 2.5; }
             elseif ($roa > 0.0)        { $ptsRoa = 1.0; }
+            else                       { $ptsRoa = 0.0; }
         }
         $steps['roa']     = $roa !== null ? round($roa, 4) : null;
         $steps['pts_roa'] = $ptsRoa;

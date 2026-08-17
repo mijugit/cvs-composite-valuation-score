@@ -297,6 +297,18 @@ return [
             // ratio. Scoring it 0/100 states a confident falsehood about a bank
             // that is actually cheap; the model declines to score instead.
             'implausible_multiple' => 3.0,
+
+            // Consistency gate: when Yahoo publishes its own ROE, compare it to
+            // ROE derived as P/B ÷ P/E (ProfitabilityMetrics::deriveRoe()) — the
+            // same underlying market cap runs through both, so on clean data
+            // they should roughly agree. Measured across 16 Financial Services
+            // tickers on 2026-08-17 the largest legitimate gap was ~1.3x
+            // (IBKR). SAN.WA — a cross-listing whose financial_currency (EUR)
+            // differs from its quote currency (PLN) — diverged 3.8x, because
+            // Yahoo's price_to_book divides a PLN price by a EUR book value.
+            // 2.0 sits comfortably above the legitimate band and well below the
+            // observed break. Set to 0 to disable the gate.
+            'max_roe_divergence' => 2.0,
         ],
     ],
 

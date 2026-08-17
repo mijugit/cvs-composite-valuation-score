@@ -223,6 +223,96 @@ class FinancialSectorScoringTest extends TestCase
         $this->assertSame(11.5, $pillar->steps()['sub_median']);
     }
 
+    /**
+     * XTB.WA: Yahoo publishes no returnOnEquity for this ticker at all.
+     * Before this fix the pillar silently fell back to plain P/B (0.1/100
+     * on a P/B of 7.9x) — exactly the -0.54 correlation this variant exists
+     * to remove. A true data gap now gets no opinion, like missing_pb.
+     */
+    public function testTrueRoeGapYieldsNeutralNotPlainPriceToBook(): void
+    {
+        $bank = $this->bank(7.87);
+        unset($bank['return_on_equity']);
+
+        $pillar = $this->pillar();
+
+        $this->assertSame(50.0, $pillar->score($bank));
+        $this->assertSame('missing_roe', $pillar->lastSource());
+    }
+
+    /**
+     * When FinancialDataFetcher has ALREADY derived ROE from P/B ÷ P/E
+     * (return_on_equity_source = 'derived_pb_pe'), that value scores
+     * normally — a true gap is only when neither Yahoo nor derivation had
+     * anything, which return_on_equity === null represents either way.
+     */
+    public function testDerivedRoeSourceScoresNormally(): void
+    {
+        $bank = $this->bank(7.87, 0.388);
+        $bank['return_on_equity_source'] = 'derived_pb_pe';
+
+        $pillar = $this->pillar();
+        $pillar->score($bank);
+
+        $this->assertNotNull($pillar->steps()['pb_roe'], 'ROE conditioning must apply to a derived ROE too');
+        $this->assertNotSame('missing_roe', $pillar->lastSource());
+    }
+
+    /**
+     * SAN.WA: financial_currency (EUR) differs from the quote currency
+     * (PLN), so Yahoo's price_to_book divides a PLN price by a EUR book
+     * value — measured 2026-08-17 at ~4.3x too high. Reported ROE (13.1%,
+     * unaffected — no price involved) disagrees with the P/B-÷-P/E-derived
+     * figure (49.9%) by 3.8x, well past every legitimate gap observed
+     * across 16 controls (max 1.3x). The gate declines to score rather
+     * than trust the broken ratio.
+     */
+    public function testCrossCurrencyPriceToBookIsCaughtByRoeDivergence(): void
+    {
+        $bank = $this->bank(7.29535, 0.13109);
+        $bank['return_on_equity_source'] = 'yahoo';
+        $bank['trailing_pe']             = 14.619423;
+
+        $pillar = $this->pillar();
+
+        $this->assertSame(50.0, $pillar->score($bank));
+        $this->assertSame('roe_divergence', $pillar->lastSource());
+    }
+
+    /**
+     * The gate must not swallow ordinary banks whose derived and reported
+     * ROE merely differ by the measured average-vs-end-of-period gap.
+     */
+    public function testOrdinaryRoeGapDoesNotTriggerDivergenceGate(): void
+    {
+        // PKO.WA: P/B 2.31, trailing P/E 12.77 → derived ROE ≈ 18.1%, vs
+        // reported 20.1% — about 1.1x, comfortably inside the 2.0x gate.
+        $bank = $this->bank(2.31, 0.201);
+        $bank['return_on_equity_source'] = 'yahoo';
+        $bank['trailing_pe']             = 12.77;
+
+        $pillar = $this->pillar();
+        $pillar->score($bank);
+
+        $this->assertNotSame('roe_divergence', $pillar->lastSource());
+    }
+
+    /**
+     * The gate is a no-op when Yahoo never published its own ROE — checking
+     * a derived figure against itself is meaningless.
+     */
+    public function testDivergenceGateSkipsWhenRoeIsAlreadyDerived(): void
+    {
+        $bank = $this->bank(7.29535, 0.499); // hypothetically "confirms" the bad P/B
+        $bank['return_on_equity_source'] = 'derived_pb_pe';
+        $bank['trailing_pe']             = 14.619423;
+
+        $pillar = $this->pillar();
+        $pillar->score($bank);
+
+        $this->assertNotSame('roe_divergence', $pillar->lastSource());
+    }
+
     // -----------------------------------------------------------------------
     // Quality: returns, not margins
     // -----------------------------------------------------------------------
@@ -266,5 +356,41 @@ class FinancialSectorScoringTest extends TestCase
         $pillar->score($this->bank(2.32));
 
         $this->assertSame('financial', $pillar->steps()['variant']);
+    }
+
+    /**
+     * XTB.WA: Yahoo publishes neither returnOnEquity nor returnOnAssets.
+     * Before this fix both scored 0/4 — the same treatment as a measured
+     * loss — dragging the whole pillar down for a data gap rather than a
+     * weak bank (score_raw 2/10 → 20.0, matching the value this test guards
+     * against regressing to). Absence should score the neutral middle, the
+     * same convention already applied to payout_ratio below.
+     */
+    public function testMissingRoeAndRoaScoreNeutralNotZero(): void
+    {
+        $bank = $this->bank(7.87);
+        unset($bank['return_on_equity'], $bank['return_on_assets']);
+
+        $pillar = $this->quality();
+        $pillar->score($bank);
+
+        $this->assertSame(2.0, $pillar->steps()['pts_roe']);
+        $this->assertSame(2.0, $pillar->steps()['pts_roa']);
+        $this->assertGreaterThan(20.0, $pillar->rawScore() / 10.0 * 100.0);
+    }
+
+    /**
+     * A MEASURED loss is real information, not a gap — it must still score
+     * 0, unlike the missing-data case above.
+     */
+    public function testMeasuredLossStillScoresZero(): void
+    {
+        $bank = $this->bank(0.60, -0.05, -0.01);
+
+        $pillar = $this->quality();
+        $pillar->score($bank);
+
+        $this->assertSame(0.0, $pillar->steps()['pts_roe']);
+        $this->assertSame(0.0, $pillar->steps()['pts_roa']);
     }
 }

@@ -6,6 +6,7 @@ namespace CVS\Api;
 
 use CVS\Api\Sec\SecFacts;
 use CVS\Api\Sec\SecShareCountClient;
+use CVS\CVS\Valuation\ProfitabilityMetrics;
 use CVS\Forecast\EarningsCalendarParser;
 use CVS\Forecast\EarningsSurpriseParser;
 use CVS\Forecast\EarningsTrendParser;
@@ -1018,6 +1019,19 @@ class FinancialDataFetcher implements LatestPriceSource
         $revenueHistory = array_map(static fn (float $r): float => $r * $fxF, $revenueHistory);
         // gross_margin_history: already dimensionless (grossProfit/revenue) — no conversion.
 
+        // return_on_equity: fall back to a derived figure when Yahoo's own
+        // returnOnEquity is absent (observed for XTB.WA and other Capital
+        // Markets names). P/B and trailing P/E must exist as locals before the
+        // return array below, since PHP array literals cannot reference their
+        // own keys — see ProfitabilityMetrics::deriveRoe() for the formula and
+        // its measured accuracy.
+        $priceToBookVal = $v($ks['priceToBook'] ?? []);
+        $trailingPeVal  = $v($sd['trailingPE']  ?? []);
+        $roeYahoo       = $v($fin['returnOnEquity'] ?? []);
+        $roeDerived     = $roeYahoo === null
+            ? ProfitabilityMetrics::deriveRoe(['price_to_book' => $priceToBookVal, 'trailing_pe' => $trailingPeVal])
+            : null;
+
         return [
             // Company metadata
             'sector'                     => is_string($ap['sector'] ?? null) ? $ap['sector'] : null,
@@ -1092,7 +1106,11 @@ class FinancialDataFetcher implements LatestPriceSource
             'forward_fcf_est'            => $forwardFcfEst,
 
             // Quality ratios (dimensionless — no conversion)
-            'return_on_equity'           => $v($fin['returnOnEquity']    ?? []),
+            'return_on_equity'           => $roeYahoo ?? $roeDerived,
+            // 'yahoo' | 'derived_pb_pe' | null (neither Yahoo nor P/B÷P/E available).
+            // ValuationPillar's roe_divergence cross-check only runs when this is
+            // 'yahoo' — a self-check against its own derivation is meaningless.
+            'return_on_equity_source'    => $roeYahoo !== null ? 'yahoo' : ($roeDerived !== null ? 'derived_pb_pe' : null),
 
             // --- Financial-sector metrics (variant C) ---
             // Banks report no meaningful gross profit or free cash flow, so the
@@ -1101,21 +1119,21 @@ class FinancialDataFetcher implements LatestPriceSource
             // per-share book value need no FX conversion — the ratio is
             // currency-neutral, and book value is per share in the same currency
             // as the quote.
-            'price_to_book'              => $v($ks['priceToBook']         ?? []),
+            'price_to_book'              => $priceToBookVal,
             // Per SHARE, so it converts with the PRICE rate ($fxP), not the
             // statement rate — it is compared against current_price, which is
             // itself converted that way. Getting this wrong would compare a
             // PLN book value to a USD price on every Warsaw-listed bank.
             'book_value_per_share'       => $fxApply($v($ks['bookValue'] ?? []), $fxP),
             'return_on_assets'           => $v($fin['returnOnAssets']     ?? []),
-            'trailing_pe'                => $v($sd['trailingPE']          ?? []),
+            'trailing_pe'                => $trailingPeVal,
             'dividend_yield'             => $v($sd['dividendYield']       ?? []),
             'payout_ratio'               => $v($sd['payoutRatio']         ?? []),
             'operating_margin'           => $v($fin['operatingMargins']  ?? []),
             'profit_margin'              => $v($fin['profitMargins']      ?? []),
 
             // Valuation multiples (dimensionless — no conversion)
-            'pe_ratio'                   => $v($sd['trailingPE']    ?? []),
+            'pe_ratio'                   => $trailingPeVal,
             'forward_pe'                 => $v($ks['forwardPE']     ?? []),
             'ps_ratio'                   => $v($ks['priceToSalesTrailing12Months'] ?? []),
             'ev_ebitda'                  => $v($ks['enterpriseToEbitda'] ?? []),

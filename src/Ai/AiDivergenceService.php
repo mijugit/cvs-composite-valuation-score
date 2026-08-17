@@ -257,6 +257,19 @@ SYSTEM;
                 . ' group (typically an ADR quote divided by an ordinary-share book value), so the model'
                 . ' declined to score it. Treat the Valuation pillar as ABSENT for this company, not neutral.';
         }
+        if ($valSource === 'missing_roe') {
+            $lines[] = '  ^ NOTE: that 50 is NOT a judgement. This company has no return-on-equity figure —'
+                . ' neither reported by the data source nor derivable from price/book and P/E — so the'
+                . ' book-multiple valuation this sector uses could not be conditioned on profitability.'
+                . ' Treat the Valuation pillar as ABSENT for this company, not neutral.';
+        }
+        if ($valSource === 'roe_divergence') {
+            $lines[] = '  ^ NOTE: that 50 is NOT a judgement. The reported ROE disagrees sharply with the'
+                . ' ROE implied by price/book and P/E (a mismatch typically caused by a cross-listing whose'
+                . ' reporting currency differs from its quote currency), so the model treats price/book as'
+                . ' unreliable and declined to score it. Treat the Valuation pillar as ABSENT for this'
+                . ' company, not neutral.';
+        }
         $lines[] = "- Momentum - Swing profile: {$pMomSwing}/100";
         $lines[] = "- Momentum - Fundamental profile: {$pMomFund}/100";
         $lines[] = '- Quality (' . ValuationNarrative::qualityLabel($isFinancial) . "): {$pQual}/100";

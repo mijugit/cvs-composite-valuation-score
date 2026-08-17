@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CVS\Ai;
 
 use CVS\CVS\Valuation\MedianResolver;
+use CVS\CVS\Valuation\ProfitabilityMetrics;
 
 /**
  * CVS implied fair value: price at which Valuation pillar = 50 (sector-median parity).
@@ -54,9 +55,36 @@ final class FairPriceCalculator
         // screener columns — the exact failure this class was fixed for once
         // already. Since the pillar equates a bank at P/B ÷ ROE = peer median,
         // the fair book multiple is that median TIMES the company's own ROE.
-        $roe      = isset($financials['return_on_equity']) ? (float) $financials['return_on_equity'] : null;
-        $pbRoeCfg = is_array($cvsConfig['financials']['pb_roe'] ?? null) ? $cvsConfig['financials']['pb_roe'] : [];
-        $useRoe   = !empty($pbRoeCfg['enabled']) && $roe !== null && $roe > 0.0;
+        $roe       = isset($financials['return_on_equity']) ? (float) $financials['return_on_equity'] : null;
+        $roeSource = $financials['return_on_equity_source'] ?? null;
+        $pbRoeCfg  = is_array($cvsConfig['financials']['pb_roe'] ?? null) ? $cvsConfig['financials']['pb_roe'] : [];
+        $roeConditioningEnabled = !empty($pbRoeCfg['enabled']);
+
+        // Same two declines as ValuationPillar::scoreVariantC(), on the same
+        // inputs — fair value has to agree with the pillar about whether it has
+        // an opinion at all, not just about the axis once it does. A true ROE
+        // gap (neither Yahoo nor P/B÷P/E) or a reported-vs-derived ROE mismatch
+        // (a broken price/book, typically a currency-mismatched cross-listing)
+        // both mean the inputs cannot be trusted; a fair price computed from them
+        // anyway would contradict a pillar that declined to score the same
+        // company right next to it.
+        if ($roeConditioningEnabled) {
+            if ($roe === null) {
+                return null;
+            }
+            if ($roeSource === 'yahoo' && $roe > 0.0) {
+                $maxDivergence = (float) ($pbRoeCfg['max_roe_divergence'] ?? 0.0);
+                $roeCheck      = $maxDivergence > 0.0 ? ProfitabilityMetrics::deriveRoe($financials) : null;
+                if ($roeCheck !== null && $roeCheck > 0.0) {
+                    $divergence = max($roeCheck / $roe, $roe / $roeCheck);
+                    if ($divergence > $maxDivergence) {
+                        return null;
+                    }
+                }
+            }
+        }
+
+        $useRoe = $roeConditioningEnabled && $roe !== null && $roe > 0.0;
 
         $metric   = $useRoe ? 'pb_roe' : 'pb';
         $medianMx = (float) ($bm[$useRoe ? 'median_pb_roe' : 'median_pb'] ?? 0);

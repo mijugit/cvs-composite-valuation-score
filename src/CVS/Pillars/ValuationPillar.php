@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CVS\CVS\Pillars;
 
 use CVS\CVS\Valuation\MedianResolver;
+use CVS\CVS\Valuation\ProfitabilityMetrics;
 use CVS\CVS\Valuation\ValuationMetrics;
 
 /**
@@ -203,9 +204,56 @@ class ValuationPillar
         // ROE at or below zero cannot condition anything (the quotient flips or
         // explodes), so those keep the plain book multiple: for a bank losing
         // money, P/B is the only signal left.
-        $roe    = isset($financials['return_on_equity']) ? (float) $financials['return_on_equity'] : null;
-        $pbRoe  = is_array($this->financialsConfig['pb_roe'] ?? null) ? $this->financialsConfig['pb_roe'] : [];
-        $useRoe = !empty($pbRoe['enabled']) && $roe !== null && $roe > 0.0;
+        $roe       = isset($financials['return_on_equity']) ? (float) $financials['return_on_equity'] : null;
+        $roeSource = $financials['return_on_equity_source'] ?? null;
+        $pbRoe     = is_array($this->financialsConfig['pb_roe'] ?? null) ? $this->financialsConfig['pb_roe'] : [];
+        $roeConditioningEnabled = !empty($pbRoe['enabled']);
+
+        // No profitability signal at all — Yahoo doesn't publish ROE for this
+        // ticker and it couldn't be derived either (FinancialDataFetcher already
+        // tried P/B ÷ P/E; see ProfitabilityMetrics::deriveRoe()). Falling back to
+        // plain P/B here would repeat the -0.54 correlation this variant exists to
+        // fix, so a true data gap gets no opinion, exactly like missing_pb —
+        // distinct from a MEASURED loss (roe <= 0) below, which is real
+        // information and keeps the plain-P/B fallback.
+        if ($roeConditioningEnabled && $roe === null) {
+            $this->lastSource    = 'missing_roe';
+            $this->lastBucketKey = '';
+            $this->lastSteps     = ['variant' => 'C', 'pb' => round($pb, 4)];
+            return 50.0;
+        }
+
+        // Cross-check: when Yahoo publishes its OWN accounting-based ROE, a P/B
+        // ÷ P/E derived ROE that disagrees with it by more than the configured
+        // multiple means price_to_book itself is broken, not that the company is
+        // mispriced — the observed case is a cross-listing whose financial
+        // statement currency differs from its quote currency, so Yahoo divides a
+        // price in one currency by a book value in another. Measured on SAN.WA
+        // 2026-08-17: reported ROE 13.1%, P/B ÷ P/E implied 49.9% (a 3.8x gap),
+        // and price_to_book alone was ~4.3x too high. A confident score built on
+        // a broken ratio is worse than no opinion — same convention as
+        // implausible_pb below, just triggered a different way.
+        if ($roeConditioningEnabled && $roeSource === 'yahoo' && $roe !== null && $roe > 0.0) {
+            $maxDivergence = (float) ($pbRoe['max_roe_divergence'] ?? 0.0);
+            $roeCheck      = $maxDivergence > 0.0 ? ProfitabilityMetrics::deriveRoe($financials) : null;
+            if ($roeCheck !== null && $roeCheck > 0.0) {
+                $divergence = max($roeCheck / $roe, $roe / $roeCheck);
+                if ($divergence > $maxDivergence) {
+                    $this->lastSource    = 'roe_divergence';
+                    $this->lastBucketKey = '';
+                    $this->lastSteps     = [
+                        'variant'      => 'C',
+                        'pb'           => round($pb, 4),
+                        'roe_reported' => round($roe, 4),
+                        'roe_derived'  => round($roeCheck, 4),
+                        'divergence'   => round($divergence, 2),
+                    ];
+                    return 50.0;
+                }
+            }
+        }
+
+        $useRoe = $roeConditioningEnabled && $roe !== null && $roe > 0.0;
 
         $metric    = $useRoe ? 'pb_roe' : 'pb';
         $companyMx = $useRoe ? $pb / $roe : $pb;
