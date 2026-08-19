@@ -600,24 +600,24 @@ argumencie — klasyfikator bezpieczeństwa to blokuje nawet gdy hasło pochodzi
 
 #### Automated
 
-- [x] 1.1 `vendor/bin/phpunit tests/Ai/GeminiClientTest.php` zielony
-- [x] 1.2 `composer stan` czysty dla `src/Ai/GeminiClient.php`/`GeminiClientFactory.php`
-- [x] 1.3 Pełny `vendor/bin/phpunit` zielony (zero regresji)
+- [x] 1.1 `vendor/bin/phpunit tests/Ai/GeminiClientTest.php` zielony — 156f10b
+- [x] 1.2 `composer stan` czysty dla `src/Ai/GeminiClient.php`/`GeminiClientFactory.php` — 156f10b
+- [x] 1.3 Pełny `vendor/bin/phpunit` zielony (zero regresji) — 156f10b
 
 #### Manual
 
-- [x] 1.4 Smoke-test curl potwierdza kształt `tools`/`groundingMetadata`
+- [x] 1.4 Smoke-test curl potwierdza kształt `tools`/`groundingMetadata` — 156f10b
 
 ### Phase 2: Natywny context gatherer (Gemini)
 
 #### Automated
 
-- [ ] 2.1 `vendor/bin/phpunit tests/LlmGemini/LlmGeminiContextGathererTest.php` zielony
-- [ ] 2.2 `composer stan` czysty dla `LlmGeminiContextGatherer.php`
+- [x] 2.1 `vendor/bin/phpunit tests/LlmGemini/LlmGeminiContextGathererTest.php` zielony
+- [x] 2.2 `composer stan` czysty dla `LlmGeminiContextGatherer.php`
 
 #### Manual
 
-- [ ] 2.3 Ręczne `gather()` na realnych tickerach — ocena jakościowa kontekstu
+- [ ] 2.3 Ręczne `gather()` na realnych tickerach — ocena jakościowa kontekstu (ODROCZONE do Fazy 4 — kod jeszcze niewdrożony na serwer; Faza 1 smoke-test już potwierdził mechanizm googleSearch na żywo, pełny gather() z polskim promptem zweryfikuje pierwsze prawdziwe uruchomienie crona)
 
 ### Phase 3: Moduł portfela LLM Gemini + baza danych
 
