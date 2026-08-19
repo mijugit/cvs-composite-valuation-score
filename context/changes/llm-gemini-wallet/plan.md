@@ -631,7 +631,7 @@ argumencie — klasyfikator bezpieczeństwa to blokuje nawet gdy hasło pochodzi
 #### Manual
 
 - [x] 3.5 `/llm-gemini` renderuje się, 10 000 USD gotówki, brak holdingów — potwierdzone bezpośrednim wywołaniem warstwy danych kontrolera na produkcji (state.cash=10000.00, holdings=0, legend=0, 5-seriowy wykres NAV: LLM Bazowy/Free/Gemini/S&P 500/Nasdaq 100, d0=2026-06-29); HTTP smoke-test `/llm-gemini`→302→`/login` potwierdza brak fatal errora na wejściu
-- [ ] 3.6 Link „LLM Gemini" w menu działa, `aria-current` poprawny (niski szczątkowy risk — czysty mirror działającego wzorca `/llm-free`, `php -l` czysty; wymaga wizualnego sprawdzenia po zalogowaniu — user zrobi przy okazji)
+- [x] 3.6 Link „LLM Gemini" w menu działa, `aria-current` poprawny — potwierdzone przez usera: strona wygląda dobrze, wykres NAV działa
 - [x] 3.7 Testowy wiersz w `llm_gemini_cycle`/`llm_gemini_transactions` renderuje się poprawnie — potwierdzone pierwszym prawdziwym cyklem (patrz 4.3), odczyt przez PDO/PHP poprawny łącznie z polskimi znakami w legendzie
 
 ### Phase 4: Cron entrypoint i deployment

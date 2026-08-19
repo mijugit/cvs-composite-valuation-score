@@ -1,7 +1,7 @@
 ---
 change_id: llm-gemini-wallet
 title: Trzeci portfel eksperymentalny — LLM Free zarządzany przez Gemini zamiast Claude
-status: implementing
+status: implemented
 created: 2026-08-19
 updated: 2026-08-19
 archived_at: null
