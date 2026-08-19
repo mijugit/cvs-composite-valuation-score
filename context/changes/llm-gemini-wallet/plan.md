@@ -623,10 +623,10 @@ argumencie — klasyfikator bezpieczeństwa to blokuje nawet gdy hasło pochodzi
 
 #### Automated
 
-- [x] 3.1 Migracja `038_*.sql` aplikuje się czysto (strukturalny klon 035, weryfikacja pełna w Fazie 4 na produkcji)
-- [x] 3.2 `vendor/bin/phpunit tests/LlmGemini/` zielony
-- [x] 3.3 Pełny `vendor/bin/phpunit` zielony (zero regresji w `tests/LlmFree/`)
-- [x] 3.4 `composer stan` czysty dla `src/LlmGemini/`
+- [x] 3.1 Migracja `038_*.sql` aplikuje się czysto (strukturalny klon 035, weryfikacja pełna w Fazie 4 na produkcji) — e309648
+- [x] 3.2 `vendor/bin/phpunit tests/LlmGemini/` zielony — e309648
+- [x] 3.3 Pełny `vendor/bin/phpunit` zielony (zero regresji w `tests/LlmFree/`) — e309648
+- [x] 3.4 `composer stan` czysty dla `src/LlmGemini/` — e309648
 
 #### Manual
 
@@ -638,7 +638,7 @@ argumencie — klasyfikator bezpieczeństwa to blokuje nawet gdy hasło pochodzi
 
 #### Automated
 
-- [ ] 4.1 `php -l bin/llm-gemini-wallet-rebalance.php` czysty
+- [x] 4.1 `php -l bin/llm-gemini-wallet-rebalance.php` czysty
 - [ ] 4.2 Ręczne uruchomienie kończy się `exit(0)`/`exit(1)` z czytelnym logiem
 
 #### Manual
