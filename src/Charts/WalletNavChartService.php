@@ -7,18 +7,26 @@ namespace CVS\Charts;
 use CVS\Api\FinancialDataFetcher;
 use CVS\Lab\LabMetrics;
 use CVS\LlmFree\LlmFreeCycleRepository;
+use CVS\LlmGemini\LlmGeminiCycleRepository;
 use CVS\Portfolio\CycleRepository;
 
 /**
- * Builds the four-series NAV comparison chart (LLM Bazowy, LLM Free, S&P 500,
- * Nasdaq 100) shown on both /portfolio and /llm-free (change: wallet-nav-chart)
- * — same visual pattern as /lab, so a page switching between the two wallets
- * sees a consistent chart.
+ * Builds the NAV comparison chart (LLM Bazowy, LLM Free, optionally LLM Gemini,
+ * S&P 500, Nasdaq 100) shown on /portfolio, /llm-free, and /llm-gemini (change:
+ * wallet-nav-chart, extended by change: llm-gemini-wallet) — same visual pattern
+ * as /lab, so a page switching between wallets sees a consistent chart.
  *
- * Deliberately outside both CVS\Portfolio\ and CVS\LlmFree\: it reads from
- * both modules' own repositories (never their raw tables — same "sanctioned
- * read via the owning repository" rule LabRepository::getLlmValueSeries()
- * already established) plus CVS\Api\, so neither module is a natural owner.
+ * Deliberately outside CVS\Portfolio\, CVS\LlmFree\, and CVS\LlmGemini\: it
+ * reads from each module's own repository (never their raw tables — same
+ * "sanctioned read via the owning repository" rule LabRepository::
+ * getLlmValueSeries() already established) plus CVS\Api\, so no single module
+ * is a natural owner.
+ *
+ * The Gemini series is additive and optional (4th constructor param, defaults
+ * null) — /portfolio and /llm-free instantiate this class without it, so their
+ * own chartSeries stay exactly two-wallet + benchmarks, unchanged. Only
+ * /llm-gemini passes an LlmGeminiCycleRepository, getting the full three-way
+ * comparison.
  *
  * build() is pure (no I/O) and unit-tested directly; fetch() is the thin,
  * untested wiring layer that gathers the raw inputs — same split as
@@ -30,6 +38,7 @@ final class WalletNavChartService
         private readonly CycleRepository $portfolioCycles,
         private readonly LlmFreeCycleRepository $llmFreeCycles,
         private readonly FinancialDataFetcher $fetcher,
+        private readonly ?LlmGeminiCycleRepository $llmGeminiCycles = null,
     ) {
     }
 
@@ -43,20 +52,22 @@ final class WalletNavChartService
             $this->llmFreeCycles->getValueSeries(),
             $this->fetcher->fetchSpyDailyCloses(),
             $this->fetcher->fetchDailyCloses('QQQ'),
+            $this->llmGeminiCycles?->getValueSeries(),
         );
     }
 
     /**
-     * @param list<array{date: string, value: float}>   $portfolioSeries LLM Bazowy, oldest first
-     * @param list<array{date: string, value: float}>   $llmFreeSeries   LLM Free, oldest first
-     * @param array{date: string[], close: float[]}|null $spy            null when the fetch failed
-     * @param array{date: string[], close: float[]}|null $qqq            null when the fetch failed
+     * @param list<array{date: string, value: float}>   $portfolioSeries  LLM Bazowy, oldest first
+     * @param list<array{date: string, value: float}>   $llmFreeSeries    LLM Free, oldest first
+     * @param array{date: string[], close: float[]}|null $spy             null when the fetch failed
+     * @param array{date: string[], close: float[]}|null $qqq             null when the fetch failed
+     * @param list<array{date: string, value: float}>|null $llmGeminiSeries LLM Gemini, oldest first; null = series omitted entirely (backward-compat default)
      * @return array{chartSeries: array<string, list<array{date: string, value: float}>>, d0: string|null}
      */
-    public static function build(array $portfolioSeries, array $llmFreeSeries, ?array $spy, ?array $qqq): array
+    public static function build(array $portfolioSeries, array $llmFreeSeries, ?array $spy, ?array $qqq, ?array $llmGeminiSeries = null): array
     {
         $d0 = null;
-        foreach ([$portfolioSeries, $llmFreeSeries] as $series) {
+        foreach ([$portfolioSeries, $llmFreeSeries, $llmGeminiSeries ?? []] as $series) {
             if ($series === []) {
                 continue;
             }
@@ -74,6 +85,10 @@ final class WalletNavChartService
             'LLM Bazowy' => LabMetrics::normaliseToBase100($portfolioSeries, 'value'),
             'LLM Free'   => LabMetrics::normaliseToBase100($llmFreeSeries, 'value'),
         ];
+
+        if ($llmGeminiSeries !== null) {
+            $chartSeries['LLM Gemini'] = LabMetrics::normaliseToBase100($llmGeminiSeries, 'value');
+        }
 
         // Benchmarks are rebased from their value AT $d0 (not their own fetch
         // window's first point, which is a full year back) so their 100 lines

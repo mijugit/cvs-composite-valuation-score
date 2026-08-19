@@ -119,4 +119,61 @@ class WalletNavChartServiceTest extends TestCase
         $this->assertArrayHasKey('S&P 500', $result['chartSeries']);
         $this->assertArrayHasKey('Nasdaq 100', $result['chartSeries']);
     }
+
+    // ------------------------------------------------------------------
+    // Optional third series: LLM Gemini (change: llm-gemini-wallet)
+    // ------------------------------------------------------------------
+
+    public function testGeminiSeriesOmittedByDefaultWhenNullPreservesOldTwoWalletBehaviour(): void
+    {
+        $portfolio = [['date' => '2026-06-01', 'value' => 10000.0]];
+        $llmFree   = [['date' => '2026-06-01', 'value' => 10000.0]];
+
+        // Positional call exactly as /portfolio and /llm-free's controllers make it —
+        // 5th param omitted entirely (backward compatibility).
+        $result = WalletNavChartService::build($portfolio, $llmFree, null, null);
+
+        $this->assertArrayNotHasKey('LLM Gemini', $result['chartSeries']);
+        $this->assertArrayHasKey('LLM Bazowy', $result['chartSeries']);
+        $this->assertArrayHasKey('LLM Free', $result['chartSeries']);
+    }
+
+    public function testGeminiSeriesIncludedAndNormalisedWhenProvided(): void
+    {
+        $portfolio = [['date' => '2026-06-01', 'value' => 10000.0]];
+        $llmFree   = [['date' => '2026-06-01', 'value' => 10000.0]];
+        $llmGemini = [
+            ['date' => '2026-08-19', 'value' => 10000.0],
+            ['date' => '2026-08-20', 'value' => 9500.0],
+        ];
+
+        $result = WalletNavChartService::build($portfolio, $llmFree, null, null, $llmGemini);
+
+        $this->assertArrayHasKey('LLM Gemini', $result['chartSeries']);
+        $this->assertEqualsWithDelta(100.0, $result['chartSeries']['LLM Gemini'][0]['value'], 0.001);
+        $this->assertEqualsWithDelta(95.0, $result['chartSeries']['LLM Gemini'][1]['value'], 0.001);
+    }
+
+    public function testGeminiSeriesEmptyArrayStillAddsKeyUnlikeNull(): void
+    {
+        $portfolio = [['date' => '2026-06-01', 'value' => 10000.0]];
+
+        // Explicit empty array (wallet exists but has no completed cycles yet) is
+        // distinct from omitting the param entirely — mirrors how the two
+        // primary wallets already behave (see testOneEmptyWalletStillProducesChartFromTheOther).
+        $result = WalletNavChartService::build($portfolio, [], null, null, []);
+
+        $this->assertArrayHasKey('LLM Gemini', $result['chartSeries']);
+        $this->assertSame([], $result['chartSeries']['LLM Gemini']);
+    }
+
+    public function testGeminiSeriesCanEstablishEarliestD0(): void
+    {
+        $portfolio = [['date' => '2026-06-01', 'value' => 10000.0]];
+        $llmGemini = [['date' => '2026-01-01', 'value' => 10000.0]];
+
+        $result = WalletNavChartService::build($portfolio, [], null, null, $llmGemini);
+
+        $this->assertSame('2026-01-01', $result['d0']);
+    }
 }

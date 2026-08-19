@@ -14,6 +14,7 @@
 $walletChartPalette = [
     'LLM Bazowy' => 'rgba(64,144,224,0.9)',
     'LLM Free'   => 'rgba(250,204,21,0.9)',
+    'LLM Gemini' => 'rgba(52,211,153,0.9)',
     'S&P 500'    => 'rgba(148,163,184,0.85)',
     'Nasdaq 100' => 'rgba(167,139,250,0.9)',
 ];

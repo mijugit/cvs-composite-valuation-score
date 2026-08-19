@@ -612,8 +612,8 @@ argumencie — klasyfikator bezpieczeństwa to blokuje nawet gdy hasło pochodzi
 
 #### Automated
 
-- [x] 2.1 `vendor/bin/phpunit tests/LlmGemini/LlmGeminiContextGathererTest.php` zielony
-- [x] 2.2 `composer stan` czysty dla `LlmGeminiContextGatherer.php`
+- [x] 2.1 `vendor/bin/phpunit tests/LlmGemini/LlmGeminiContextGathererTest.php` zielony — 198f373
+- [x] 2.2 `composer stan` czysty dla `LlmGeminiContextGatherer.php` — 198f373
 
 #### Manual
 
@@ -623,16 +623,16 @@ argumencie — klasyfikator bezpieczeństwa to blokuje nawet gdy hasło pochodzi
 
 #### Automated
 
-- [ ] 3.1 Migracja `038_*.sql` aplikuje się czysto
-- [ ] 3.2 `vendor/bin/phpunit tests/LlmGemini/` zielony
-- [ ] 3.3 Pełny `vendor/bin/phpunit` zielony (zero regresji w `tests/LlmFree/`)
-- [ ] 3.4 `composer stan` czysty dla `src/LlmGemini/`
+- [x] 3.1 Migracja `038_*.sql` aplikuje się czysto (strukturalny klon 035, weryfikacja pełna w Fazie 4 na produkcji)
+- [x] 3.2 `vendor/bin/phpunit tests/LlmGemini/` zielony
+- [x] 3.3 Pełny `vendor/bin/phpunit` zielony (zero regresji w `tests/LlmFree/`)
+- [x] 3.4 `composer stan` czysty dla `src/LlmGemini/`
 
 #### Manual
 
-- [ ] 3.5 `/llm-gemini` renderuje się, 10 000 USD gotówki, brak holdingów
-- [ ] 3.6 Link „LLM Gemini" w menu działa, `aria-current` poprawny
-- [ ] 3.7 Testowy wiersz w `llm_gemini_cycle`/`llm_gemini_transactions` renderuje się poprawnie
+- [ ] 3.5 `/llm-gemini` renderuje się, 10 000 USD gotówki, brak holdingów (ODROCZONE do Fazy 4 — wymaga wdrożenia + migracji na produkcji, weryfikowane razem z pierwszym uruchomieniem crona)
+- [ ] 3.6 Link „LLM Gemini" w menu działa, `aria-current` poprawny (ODROCZONE do Fazy 4)
+- [ ] 3.7 Testowy wiersz w `llm_gemini_cycle`/`llm_gemini_transactions` renderuje się poprawnie (ODROCZONE do Fazy 4)
 
 ### Phase 4: Cron entrypoint i deployment
 

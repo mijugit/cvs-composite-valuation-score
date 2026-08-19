@@ -22,6 +22,7 @@ use CVS\Pro\ProController;
 use CVS\Translation\TranslationController;
 use CVS\Portfolio\PortfolioController;
 use CVS\LlmFree\LlmFreeController;
+use CVS\LlmGemini\LlmGeminiController;
 use CVS\Lab\LabController;
 use CVS\Links\TickerLinkController;
 
@@ -172,6 +173,13 @@ $router->get('/portfolio/history', fn($req) => $portfolio->history($req));
 
 $llmFree = new LlmFreeController();
 $router->get('/llm-free', fn($req) => $llmFree->index($req));
+
+// ------------------------------------------------------------------
+// LLM_Gemini_Wallet — third, Gemini-executed portfolio (change: llm-gemini-wallet)
+// ------------------------------------------------------------------
+
+$llmGemini = new LlmGeminiController();
+$router->get('/llm-gemini', fn($req) => $llmGemini->index($req));
 
 // ------------------------------------------------------------------
 // Lab — experimental paper portfolios (change: cvs-experimental-portfolios)
