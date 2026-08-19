@@ -638,8 +638,8 @@ argumencie — klasyfikator bezpieczeństwa to blokuje nawet gdy hasło pochodzi
 
 #### Automated
 
-- [x] 4.1 `php -l bin/llm-gemini-wallet-rebalance.php` czysty
-- [ ] 4.2 Ręczne uruchomienie kończy się `exit(0)`/`exit(1)` z czytelnym logiem
+- [x] 4.1 `php -l bin/llm-gemini-wallet-rebalance.php` czysty — 926a5f6
+- [x] 4.2 Ręczne uruchomienie kończy się `exit(0)`/`exit(1)` z czytelnym logiem — potwierdzone na produkcji (26.08.19 20:48 CEST): `outside_rebalance_window`, exit 0, czysty log, zero fatal errors
 
 #### Manual
 
