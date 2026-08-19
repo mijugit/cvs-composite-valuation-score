@@ -632,7 +632,7 @@ argumencie — klasyfikator bezpieczeństwa to blokuje nawet gdy hasło pochodzi
 
 - [x] 3.5 `/llm-gemini` renderuje się, 10 000 USD gotówki, brak holdingów — potwierdzone bezpośrednim wywołaniem warstwy danych kontrolera na produkcji (state.cash=10000.00, holdings=0, legend=0, 5-seriowy wykres NAV: LLM Bazowy/Free/Gemini/S&P 500/Nasdaq 100, d0=2026-06-29); HTTP smoke-test `/llm-gemini`→302→`/login` potwierdza brak fatal errora na wejściu
 - [ ] 3.6 Link „LLM Gemini" w menu działa, `aria-current` poprawny (niski szczątkowy risk — czysty mirror działającego wzorca `/llm-free`, `php -l` czysty; wymaga wizualnego sprawdzenia po zalogowaniu — user zrobi przy okazji)
-- [ ] 3.7 Testowy wiersz w `llm_gemini_cycle`/`llm_gemini_transactions` renderuje się poprawnie (wymaga realnych transakcji z pierwszego cyklu — patrz 4.3/4.4)
+- [x] 3.7 Testowy wiersz w `llm_gemini_cycle`/`llm_gemini_transactions` renderuje się poprawnie — potwierdzone pierwszym prawdziwym cyklem (patrz 4.3), odczyt przez PDO/PHP poprawny łącznie z polskimi znakami w legendzie
 
 ### Phase 4: Cron entrypoint i deployment
 
@@ -643,5 +643,5 @@ argumencie — klasyfikator bezpieczeństwa to blokuje nawet gdy hasło pochodzi
 
 #### Manual
 
-- [ ] 4.3 Pierwsze uruchomienie na serwerze zapisuje `completed` cycle z legendą i tokenami
-- [ ] 4.4 `/llm-gemini` pokazuje transakcje/legendę po pierwszym cyklu
+- [x] 4.3 Pierwsze uruchomienie na serwerze zapisuje `completed` cycle z legendą i tokenami — potwierdzone 2026-08-19 21:08 CEST: cycle_date=2026-08-19, status=completed, tokens_input=4115, tokens_output=800, legend niepusta z poprawną polską diakrytyką (zweryfikowane przez PDO)
+- [x] 4.4 `/llm-gemini` pokazuje transakcje/legendę po pierwszym cyklu — 7 transakcji BUY (MU/SNDK/ADBE/SE/PDD/PFE/RR.L) zapisanych w `llm_gemini_transactions`, holdingi i state (cash=834.54) potwierdzone w bazie; wizualny render w przeglądarce nie sprawdzony (wymaga logowania — patrz 3.6)
