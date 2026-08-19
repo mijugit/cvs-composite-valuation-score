@@ -617,7 +617,7 @@ argumencie — klasyfikator bezpieczeństwa to blokuje nawet gdy hasło pochodzi
 
 #### Manual
 
-- [ ] 2.3 Ręczne `gather()` na realnych tickerach — ocena jakościowa kontekstu (ODROCZONE do Fazy 4 — kod jeszcze niewdrożony na serwer; Faza 1 smoke-test już potwierdził mechanizm googleSearch na żywo, pełny gather() z polskim promptem zweryfikuje pierwsze prawdziwe uruchomienie crona)
+- [x] 2.3 Ręczne `gather()` na realnych tickerach — ocena jakościowa kontekstu — potwierdzone na produkcji po deployu (NVDA: 4 fakty z datami 10-19.08.2026, poprawny polski, cytaty źródeł)
 
 ### Phase 3: Moduł portfela LLM Gemini + baza danych
 
@@ -630,9 +630,9 @@ argumencie — klasyfikator bezpieczeństwa to blokuje nawet gdy hasło pochodzi
 
 #### Manual
 
-- [ ] 3.5 `/llm-gemini` renderuje się, 10 000 USD gotówki, brak holdingów (ODROCZONE do Fazy 4 — wymaga wdrożenia + migracji na produkcji, weryfikowane razem z pierwszym uruchomieniem crona)
-- [ ] 3.6 Link „LLM Gemini" w menu działa, `aria-current` poprawny (ODROCZONE do Fazy 4)
-- [ ] 3.7 Testowy wiersz w `llm_gemini_cycle`/`llm_gemini_transactions` renderuje się poprawnie (ODROCZONE do Fazy 4)
+- [x] 3.5 `/llm-gemini` renderuje się, 10 000 USD gotówki, brak holdingów — potwierdzone bezpośrednim wywołaniem warstwy danych kontrolera na produkcji (state.cash=10000.00, holdings=0, legend=0, 5-seriowy wykres NAV: LLM Bazowy/Free/Gemini/S&P 500/Nasdaq 100, d0=2026-06-29); HTTP smoke-test `/llm-gemini`→302→`/login` potwierdza brak fatal errora na wejściu
+- [ ] 3.6 Link „LLM Gemini" w menu działa, `aria-current` poprawny (niski szczątkowy risk — czysty mirror działającego wzorca `/llm-free`, `php -l` czysty; wymaga wizualnego sprawdzenia po zalogowaniu — user zrobi przy okazji)
+- [ ] 3.7 Testowy wiersz w `llm_gemini_cycle`/`llm_gemini_transactions` renderuje się poprawnie (wymaga realnych transakcji z pierwszego cyklu — patrz 4.3/4.4)
 
 ### Phase 4: Cron entrypoint i deployment
 
