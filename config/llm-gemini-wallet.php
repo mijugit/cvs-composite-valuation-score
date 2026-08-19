@@ -23,21 +23,25 @@ return [
     'initial_capital_usd' => 10000.0,
 
     // --- NYSE market hours (America/New_York timezone) ---
-    // Identical to config/llm-free-wallet.php's block — same practical
-    // execution-window bound (17:00, not the real 16:00 ET close).
+    // close_time here is 16:30, not the real 16:00 ET close — 30 minutes of
+    // padding so a cron firing shortly after the bell still lands in-window.
     'market' => [
         'open_time'  => '09:30',
-        'close_time' => '17:00',
+        'close_time' => '16:30',
         'timezone'   => 'America/New_York',
     ],
 
     // --- Rebalance window ---
-    // Mirrors llm-free-wallet.php's 90-minute window. Cron entries chosen 10
-    // minutes earlier than the sibling's (21:40/22:40 Warsaw vs 21:50/22:50) —
-    // a pure time-translation of the sibling's proven DST-safe schedule, so it
-    // inherits the same safety margin without recomputing it. See
-    // bin/llm-gemini-wallet-rebalance.php's docblock for the full walk-through.
-    'rebalance_window_minutes' => 90,
+    // Deliberately WIDE (change: llm-gemini-wallet, 2026-08-19) — unlike the
+    // sibling LLM_Free_Wallet's narrow 90-minute near-close window, this wallet
+    // covers the full trading session: [close_time - 420min, close_time) =
+    // [09:30, 16:30) ET = 15:30–22:30 Warsaw at the nominal 6h summer offset.
+    // The operator controls exactly when the cron fires (typically near
+    // session close) and wanted flexibility to trigger test runs at any point
+    // during the session without recomputing a DST-safe two-entry schedule —
+    // MarketCalendar::isInRebalanceWindow() only rejects requests outside real
+    // trading hours, it does not dictate when within them to run.
+    'rebalance_window_minutes' => 420,
 
     // --- Memory / context knobs unique to this module ---
     'legend_context_count' => 10,   // N last legend entries read back as context

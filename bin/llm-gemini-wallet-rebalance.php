@@ -15,34 +15,25 @@ declare(strict_types=1);
  * cache, always running its own fresh googleSearch-grounded call (change:
  * llm-gemini-wallet's explicit provider-isolation decision).
  *
- * OPERATOR'S CHOSEN SCHEDULE DESIGN (2026-08-19): 21:40 Warsaw (primary) and
- * 22:40 Warsaw (backup) — a pure 10-minute-earlier time-translation of the
- * sibling LLM_Free_Wallet's own proven schedule (21:50/22:50), chosen so it
- * inherits the exact same DST-safety margin without recomputing it, while
- * staying clear of both other wallets' cron windows (Base: 20:30/21:30,
- * Free: 21:50/22:50) by at least 10 minutes in both directions.
+ * OPERATOR'S CHOSEN SCHEDULE DESIGN (revised 2026-08-19): unlike the sibling
+ * LLM_Free_Wallet's narrow 90-minute near-close window (which forces a
+ * two-entry DST-juggling cron schedule to land inside it), this wallet's
+ * config/llm-gemini-wallet.php sets rebalance_window_minutes=420 with
+ * market.close_time='16:30' → a WIDE effective window [09:30, 16:30) ET
+ * (≈15:30–22:30 Warsaw at the nominal 6h summer offset) covering the entire
+ * NYSE session plus a 30-minute close buffer. The operator controls exactly
+ * when the cron fires — typically near session close, but with room to trigger
+ * ad-hoc test runs at any point during the session — so there is no fixed
+ * recommended cron pair to derive here; any single well-chosen entry inside
+ * the window works, with no DST-offset walkthrough needed (the window is wide
+ * enough to absorb the ±1h EU/US DST-mismatch weeks without a backup entry).
  *
- * config/llm-gemini-wallet.php sets rebalance_window_minutes=90 with
- * market.close_time='17:00' (mirrors the sibling's window exactly) → effective
- * window [15:30, 17:00) ET. Walking through what each entry maps to per offset
- * (identical reasoning to the sibling's docblock, shifted 10 minutes earlier):
- *   - offset 6h (nominal, most of the year): 21:40→15:40 ET (in-window, ~10min
- *     earlier than the sibling's ideal 15:50 ET target) — 22:40→16:40 ET, cycle
- *     already 'completed' by then, silent no-op (dormant backup).
- *   - offset 5h (mid-March mismatch): 21:40→16:40 ET (still in-window) —
- *     22:40→17:40 ET, outside the window, no-op.
- *   - offset 7h (late-Oct/early-Nov mismatch): 21:40→14:40 ET, BEFORE the
- *     window opens (15:30) — no-op — 22:40→15:40 ET, in-window, so the backup
- *     entry becomes the effective primary that week.
- * Net effect: every trading day gets exactly one execution, always within the
- * practical window, without a third entry.
- *
- * Cron entries (CyberFolks panel -> "Sciezka" type, explicit PHP 8.2 path:
+ * Cron entry (CyberFolks panel -> "Sciezka" type, explicit PHP 8.2 path:
  * /usr/local/bin/php82 — same binary as the sibling wallet, confirmed via
- * deployment/<slug>.deploy.json):
+ * deployment/<slug>.deploy.json). Example, not prescriptive — the operator
+ * picks the actual time:
  *
  *   40 21 * * 1-5  /usr/local/bin/php82 /home/amjsystem/sites/cvs.timeflow.fun/bin/llm-gemini-wallet-rebalance.php
- *   40 22 * * 1-5  /usr/local/bin/php82 /home/amjsystem/sites/cvs.timeflow.fun/bin/llm-gemini-wallet-rebalance.php
  */
 
 // Guard: only run from CLI, never via HTTP.
