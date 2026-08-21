@@ -650,13 +650,13 @@ touched. Next available migration numbers are `039` and `040` (last is `038_crea
 
 #### Automated
 
-- [x] 1.1 Migrations 039/040 apply cleanly
-- [x] 1.2 FundamentalFieldRegistry tests pass
-- [x] 1.3 SuspectFieldDetector tests pass
-- [x] 1.4 FundamentalOverrideMerger tests pass
-- [x] 1.5 MovingAverageCalculator tests pass
-- [x] 1.6 PHPStan level 6 clean on new files
-- [x] 1.7 php -l clean on new files
+- [x] 1.1 Migrations 039/040 apply cleanly — 82bad48
+- [x] 1.2 FundamentalFieldRegistry tests pass — 82bad48
+- [x] 1.3 SuspectFieldDetector tests pass — 82bad48
+- [x] 1.4 FundamentalOverrideMerger tests pass — 82bad48
+- [x] 1.5 MovingAverageCalculator tests pass — 82bad48
+- [x] 1.6 PHPStan level 6 clean on new files — 82bad48
+- [x] 1.7 php -l clean on new files — 82bad48
 
 #### Manual
 
@@ -666,9 +666,9 @@ touched. Next available migration numbers are `039` and `040` (last is `038_crea
 
 #### Automated
 
-- [ ] 2.1 FundamentalsValidationService tests pass
-- [ ] 2.2 FundamentalsValidationRunRepository tests pass
-- [ ] 2.3 PHPStan clean; php -l clean
+- [x] 2.1 FundamentalsValidationService tests pass
+- [x] 2.2 FundamentalsValidationRunRepository tests pass
+- [x] 2.3 PHPStan clean; php -l clean
 
 #### Manual
 
