@@ -701,8 +701,8 @@ touched. Next available migration numbers are `039` and `040` (last is `038_crea
 
 #### Automated
 
-- [x] 5.1 php -l clean on templates/analysis.php
-- [x] 5.2 PHPStan clean on AnalysisController.php
+- [x] 5.1 php -l clean on templates/analysis.php — edc6fd7
+- [x] 5.2 PHPStan clean on AnalysisController.php — edc6fd7
 
 #### Manual
 

@@ -1765,6 +1765,11 @@
 
                 function fvRenderDiff(diff, notes) {
                     fvPendingDiff = diff;
+                    // Re-enable for this round — a prior successful confirm left it
+                    // disabled (see confirm handler below) and the page is never
+                    // reloaded between the "missing" and "all" runs, so the same
+                    // DOM node has to work for every subsequent diff shown.
+                    if (fvConfirmBtn) fvConfirmBtn.disabled = false;
                     if (!fvDiffTableBody) return;
                     var rows = '';
                     Object.keys(diff).forEach(function (field) {
