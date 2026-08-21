@@ -689,8 +689,8 @@ touched. Next available migration numbers are `039` and `040` (last is `038_crea
 
 #### Automated
 
-- [x] 4.1 FundamentalsValidationController tests pass
-- [x] 4.2 PHPStan clean; php -l clean on all touched files
+- [x] 4.1 FundamentalsValidationController tests pass — faaa13b
+- [x] 4.2 PHPStan clean; php -l clean on all touched files — faaa13b
 
 #### Manual
 
@@ -701,8 +701,8 @@ touched. Next available migration numbers are `039` and `040` (last is `038_crea
 
 #### Automated
 
-- [ ] 5.1 php -l clean on templates/analysis.php
-- [ ] 5.2 PHPStan clean on AnalysisController.php
+- [x] 5.1 php -l clean on templates/analysis.php
+- [x] 5.2 PHPStan clean on AnalysisController.php
 
 #### Manual
 

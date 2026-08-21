@@ -6,10 +6,14 @@ namespace CVS\CVS;
 
 use CVS\Ai\AiAnalysisRepository;
 use CVS\Ai\AiCriticalReviewRepository;
+use CVS\Ai\FundamentalsValidationRunRepository;
 use CVS\Alerts\AlertRepository;
 use CVS\Alerts\PriceAlertRepository;
 use CVS\Auth\AuthController;
 use CVS\Api\FinancialDataFetcher;
+use CVS\Api\FundamentalOverrideMerger;
+use CVS\Api\FundamentalOverrideRepository;
+use CVS\Api\SuspectFieldDetector;
 use CVS\Core\Request;
 use CVS\Core\Response;
 use CVS\History\HistoryRepository;
@@ -188,6 +192,21 @@ class AnalysisController
             return;
         }
 
+        // change: fundamentals-validation — confirmed overrides take priority
+        // over the live Yahoo fetch everywhere $financials is used below
+        // (scoring, raw-data display, ATR), same single merge-point discipline
+        // bin/rescore.php uses for peer_bucket_override.
+        $overrideRepo = new FundamentalOverrideRepository();
+        $overrideRows = $overrideRepo->findByTicker($ticker);
+        $financials   = FundamentalOverrideMerger::merge($financials, $overrideRows);
+
+        $suspectFields = array_keys(SuspectFieldDetector::detect($financials));
+        $fieldStates   = array_fill_keys($suspectFields, 'suspect');
+        foreach ($overrideRows as $field => $row) {
+            $fieldStates[$field] = $row['status'] === 'validated' ? 'validated' : 'checked_no_data';
+        }
+        $validationRun = (new FundamentalsValidationRunRepository())->findByTicker($ticker);
+
         $result    = $this->model->calculate($ticker, $financials);
         $userId    = (int) $_SESSION['user_id'];
         $isWatched = $this->watchlist->isWatched($userId, $ticker);
@@ -261,6 +280,9 @@ class AnalysisController
             'priceAlertEnabled'    => $priceAlertEnabled,    // Phase 8 slice 3 — "price in zone" alert
             'criticalReviewStatus' => $criticalReviewStatus, // change: cvs-ai-critical-review
             'cachedCriticalReview' => $cachedCriticalReview, // change: cvs-ai-critical-review
+            'fieldStates'          => $fieldStates,          // change: fundamentals-validation
+            'validationRun'        => $validationRun,        // change: fundamentals-validation
+            'isAdmin'              => !empty($_SESSION['is_admin']), // change: fundamentals-validation
             'error'                => null,
         ]);
     }

@@ -1126,6 +1126,17 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
 .raw-data summary { cursor: pointer; font-size: var(--text-sm); color: var(--c-muted); margin-bottom: .5rem; }
 .raw-table td:first-child { color: var(--c-muted); font-size: .82rem; width: 55%; }
 
+/* change: fundamentals-validation — three field states in the raw-data table */
+.fv-field--suspect td:first-child          { color: var(--c-danger); }
+.fv-field--validated td:first-child        { color: var(--c-success); }
+.fv-field--checked-no-data td:first-child  { color: var(--c-muted); font-style: italic; }
+.fv-actions { display: flex; gap: .5rem; align-items: center; margin-top: .75rem; flex-wrap: wrap; }
+.fv-status { font-size: var(--text-xs); color: var(--c-muted); }
+.fv-diff { margin-top: .75rem; }
+.fv-diff table { margin-bottom: .5rem; }
+.fv-diff td.fv-diff__old { color: var(--c-muted); text-decoration: line-through; }
+.fv-diff td.fv-diff__new { color: var(--c-success); }
+
 .price-chart-section {
     background: var(--c-surface);
     border: 1px solid var(--c-border);

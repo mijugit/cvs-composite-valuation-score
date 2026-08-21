@@ -731,14 +731,14 @@
                         <tr>
                             <th colspan="1">CVS Swing</th>
                             <td colspan="3">
-                                <strong><?= number_format((float)($swing['cvs'] ?? 0), 1) ?></strong>
+                                <strong id="cvs-score-swing"><?= number_format((float)($swing['cvs'] ?? 0), 1) ?></strong>
                                 — <?= htmlspecialchars($swing['recommendation'] ?? '') ?>
                             </td>
                         </tr>
                         <tr>
                             <th colspan="1">CVS Fund</th>
                             <td colspan="3">
-                                <strong><?= number_format((float)($fund['cvs'] ?? 0), 1) ?></strong>
+                                <strong id="cvs-score-fund"><?= number_format((float)($fund['cvs'] ?? 0), 1) ?></strong>
                                 — <?= htmlspecialchars($fund['recommendation'] ?? '') ?>
                             </td>
                         </tr>
@@ -778,20 +778,62 @@
                                 'forward_eps'            => 'EPS forward',
                                 'trailing_eps'           => 'EPS trailing',
                                 'sector'                 => 'Sektor',
+                                // change: fundamentals-validation — fields the model uses but this
+                                // table didn't render before (Yahoo gaps on otherwise well-covered
+                                // companies; see context/changes/fundamentals-validation/research.md).
+                                'gross_profit'           => 'Zysk brutto ($)',
+                                'total_equity'           => 'Kapitał własny ($)',
+                                'current_assets'         => 'Aktywa obrotowe ($)',
+                                'current_liabilities'    => 'Zobowiązania krótkoterminowe ($)',
+                                'ps_ratio'                => 'P/S',
+                                'moving_average_200'     => 'Średnia 200-dniowa (USD)',
+                            ];
+                            // change: fundamentals-validation — NULL fields now render too (label +
+                            // dash) so they can be colored; a field absent from $fieldStates renders
+                            // with no color at all (e.g. trailing_pe null on negative EPS is a
+                            // correct NULL, never flagged — see SuspectFieldDetector).
+                            $fvStates = $fieldStates ?? [];
+                            $fvTitles = [
+                                'suspect'          => 'Oznaczone jako podejrzane — patrz przycisk walidacji poniżej',
+                                'validated'        => 'Zwalidowane',
+                                'checked_no_data'  => 'Sprawdzone — brak wiarygodnych danych',
                             ];
                             foreach ($rawFields as $key => $label):
-                                $val = $financials[$key] ?? null;
-                                if ($val === null) continue;
+                                $val   = $financials[$key] ?? null;
+                                $state = $fvStates[$key] ?? null;
+                                $rowClass = $state !== null ? ' class="fv-field fv-field--' . $state . '"' : '';
+                                $rowTitle = $state !== null ? ' title="' . htmlspecialchars($fvTitles[$state]) . '"' : '';
                             ?>
-                            <tr>
+                            <tr<?= $rowClass ?><?= $rowTitle ?> data-field="<?= htmlspecialchars($key) ?>">
                                 <td><?= htmlspecialchars($label) ?></td>
                                 <td>
-                                    <?= $fmtRaw($key, $val) ?>
+                                    <?= $val === null ? '—' : $fmtRaw($key, $val) ?>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
                         </tbody>
                     </table>
+                    <?php if (!empty($isAdmin)): ?>
+                    <div class="fv-actions">
+                        <button id="btn-fv-missing" class="btn btn--secondary btn--sm"
+                                data-ticker="<?= htmlspecialchars($ticker) ?>" data-mode="missing"
+                                <?= ($validationRun['status'] ?? null) === 'pending' ? 'disabled' : '' ?>>
+                            Sprawdź dane brakujące
+                        </button>
+                        <button id="btn-fv-all" class="btn btn--ghost btn--sm"
+                                data-ticker="<?= htmlspecialchars($ticker) ?>" data-mode="all"
+                                <?= ($validationRun['status'] ?? null) === 'pending' ? 'disabled' : '' ?>>
+                            Sprawdź wszystkie dane
+                        </button>
+                        <span id="fv-status" class="fv-status"></span>
+                    </div>
+                    <div id="fv-diff" class="fv-diff" hidden>
+                        <table class="pillar-table raw-table" id="fv-diff-table">
+                            <tbody></tbody>
+                        </table>
+                        <button id="btn-fv-confirm" class="btn btn--primary btn--sm">Zastosuj</button>
+                    </div>
+                    <?php endif; ?>
                 </details>
                 <?php endif; ?>
             </div>
@@ -1667,6 +1709,168 @@
                 // resume polling instead of leaving the page in a dead "pending" state.
                 if (crInitialStatus === 'pending') {
                     crStartPolling();
+                }
+
+                // ── Walidacja danych fundamentalnych — change: fundamentals-validation ──
+                var fvTicker        = <?= json_encode($ticker) ?>;
+                var fvInitialStatus = <?= json_encode(!empty($isAdmin) ? ($validationRun['status'] ?? 'none') : 'none') ?>;
+                var fvBtnMissing    = document.getElementById('btn-fv-missing');
+                var fvBtnAll        = document.getElementById('btn-fv-all');
+                var fvStatusEl      = document.getElementById('fv-status');
+                var fvDiffEl        = document.getElementById('fv-diff');
+                var fvDiffTableBody = document.querySelector('#fv-diff-table tbody');
+                var fvConfirmBtn    = document.getElementById('btn-fv-confirm');
+                var fvPollTimer     = null;
+                var fvPollStart     = null;
+                var fvPendingDiff   = null;
+                var FV_MAX_WAIT_MS      = 5 * 60 * 1000;
+                var FV_POLL_INTERVAL_MS = 5000;
+
+                function fvSetButtonsDisabled(disabled) {
+                    if (fvBtnMissing) fvBtnMissing.disabled = disabled;
+                    if (fvBtnAll) fvBtnAll.disabled = disabled;
+                }
+
+                function fvHandleClick(mode) {
+                    fvSetButtonsDisabled(true);
+                    if (fvStatusEl) fvStatusEl.textContent = 'Uruchamiam walidację…';
+                    fetch('/analysis/' + encodeURIComponent(fvTicker) + '/validate-fundamentals', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type':     'application/x-www-form-urlencoded',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-Token':     csrf,
+                        },
+                        body: new URLSearchParams({ _csrf: csrf, mode: mode }),
+                    })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        if (data.ok) {
+                            fvStartPolling();
+                        } else {
+                            fvSetButtonsDisabled(false);
+                            if (fvStatusEl) fvStatusEl.textContent = data.message || 'Nie udało się uruchomić walidacji.';
+                        }
+                    })
+                    .catch(function () {
+                        fvSetButtonsDisabled(false);
+                        if (fvStatusEl) fvStatusEl.textContent = 'Błąd sieci. Spróbuj ponownie.';
+                    });
+                }
+
+                function fvStopPolling() {
+                    if (fvPollTimer) { clearInterval(fvPollTimer); fvPollTimer = null; }
+                    fvSetButtonsDisabled(false);
+                }
+
+                function fvRenderDiff(diff, notes) {
+                    fvPendingDiff = diff;
+                    if (!fvDiffTableBody) return;
+                    var rows = '';
+                    Object.keys(diff).forEach(function (field) {
+                        var entry = diff[field];
+                        var label = field;
+                        var labelCell = document.querySelector('tr[data-field="' + field + '"] td:first-child');
+                        if (labelCell) label = labelCell.textContent;
+                        var oldVal = (entry.old === null || entry.old === undefined) ? '—' : entry.old;
+                        var newVal = entry.status === 'validated' ? entry.new : 'brak wiarygodnych danych';
+                        rows += '<tr><td>' + label + '</td>'
+                              + '<td class="fv-diff__old">' + oldVal + '</td>'
+                              + '<td class="fv-diff__new">' + newVal + '</td></tr>';
+                    });
+                    fvDiffTableBody.innerHTML = rows;
+                    if (fvDiffEl) fvDiffEl.hidden = false;
+                    if (fvStatusEl) fvStatusEl.textContent = notes || 'Gotowe do przeglądu.';
+                }
+
+                function fvPoll() {
+                    if (Date.now() - fvPollStart > FV_MAX_WAIT_MS) {
+                        fvStopPolling();
+                        if (fvStatusEl) fvStatusEl.textContent = 'Walidacja trwa dłużej niż zwykle — sprawdź ponownie za chwilę.';
+                        return;
+                    }
+                    fetch('/analysis/' + encodeURIComponent(fvTicker) + '/validate-fundamentals/status', {
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        if (!data.ok) return;
+                        if (data.status === 'completed') {
+                            fvStopPolling();
+                            fvRenderDiff(data.diff || {}, data.notes || '');
+                        } else if (data.status === 'failed') {
+                            fvStopPolling();
+                            if (fvStatusEl) fvStatusEl.textContent = data.error_message || 'Walidacja się nie powiodła.';
+                        }
+                        // 'pending' → keep polling silently.
+                    })
+                    .catch(function () { /* transient network hiccup — keep polling */ });
+                }
+
+                function fvStartPolling() {
+                    fvPollStart = Date.now();
+                    fvSetButtonsDisabled(true);
+                    if (fvStatusEl) fvStatusEl.textContent = 'Walidacja w toku…';
+                    fvPollTimer = setInterval(fvPoll, FV_POLL_INTERVAL_MS);
+                    fvPoll();
+                }
+
+                if (fvBtnMissing) fvBtnMissing.addEventListener('click', function () { fvHandleClick('missing'); });
+                if (fvBtnAll) fvBtnAll.addEventListener('click', function () { fvHandleClick('all'); });
+
+                if (fvConfirmBtn) {
+                    fvConfirmBtn.addEventListener('click', function () {
+                        if (!fvPendingDiff) return;
+                        fvConfirmBtn.disabled = true;
+                        if (fvStatusEl) fvStatusEl.textContent = 'Zapisuję…';
+                        fetch('/analysis/' + encodeURIComponent(fvTicker) + '/validate-fundamentals/confirm', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type':     'application/x-www-form-urlencoded',
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'X-CSRF-Token':     csrf,
+                            },
+                            body: new URLSearchParams({ _csrf: csrf }),
+                        })
+                        .then(function (r) { return r.json(); })
+                        .then(function (data) {
+                            if (!data.ok) {
+                                if (fvStatusEl) fvStatusEl.textContent = data.message || 'Zapis się nie powiódł.';
+                                fvConfirmBtn.disabled = false;
+                                return;
+                            }
+                            Object.keys(fvPendingDiff).forEach(function (field) {
+                                var entry = fvPendingDiff[field];
+                                var row = document.querySelector('tr[data-field="' + field + '"]');
+                                if (!row) return;
+                                row.classList.remove('fv-field--suspect');
+                                row.classList.add(entry.status === 'validated' ? 'fv-field--validated' : 'fv-field--checked-no-data');
+                                if (entry.status === 'validated' && row.children[1]) {
+                                    row.children[1].textContent = entry.new;
+                                }
+                            });
+                            var swingEl = document.getElementById('cvs-score-swing');
+                            var fundEl  = document.getElementById('cvs-score-fund');
+                            if (swingEl && data.cvs_swing !== null && data.cvs_swing !== undefined) {
+                                swingEl.textContent = Number(data.cvs_swing).toFixed(1);
+                            }
+                            if (fundEl && data.cvs_fund !== null && data.cvs_fund !== undefined) {
+                                fundEl.textContent = Number(data.cvs_fund).toFixed(1);
+                            }
+                            if (fvDiffEl) fvDiffEl.hidden = true;
+                            fvPendingDiff = null;
+                            if (fvStatusEl) fvStatusEl.textContent = 'Zastosowano i przeliczono.';
+                        })
+                        .catch(function () {
+                            if (fvStatusEl) fvStatusEl.textContent = 'Błąd sieci. Spróbuj ponownie.';
+                            fvConfirmBtn.disabled = false;
+                        });
+                    });
+                }
+
+                // Resume polling on reload if a job was left running.
+                if (fvInitialStatus === 'pending') {
+                    fvStartPolling();
                 }
             })();
             </script>
