@@ -10,6 +10,7 @@ declare(strict_types=1);
  */
 
 use CVS\Ai\AiAnalysisController;
+use CVS\Ai\FundamentalsValidationController;
 use CVS\Alerts\AlertController;
 use CVS\Auth\AuthController;
 use CVS\CVS\AnalysisController;
@@ -140,6 +141,12 @@ $router->post('/analysis/{ticker}/share-prompt', fn($req) => $aiAnalysis->shareP
 // Recenzja krytyczna (etap 2) — change: cvs-ai-critical-review
 $router->post('/analysis/{ticker}/critical-review',        fn($req) => $aiAnalysis->criticalReview($req));
 $router->get('/analysis/{ticker}/critical-review/status',  fn($req) => $aiAnalysis->criticalReviewStatus($req));
+
+// Fundamentals validation (change: fundamentals-validation)
+$fundamentalsValidation = new FundamentalsValidationController();
+$router->post('/analysis/{ticker}/validate-fundamentals',          fn($req) => $fundamentalsValidation->trigger($req));
+$router->get('/analysis/{ticker}/validate-fundamentals/status',    fn($req) => $fundamentalsValidation->status($req));
+$router->post('/analysis/{ticker}/validate-fundamentals/confirm',  fn($req) => $fundamentalsValidation->confirm($req));
 
 // ------------------------------------------------------------------
 // Track Record (S-02)

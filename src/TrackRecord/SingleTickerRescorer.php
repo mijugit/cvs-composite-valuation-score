@@ -30,7 +30,7 @@ use CVS\Execution\AtrZoneCalculator;
  * rescore() returns — flushDigests() is a batch-sender, not meant to fire
  * per-ticker (mirrors bin/rescore.php:257's single end-of-run call).
  */
-final class SingleTickerRescorer
+class SingleTickerRescorer
 {
     /**
      * @param array<string, mixed>  $atrZonesConfig

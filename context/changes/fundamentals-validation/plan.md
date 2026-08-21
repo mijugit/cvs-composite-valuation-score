@@ -678,8 +678,8 @@ touched. Next available migration numbers are `039` and `040` (last is `038_crea
 
 #### Automated
 
-- [x] 3.1 SingleTickerRescorer tests pass
-- [x] 3.2 PHPStan clean; php -l clean
+- [x] 3.1 SingleTickerRescorer tests pass — 64d78b2
+- [x] 3.2 PHPStan clean; php -l clean — 64d78b2
 
 #### Manual
 
@@ -689,8 +689,8 @@ touched. Next available migration numbers are `039` and `040` (last is `038_crea
 
 #### Automated
 
-- [ ] 4.1 FundamentalsValidationController tests pass
-- [ ] 4.2 PHPStan clean; php -l clean on all touched files
+- [x] 4.1 FundamentalsValidationController tests pass
+- [x] 4.2 PHPStan clean; php -l clean on all touched files
 
 #### Manual
 
