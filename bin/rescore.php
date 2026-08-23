@@ -63,6 +63,8 @@ use CVS\Alerts\AlertRepository;
 use CVS\Alerts\AlertService;
 use CVS\Alerts\PriceAlertRepository;
 use CVS\Api\FinancialDataFetcher;
+use CVS\Api\FundamentalOverrideMerger;
+use CVS\Api\FundamentalOverrideRepository;
 use CVS\Api\PayloadCompleteness;
 use CVS\Auth\UserRepository;
 use CVS\Execution\AtrZoneCalculator;
@@ -120,6 +122,14 @@ $medianResolver = MedianResolver::fromConfig($config);
 // leaves Yahoo's industry on the snapshot untouched.
 $peerOverrides = (new PeerBucketOverrideRepository())->findBucketMap();
 
+// Admin-confirmed fundamental-data overrides (migration 039, change:
+// fundamentals-validation), read once for the whole run — same bulk-read-
+// before-the-loop shape as $peerOverrides above. Without this merge, a
+// validated correction survives only until this exact script's next run
+// (twice daily), silently reverting to the uncorrected Yahoo fetch — the
+// entire feature is pointless without this line.
+$fundamentalOverrides = (new FundamentalOverrideRepository())->findAllGroupedByTicker();
+
 // Names we believe each symbol stands for, read from the universe file the
 // admin screen maintains. Used only to notice when a symbol stops meaning what
 // it used to: `GOLD` was reassigned from Barrick (which moved to `B`) to
@@ -166,6 +176,16 @@ foreach ($tickers as $ticker) {
         $skipped++;
         $skippedTickers[] = $ticker;
         continue;
+    }
+
+    // change: fundamentals-validation — admin-confirmed overrides take
+    // priority over the fresh Yahoo fetch, same merge-point discipline as
+    // peer_bucket_override below. Must run before PayloadCompleteness so a
+    // validated backfill (e.g. a previously-missing revenue figure) can turn
+    // a would-be skip into a scored ticker.
+    $tickerOverrides = $fundamentalOverrides[strtoupper($ticker)] ?? [];
+    if ($tickerOverrides !== []) {
+        $financials = FundamentalOverrideMerger::merge($financials, $tickerOverrides);
     }
 
     // Structurally-fine-but-empty payload (Yahoo 200 with an empty income

@@ -54,6 +54,34 @@ class FundamentalOverrideRepository
     }
 
     /**
+     * Every override, grouped by ticker — one bulk read for the whole batch run
+     * (bin/rescore.php walks the full watchlist union; a per-ticker lookup there
+     * would be a round trip per ticker for a table that's small in comparison).
+     * Same "findBucketMap()-style bulk read before the loop" shape as
+     * PeerBucketOverrideRepository — see bin/rescore.php's merge point.
+     *
+     * @return array<string, array<string, array{value: ?string, status: string, source: string, validated_at: string}>>
+     *         ticker (uppercase) => field_name => row
+     */
+    public function findAllGroupedByTicker(): array
+    {
+        $stmt = $this->db->query('SELECT ticker, field_name, value, status, source, validated_at FROM fundamental_overrides');
+        $rows = $stmt !== false ? ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+
+        $out = [];
+        foreach ($rows as $row) {
+            $ticker = strtoupper((string) $row['ticker']);
+            $out[$ticker][(string) $row['field_name']] = [
+                'value'        => $row['value'] !== null ? (string) $row['value'] : null,
+                'status'       => (string) $row['status'],
+                'source'       => (string) $row['source'],
+                'validated_at' => (string) $row['validated_at'],
+            ];
+        }
+        return $out;
+    }
+
+    /**
      * Sets or replaces one field's override.
      *
      * @param string|null $value NULL means "checked, no value found" — the
