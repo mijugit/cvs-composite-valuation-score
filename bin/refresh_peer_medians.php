@@ -65,6 +65,8 @@ $_SESSION = [];
 $config = require ROOT_PATH . '/config/cvs-weights.php';
 
 use CVS\Api\FinancialDataFetcher;
+use CVS\Api\FundamentalOverrideMerger;
+use CVS\Api\FundamentalOverrideRepository;
 use CVS\CVS\CVSModel;
 use CVS\CVS\Valuation\PeerMedianRepository;
 use CVS\CVS\Valuation\ValuationMetrics;
@@ -158,6 +160,13 @@ foreach ($todaysSectors as $targetSector) {
     $buckets = [];
     $peerOverrides = (new PeerBucketOverrideRepository())->findBucketMap();
 
+    // change: fundamentals-validation — admin-confirmed overrides feed the
+    // peer medians too, not just the daily rescore. With buckets sometimes
+    // as thin as 5-7 peers, one company's uncorrected Yahoo figure skews the
+    // whole group's benchmark disproportionately (see bin/rescore.php's
+    // identical merge for the full rationale).
+    $fundamentalOverrides = (new FundamentalOverrideRepository())->findAllGroupedByTicker();
+
     // --- Fetch all tickers for this sector ---
     foreach ($allTickers as $entry) {
         $ticker = strtoupper(trim($entry['symbol'] ?? ''));
@@ -171,6 +180,11 @@ foreach ($todaysSectors as $targetSector) {
             $log(sprintf('refresh_peer_medians: fetch failed for %s — skipping', $ticker));
             $totalFailed++;
             continue;
+        }
+
+        $tickerOverrides = $fundamentalOverrides[strtoupper($ticker)] ?? [];
+        if ($tickerOverrides !== []) {
+            $financials = FundamentalOverrideMerger::merge($financials, $tickerOverrides);
         }
 
         $sector   = $financials['sector']   ?? null;
