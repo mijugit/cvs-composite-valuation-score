@@ -694,8 +694,8 @@ touched. Next available migration numbers are `039` and `040` (last is `038_crea
 
 #### Manual
 
-- [ ] 4.3 Trigger endpoint fires worker and produces a completed run with a non-empty diff
-- [ ] 4.4 bin/rescore.php log output unaffected when run alongside
+- [x] 4.3 Trigger endpoint fires worker and produces a completed run with a non-empty diff
+- [x] 4.4 bin/rescore.php log output unaffected when run alongside
 
 ### Phase 5: UI
 
@@ -706,10 +706,10 @@ touched. Next available migration numbers are `039` and `040` (last is `038_crea
 
 #### Manual
 
-- [ ] 5.3 Suspect fields render red; previously-hidden null fields now render
-- [ ] 5.4 Trigger button → pending indicator → poll stops on completion
-- [ ] 5.5 Diff renders inline with old/new values
-- [ ] 5.6 Confirm applies overrides, updates row colors and on-page score without reload
-- [ ] 5.7 Override persists across page reload and comes from fundamental_overrides
-- [ ] 5.8 Non-admin sees no validation UI at all
-- [ ] 5.9 bin/rescore.php batch run afterward reflects the override on its own next snapshot
+- [x] 5.3 Suspect fields render red; previously-hidden null fields now render
+- [x] 5.4 Trigger button → pending indicator → poll stops on completion
+- [x] 5.5 Diff renders inline with old/new values
+- [x] 5.6 Confirm applies overrides, updates row colors and on-page score without reload
+- [x] 5.7 Override persists across page reload and comes from fundamental_overrides
+- [x] 5.8 Non-admin sees no validation UI at all
+- [x] 5.9 bin/rescore.php batch run afterward reflects the override on its own next snapshot

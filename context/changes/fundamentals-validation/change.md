@@ -1,9 +1,9 @@
 ---
 change_id: fundamentals-validation
 title: Fundamentals validation
-status: implementing
+status: implemented
 created: 2026-08-21
-updated: 2026-08-21
+updated: 2026-08-23
 archived_at: null
 ---
 
