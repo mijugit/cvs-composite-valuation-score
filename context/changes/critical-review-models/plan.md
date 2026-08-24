@@ -628,8 +628,8 @@ inline).
 
 #### Automated
 
-- [x] 3.1 `vendor/bin/phpunit tests/Ai/AiAnalysisControllerCriticalReviewTest.php` passes
-- [x] 3.2 `composer stan` reports no new errors
+- [x] 3.1 `vendor/bin/phpunit tests/Ai/AiAnalysisControllerCriticalReviewTest.php` passes — 57b5465
+- [x] 3.2 `composer stan` reports no new errors — 57b5465
 
 #### Manual
 
@@ -642,7 +642,7 @@ inline).
 
 #### Automated
 
-- [ ] 4.1 `composer stan` reports no new errors
+- [x] 4.1 `composer stan` reports no new errors
 
 #### Manual
 

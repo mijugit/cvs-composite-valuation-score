@@ -1050,12 +1050,16 @@
             </div>
 
             <!-- ===================================================== -->
-            <!-- Stage-2: Recenzja krytyczna (change: cvs-ai-critical-review) -->
+            <!-- Stage-2: Recenzja krytyczna (change: cvs-ai-critical-review, -->
+            <!-- extended with a provider tab strip by change: critical-review-models) -->
             <!-- ===================================================== -->
             <?php if (!empty($cachedAi)): ?>
             <?php
-                $crStatus = $criticalReviewStatus ?? 'none';
-                $crCached = $cachedCriticalReview ?? null;
+                $crProviderLabels = ['claude' => 'Claude', 'gemini' => 'Gemini'];
+                $crByProvider = $criticalReviewByProvider ?? [
+                    'claude' => ['status' => $criticalReviewStatus ?? 'none', 'cached' => $cachedCriticalReview ?? null],
+                    'gemini' => ['status' => 'none', 'cached' => null],
+                ];
             ?>
             <div class="card ai-analysis-card" id="critical-review-section">
                 <div class="ai-analysis-card__header">
@@ -1065,14 +1069,33 @@
                                 <strong>Czym różni się od analizy powyżej?</strong><br>
                                 Recenzja krytyczna szuka świeżych newsów (web search, ~14 dni) i
                                 konfrontuje je z analizą etapu 1 — pokazuje co model mógł przeoczyć
-                                i gdzie analiza powyżej bywa zbyt optymistyczna lub ostrożna.
+                                i gdzie analiza powyżej bywa zbyt optymistyczna lub ostrożna. Wybierz
+                                dostawcę modelu zakładką poniżej — każda recenzja jest niezależna.
                                 Trwa dłużej (~2-4 min), generuje się w tle.
                             </span>
                         </span>
                     </h2>
+                </div>
+
+                <div class="cr-tabs" role="tablist">
+                    <?php foreach ($crProviderLabels as $crProviderKey => $crProviderLabel): ?>
+                    <button type="button"
+                            class="cr-tabs__item<?= $crProviderKey === 'claude' ? ' is-active' : '' ?>"
+                            data-provider="<?= $crProviderKey ?>" role="tab"
+                            aria-selected="<?= $crProviderKey === 'claude' ? 'true' : 'false' ?>">
+                        <?= htmlspecialchars($crProviderLabel) ?>
+                    </button>
+                    <?php endforeach; ?>
+                </div>
+
+                <?php foreach ($crProviderLabels as $crProviderKey => $crProviderLabel):
+                    $crStatus = $crByProvider[$crProviderKey]['status'] ?? 'none';
+                    $crCached = $crByProvider[$crProviderKey]['cached'] ?? null;
+                ?>
+                <div class="cr-panel" data-provider="<?= $crProviderKey ?>" <?= $crProviderKey === 'claude' ? '' : 'hidden' ?>>
                     <div class="ai-analysis-card__actions">
                         <?php if ($crCached): ?>
-                            <span class="ai-analysis-card__date" id="critical-review-date">
+                            <span class="ai-analysis-card__date" id="critical-review-date-<?= $crProviderKey ?>">
                                 Recenzja z <?= htmlspecialchars(substr((string) $crCached['generated_at'], 0, 10)) ?>
                                 <?php if (!empty($crCached['stale'])): ?>
                                     <span style="color:var(--c-warn);font-weight:600;" title="Starsza niż 48h">· może być nieaktualna</span>
@@ -1080,73 +1103,85 @@
                             </span>
                         <?php endif; ?>
                         <?php if (!empty($canGenerateAi) && $crStatus !== 'pending'): ?>
-                            <button id="btn-critical-review" class="btn btn--primary btn--sm"
-                                    data-ticker="<?= htmlspecialchars($ticker) ?>">
-                                <?= $crCached ? 'Odśwież recenzję' : 'Recenzja krytyczna' ?>
+                            <button id="btn-critical-review-<?= $crProviderKey ?>" class="btn btn--primary btn--sm cr-trigger-btn"
+                                    data-ticker="<?= htmlspecialchars($ticker) ?>" data-provider="<?= $crProviderKey ?>">
+                                <?= $crCached ? 'Odśwież recenzję' : 'Zleć recenzję' ?>
                             </button>
                         <?php elseif (empty($canGenerateAi) && !$crCached): ?>
-                            <button id="btn-enter-pro-cr" class="btn btn--secondary btn--sm">
+                            <button id="btn-enter-pro-cr-<?= $crProviderKey ?>" class="btn btn--secondary btn--sm cr-pro-btn">
                                 Wprowadź kod PRO
                             </button>
                         <?php endif; ?>
                     </div>
-                </div>
 
-                <div id="critical-review-result" <?= $crCached ? '' : 'hidden' ?>>
-                    <?php if ($crCached): ?>
-                    <div class="ai-narrative">
-                        <?php
-                        $raw  = htmlspecialchars($crCached['content']);
-                        $html = preg_replace('/^## (\d+\. .+)$/m', '<h3 class="ai-narrative__section">$1</h3>', $raw);
-                        $html = preg_replace('/\n{2,}/', '</p><p>', $html ?? $raw);
-                        $html = str_replace("\n", '<br>', $html ?? $raw);
-                        echo '<p>' . $html . '</p>';
-                        ?>
+                    <div id="critical-review-result-<?= $crProviderKey ?>" <?= $crCached ? '' : 'hidden' ?>>
+                        <?php if ($crCached): ?>
+                        <div class="ai-narrative">
+                            <?php
+                            $raw  = htmlspecialchars($crCached['content']);
+                            $html = preg_replace('/^## (\d+\. .+)$/m', '<h3 class="ai-narrative__section">$1</h3>', $raw);
+                            $html = preg_replace('/\n{2,}/', '</p><p>', $html ?? $raw);
+                            $html = str_replace("\n", '<br>', $html ?? $raw);
+                            echo '<p>' . $html . '</p>';
+                            ?>
+                        </div>
+                        <?php if ($crCached['bull_probability'] !== null || $crCached['bear_probability'] !== null): ?>
+                        <div class="cr-probability" id="critical-review-probability-<?= $crProviderKey ?>">
+                            <div class="cr-probability__bar">
+                                <span class="cr-probability__bull" style="flex-basis:<?= (int) ($crCached['bull_probability'] ?? 0) ?>%">Byczy <?= (int) ($crCached['bull_probability'] ?? 0) ?>%</span>
+                                <span class="cr-probability__bear" style="flex-basis:<?= (int) ($crCached['bear_probability'] ?? 0) ?>%">Niedźwiedzi <?= (int) ($crCached['bear_probability'] ?? 0) ?>%</span>
+                            </div>
+                            <?php if (!empty($crCached['probability_rationale'])): ?>
+                            <p class="cr-probability__rationale"><?= htmlspecialchars((string) $crCached['probability_rationale']) ?></p>
+                            <?php endif; ?>
+                        </div>
+                        <?php endif; ?>
+                        <?php if (!empty($crCached['sources'])): ?>
+                        <div id="critical-review-sources-<?= $crProviderKey ?>" style="margin-top:.75rem;font-size:var(--text-sm);">
+                            <strong>Źródła:</strong>
+                            <ul style="margin:.35rem 0 0 1.1rem;">
+                                <?php foreach ($crCached['sources'] as $src): ?>
+                                    <li><a href="<?= htmlspecialchars((string) ($src['url'] ?? '')) ?>" target="_blank" rel="noopener noreferrer">
+                                        <?= htmlspecialchars((string) ($src['title'] ?? $src['url'] ?? '')) ?>
+                                    </a></li>
+                                <?php endforeach; ?>
+                            </ul>
+                        </div>
+                        <?php else: ?>
+                        <div id="critical-review-sources-<?= $crProviderKey ?>" style="margin-top:.75rem;font-size:var(--text-sm);"></div>
+                        <?php endif; ?>
+                        <?php endif; ?>
                     </div>
-                    <?php if (!empty($crCached['sources'])): ?>
-                    <div id="critical-review-sources" style="margin-top:.75rem;font-size:var(--text-sm);">
-                        <strong>Źródła:</strong>
-                        <ul style="margin:.35rem 0 0 1.1rem;">
-                            <?php foreach ($crCached['sources'] as $src): ?>
-                                <li><a href="<?= htmlspecialchars((string) ($src['url'] ?? '')) ?>" target="_blank" rel="noopener noreferrer">
-                                    <?= htmlspecialchars((string) ($src['title'] ?? $src['url'] ?? '')) ?>
-                                </a></li>
-                            <?php endforeach; ?>
-                        </ul>
-                    </div>
-                    <?php else: ?>
-                    <div id="critical-review-sources" style="margin-top:.75rem;font-size:var(--text-sm);"></div>
+
+                    <?php if ($crStatus === 'pending'): ?>
+                    <p style="color:var(--c-muted);font-size:var(--text-sm);" id="critical-review-placeholder-<?= $crProviderKey ?>">
+                        Recenzja jest generowana w tle — strona sama się zaktualizuje (~2-4 min).
+                    </p>
+                    <?php elseif ($crStatus === 'failed' && !$crCached): ?>
+                    <p style="color:var(--c-danger);font-size:var(--text-sm);" id="critical-review-placeholder-<?= $crProviderKey ?>">
+                        Poprzednia próba się nie powiodła. Spróbuj ponownie.
+                    </p>
+                    <?php elseif (!$crCached): ?>
+                    <p style="color:var(--c-muted);font-size:var(--text-sm);" id="critical-review-placeholder-<?= $crProviderKey ?>">
+                        Kliknij „Zleć recenzję", aby sprawdzić świeże katalizatory i skonfrontować
+                        je z analizą powyżej.
+                    </p>
                     <?php endif; ?>
+
+                    <?php if (!$crCached): ?>
+                    <!-- Cached review content already ends with this exact disclaimer
+                         (mandated by CriticalReviewPrompt's system prompt) — only
+                         show the static fallback when there's no AI text to carry it.
+                         Hidden client-side too once a fresh poll completes (see
+                         crRenderCompleted() below), so it's never shown alongside the
+                         AI's own disclaimer within the same page session. -->
+                    <p class="disclaimer-inline" id="critical-review-disclaimer-fallback-<?= $crProviderKey ?>" style="margin-top:.75rem;">
+                        Recenzja krytyczna to hipoteza modelu analitycznego, nie rekomendacja
+                        inwestycyjna. Inwestuj świadomie.
+                    </p>
                     <?php endif; ?>
                 </div>
-
-                <?php if ($crStatus === 'pending'): ?>
-                <p style="color:var(--c-muted);font-size:var(--text-sm);" id="critical-review-placeholder">
-                    Recenzja jest generowana w tle — strona sama się zaktualizuje (~2-4 min).
-                </p>
-                <?php elseif ($crStatus === 'failed' && !$crCached): ?>
-                <p style="color:var(--c-danger);font-size:var(--text-sm);" id="critical-review-placeholder">
-                    Poprzednia próba się nie powiodła. Spróbuj ponownie.
-                </p>
-                <?php elseif (!$crCached): ?>
-                <p style="color:var(--c-muted);font-size:var(--text-sm);" id="critical-review-placeholder">
-                    Kliknij „Recenzja krytyczna", aby sprawdzić świeże katalizatory i skonfrontować
-                    je z analizą powyżej.
-                </p>
-                <?php endif; ?>
-
-                <?php if (!$crCached): ?>
-                <!-- Cached review content already ends with this exact disclaimer
-                     (mandated by the AiCriticalReviewService system prompt) — only
-                     show the static fallback when there's no AI text to carry it.
-                     Hidden client-side too once a fresh poll completes (see
-                     crRenderCompleted() below), so it's never shown alongside the
-                     AI's own disclaimer within the same page session. -->
-                <p class="disclaimer-inline" id="critical-review-disclaimer-fallback" style="margin-top:.75rem;">
-                    Recenzja krytyczna to hipoteza modelu analitycznego, nie rekomendacja
-                    inwestycyjna. Inwestuj świadomie.
-                </p>
-                <?php endif; ?>
+                <?php endforeach; ?>
             </div>
             <?php endif; ?>
 
@@ -1537,24 +1572,40 @@
                     });
                 });
 
-                // ── Recenzja krytyczna (stage 2) — change: cvs-ai-critical-review ──
-                var crTicker         = <?= json_encode($ticker) ?>;
-                var crInitialStatus  = <?= json_encode($criticalReviewStatus ?? 'none') ?>;
-                var crCanGenerate    = <?= json_encode(!empty($canGenerateAi)) ?>;
-                var crResultEl       = document.getElementById('critical-review-result');
-                var crSourcesEl      = document.getElementById('critical-review-sources');
-                var crPlaceholderEl  = document.getElementById('critical-review-placeholder');
-                var crBtn            = document.getElementById('btn-critical-review');
-                var crPollTimer      = null;
-                var crStageTimer     = null;
-                var crPollStart      = null;
-                var crStageIdx       = 0;
+                // ── Recenzja krytyczna (stage 2) — change: cvs-ai-critical-review, ──
+                // ── provider tabs added by change: critical-review-models ──
+                //
+                // Two independent, provider-keyed states (crState.claude / crState.gemini)
+                // rather than a single set of module-level variables — following the
+                // fv-* single-parametrized-handler convention below. Each provider polls
+                // on its own timer regardless of which tab is currently visible; the tab
+                // click handler only toggles pane visibility, it never touches polling.
+                var crTicker      = <?= json_encode($ticker) ?>;
+                var crCanGenerate = <?= json_encode(!empty($canGenerateAi)) ?>;
+                var crInitialData = <?= json_encode($crByProvider ?? ['claude' => ['status' => 'none'], 'gemini' => ['status' => 'none']]) ?>;
                 var crStages = ['Przeszukuję newsy…', 'Konfrontuję z modelem…', 'Piszę recenzję…', 'Prawie gotowe…'];
                 var CR_MAX_WAIT_MS      = 5 * 60 * 1000;
                 var CR_POLL_INTERVAL_MS = 5000;
+                var CR_PROVIDERS = ['claude', 'gemini'];
 
-                function crHandleClick() {
-                    if (crBtn) crBtn.disabled = true;
+                var crState = {};
+                CR_PROVIDERS.forEach(function (provider) {
+                    crState[provider] = {
+                        resultEl:      document.getElementById('critical-review-result-' + provider),
+                        sourcesEl:     document.getElementById('critical-review-sources-' + provider),
+                        probabilityEl: document.getElementById('critical-review-probability-' + provider),
+                        placeholderEl: document.getElementById('critical-review-placeholder-' + provider),
+                        btn:           document.getElementById('btn-critical-review-' + provider),
+                        pollTimer:     null,
+                        stageTimer:    null,
+                        pollStart:     null,
+                        stageIdx:      0,
+                    };
+                });
+
+                function crHandleClick(provider) {
+                    var st = crState[provider];
+                    if (st.btn) st.btn.disabled = true;
                     fetch('/analysis/' + encodeURIComponent(crTicker) + '/critical-review', {
                         method: 'POST',
                         headers: {
@@ -1562,154 +1613,217 @@
                             'X-Requested-With': 'XMLHttpRequest',
                             'X-CSRF-Token':     csrf,
                         },
-                        body: new URLSearchParams({ _csrf: csrf }),
+                        body: new URLSearchParams({ _csrf: csrf, provider: provider }),
                     })
                     .then(function (r) { return r.json(); })
                     .then(function (data) {
                         if (data.ok) {
-                            crStartPolling();
+                            crStartPolling(provider);
                         } else {
-                            if (crBtn) crBtn.disabled = false;
-                            crShowMessage(data.message || 'Nie udało się uruchomić generowania.', true);
+                            if (st.btn) st.btn.disabled = false;
+                            crShowMessage(provider, data.message || 'Nie udało się uruchomić generowania.', true);
                         }
                     })
                     .catch(function () {
-                        if (crBtn) crBtn.disabled = false;
-                        crShowMessage('Błąd sieci. Sprawdź połączenie i spróbuj ponownie.', true);
+                        if (st.btn) st.btn.disabled = false;
+                        crShowMessage(provider, 'Błąd sieci. Sprawdź połączenie i spróbuj ponownie.', true);
                     });
                 }
 
-                function crShowMessage(text, isError) {
-                    if (!crPlaceholderEl) {
-                        var container = document.getElementById('critical-review-result');
+                function crShowMessage(provider, text, isError) {
+                    var st = crState[provider];
+                    if (!st.placeholderEl) {
+                        var container = document.getElementById('critical-review-result-' + provider);
                         if (!container || !container.parentNode) return;
-                        crPlaceholderEl = document.createElement('p');
-                        crPlaceholderEl.id = 'critical-review-placeholder';
-                        crPlaceholderEl.style.fontSize = 'var(--text-sm)';
-                        container.parentNode.insertBefore(crPlaceholderEl, container.nextSibling);
+                        st.placeholderEl = document.createElement('p');
+                        st.placeholderEl.id = 'critical-review-placeholder-' + provider;
+                        st.placeholderEl.style.fontSize = 'var(--text-sm)';
+                        container.parentNode.insertBefore(st.placeholderEl, container.nextSibling);
                     }
-                    crPlaceholderEl.hidden = false;
-                    crPlaceholderEl.style.color = isError ? 'var(--c-danger)' : 'var(--c-muted)';
-                    crPlaceholderEl.textContent = text;
+                    st.placeholderEl.hidden = false;
+                    st.placeholderEl.style.color = isError ? 'var(--c-danger)' : 'var(--c-muted)';
+                    st.placeholderEl.textContent = text;
                 }
 
-                function crRenderCompleted(content, sources, generatedAt) {
-                    if (crResultEl) {
+                function crRenderProbability(provider, probability) {
+                    var st = crState[provider];
+                    var hasBull = probability && probability.bull_probability !== null && probability.bull_probability !== undefined;
+                    var hasBear = probability && probability.bear_probability !== null && probability.bear_probability !== undefined;
+                    if (!hasBull && !hasBear) {
+                        if (st.probabilityEl) st.probabilityEl.hidden = true;
+                        return;
+                    }
+                    var bull = hasBull ? probability.bull_probability : 0;
+                    var bear = hasBear ? probability.bear_probability : 0;
+                    var rationale = probability.rationale ? String(probability.rationale)
+                        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
+
+                    if (!st.probabilityEl) {
+                        var panel = document.querySelector('.cr-panel[data-provider="' + provider + '"] .ai-narrative');
+                        if (!panel || !panel.parentNode) return;
+                        st.probabilityEl = document.createElement('div');
+                        st.probabilityEl.className = 'cr-probability';
+                        st.probabilityEl.id = 'critical-review-probability-' + provider;
+                        panel.parentNode.insertBefore(st.probabilityEl, panel.nextSibling);
+                    }
+                    st.probabilityEl.hidden = false;
+                    st.probabilityEl.innerHTML =
+                        '<div class="cr-probability__bar">'
+                        + '<span class="cr-probability__bull" style="flex-basis:' + bull + '%">Byczy ' + bull + '%</span>'
+                        + '<span class="cr-probability__bear" style="flex-basis:' + bear + '%">Niedźwiedzi ' + bear + '%</span>'
+                        + '</div>'
+                        + (rationale ? '<p class="cr-probability__rationale">' + rationale + '</p>' : '');
+                }
+
+                function crRenderCompleted(provider, content, sources, probability, generatedAt) {
+                    var st = crState[provider];
+                    if (st.resultEl) {
                         var html = String(content)
                             .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
                             .replace(/## (\d+\. .+)/g, '<h3 class="ai-narrative__section">$1</h3>')
                             .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
                             .replace(/\n\n/g, '</p><p>')
                             .replace(/\n/g, '<br>');
-                        crResultEl.innerHTML = '<div class="ai-narrative"><p>' + html + '</p></div>';
-                        crResultEl.hidden = false;
+                        st.resultEl.innerHTML = '<div class="ai-narrative"><p>' + html + '</p></div>';
+                        st.resultEl.hidden = false;
                     }
-                    if (crSourcesEl && Array.isArray(sources) && sources.length) {
+                    crRenderProbability(provider, probability);
+                    if (st.sourcesEl && Array.isArray(sources) && sources.length) {
                         var lis = sources.map(function (s) {
                             var url   = String(s.url || '').replace(/"/g, '&quot;');
                             var title = String(s.title || s.url || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                             return '<li><a href="' + url + '" target="_blank" rel="noopener noreferrer">' + title + '</a></li>';
                         }).join('');
-                        crSourcesEl.innerHTML = '<strong>Źródła:</strong><ul style="margin:.35rem 0 0 1.1rem;">' + lis + '</ul>';
+                        st.sourcesEl.innerHTML = '<strong>Źródła:</strong><ul style="margin:.35rem 0 0 1.1rem;">' + lis + '</ul>';
                     }
-                    if (crPlaceholderEl) crPlaceholderEl.hidden = true;
-                    var crFallbackDisclaimer = document.getElementById('critical-review-disclaimer-fallback');
-                    if (crFallbackDisclaimer) crFallbackDisclaimer.hidden = true;
+                    if (st.placeholderEl) st.placeholderEl.hidden = true;
+                    var fallbackDisclaimer = document.getElementById('critical-review-disclaimer-fallback-' + provider);
+                    if (fallbackDisclaimer) fallbackDisclaimer.hidden = true;
 
                     if (generatedAt) {
                         var dateText = 'Recenzja z ' + String(generatedAt).substring(0, 10);
-                        var dateEl = document.getElementById('critical-review-date');
+                        var dateEl = document.getElementById('critical-review-date-' + provider);
                         if (dateEl) {
                             dateEl.textContent = dateText;
                         } else {
-                            var hdr = document.querySelector('#critical-review-section .ai-analysis-card__actions');
+                            var hdr = document.querySelector('.cr-panel[data-provider="' + provider + '"] .ai-analysis-card__actions');
                             if (hdr) {
                                 var span = document.createElement('span');
                                 span.className = 'ai-analysis-card__date';
-                                span.id = 'critical-review-date';
+                                span.id = 'critical-review-date-' + provider;
                                 span.textContent = dateText;
                                 hdr.prepend(span);
                             }
                         }
                     }
 
-                    if (crBtn) {
-                        crBtn.textContent = 'Odśwież recenzję';
-                        crBtn.disabled = false;
-                        crBtn.hidden = false;
+                    if (st.btn) {
+                        st.btn.textContent = 'Odśwież recenzję';
+                        st.btn.disabled = false;
+                        st.btn.hidden = false;
                     } else if (crCanGenerate) {
-                        var actions = document.querySelector('#critical-review-section .ai-analysis-card__actions');
+                        var actions = document.querySelector('.cr-panel[data-provider="' + provider + '"] .ai-analysis-card__actions');
                         if (actions) {
-                            crBtn = document.createElement('button');
-                            crBtn.id = 'btn-critical-review';
-                            crBtn.className = 'btn btn--primary btn--sm';
-                            crBtn.dataset.ticker = crTicker;
-                            crBtn.textContent = 'Odśwież recenzję';
-                            crBtn.addEventListener('click', crHandleClick);
-                            actions.appendChild(crBtn);
+                            st.btn = document.createElement('button');
+                            st.btn.id = 'btn-critical-review-' + provider;
+                            st.btn.className = 'btn btn--primary btn--sm cr-trigger-btn';
+                            st.btn.dataset.ticker = crTicker;
+                            st.btn.dataset.provider = provider;
+                            st.btn.textContent = 'Odśwież recenzję';
+                            st.btn.addEventListener('click', function () { crHandleClick(provider); });
+                            actions.appendChild(st.btn);
                         }
                     }
                 }
 
-                function crStopPolling() {
-                    if (crPollTimer) { clearInterval(crPollTimer); crPollTimer = null; }
-                    if (crStageTimer) { clearInterval(crStageTimer); crStageTimer = null; }
-                    if (crBtn) crBtn.disabled = false;
+                function crStopPolling(provider) {
+                    var st = crState[provider];
+                    if (st.pollTimer) { clearInterval(st.pollTimer); st.pollTimer = null; }
+                    if (st.stageTimer) { clearInterval(st.stageTimer); st.stageTimer = null; }
+                    if (st.btn) st.btn.disabled = false;
                 }
 
-                function crPoll() {
-                    if (Date.now() - crPollStart > CR_MAX_WAIT_MS) {
-                        crStopPolling();
-                        crShowMessage('Generowanie trwa dłużej niż zwykle — sprawdź ponownie za chwilę.', false);
+                function crPoll(provider) {
+                    var st = crState[provider];
+                    if (Date.now() - st.pollStart > CR_MAX_WAIT_MS) {
+                        crStopPolling(provider);
+                        crShowMessage(provider, 'Generowanie trwa dłużej niż zwykle — sprawdź ponownie za chwilę.', false);
                         return;
                     }
-                    fetch('/analysis/' + encodeURIComponent(crTicker) + '/critical-review/status', {
+                    fetch('/analysis/' + encodeURIComponent(crTicker) + '/critical-review/status?provider=' + encodeURIComponent(provider), {
                         headers: { 'X-Requested-With': 'XMLHttpRequest' },
                     })
                     .then(function (r) { return r.json(); })
                     .then(function (data) {
                         if (!data.ok) return;
                         if (data.status === 'completed') {
-                            crStopPolling();
-                            crRenderCompleted(data.content, data.sources, data.generated_at);
+                            crStopPolling(provider);
+                            crRenderCompleted(provider, data.content, data.sources, {
+                                bull_probability: data.bull_probability,
+                                bear_probability: data.bear_probability,
+                                rationale: data.probability_rationale,
+                            }, data.generated_at);
                         } else if (data.status === 'failed') {
-                            crStopPolling();
-                            crShowMessage(data.error_message || 'Recenzja się nie powiodła. Spróbuj ponownie.', true);
+                            crStopPolling(provider);
+                            crShowMessage(provider, data.error_message || 'Recenzja się nie powiodła. Spróbuj ponownie.', true);
                         }
                         // 'pending' → keep polling silently.
                     })
                     .catch(function () { /* transient network hiccup — keep polling */ });
                 }
 
-                function crStartPolling() {
-                    crPollStart = Date.now();
-                    if (crBtn) crBtn.disabled = true;
-                    crStageIdx = 0;
-                    crShowMessage(crStages[0], false);
-                    crStageTimer = setInterval(function () {
-                        crStageIdx = (crStageIdx + 1) % crStages.length;
-                        crShowMessage(crStages[crStageIdx], false);
+                function crStartPolling(provider) {
+                    var st = crState[provider];
+                    st.pollStart = Date.now();
+                    if (st.btn) st.btn.disabled = true;
+                    st.stageIdx = 0;
+                    crShowMessage(provider, crStages[0], false);
+                    st.stageTimer = setInterval(function () {
+                        st.stageIdx = (st.stageIdx + 1) % crStages.length;
+                        crShowMessage(provider, crStages[st.stageIdx], false);
                     }, 8000);
-                    crPollTimer = setInterval(crPoll, CR_POLL_INTERVAL_MS);
-                    crPoll();
+                    st.pollTimer = setInterval(function () { crPoll(provider); }, CR_POLL_INTERVAL_MS);
+                    crPoll(provider);
                 }
 
-                if (crBtn) {
-                    crBtn.addEventListener('click', crHandleClick);
-                }
-
-                document.getElementById('btn-enter-pro-cr')?.addEventListener('click', function () {
-                    if (proErrEl) { proErrEl.style.display = 'none'; proErrEl.textContent = ''; }
-                    if (proInput) proInput.value = '';
-                    proModal.hidden = false;
-                    setTimeout(function () { if (proInput) proInput.focus(); }, 50);
+                document.querySelectorAll('.cr-trigger-btn').forEach(function (btn) {
+                    btn.addEventListener('click', function () { crHandleClick(btn.dataset.provider); });
                 });
 
-                // Tab was closed/reopened while a background job was still running —
-                // resume polling instead of leaving the page in a dead "pending" state.
-                if (crInitialStatus === 'pending') {
-                    crStartPolling();
-                }
+                document.querySelectorAll('.cr-pro-btn').forEach(function (btn) {
+                    btn.addEventListener('click', function () {
+                        if (proErrEl) { proErrEl.style.display = 'none'; proErrEl.textContent = ''; }
+                        if (proInput) proInput.value = '';
+                        proModal.hidden = false;
+                        setTimeout(function () { if (proInput) proInput.focus(); }, 50);
+                    });
+                });
+
+                // Tab strip — switching the visible pane never starts/stops polling;
+                // each provider's timers (if any) keep running underneath regardless
+                // of which pane is shown (US-01 acceptance criterion).
+                document.querySelectorAll('.cr-tabs__item').forEach(function (tabBtn) {
+                    tabBtn.addEventListener('click', function () {
+                        var provider = tabBtn.dataset.provider;
+                        document.querySelectorAll('.cr-tabs__item').forEach(function (b) {
+                            b.classList.toggle('is-active', b === tabBtn);
+                            b.setAttribute('aria-selected', b === tabBtn ? 'true' : 'false');
+                        });
+                        document.querySelectorAll('.cr-panel').forEach(function (panel) {
+                            panel.hidden = panel.dataset.provider !== provider;
+                        });
+                    });
+                });
+
+                // Page reloaded while a background job was still running for either
+                // provider — resume polling for that provider independently, rather
+                // than leaving the page in a dead "pending" state. Runs regardless of
+                // which tab is active by default (Claude).
+                CR_PROVIDERS.forEach(function (provider) {
+                    if ((crInitialData[provider] || {}).status === 'pending') {
+                        crStartPolling(provider);
+                    }
+                });
 
                 // ── Walidacja danych fundamentalnych — change: fundamentals-validation ──
                 var fvTicker        = <?= json_encode($ticker) ?>;
