@@ -41,18 +41,23 @@ class LlmFreeContextGathererTest extends TestCase
 
         $this->db->exec('
             CREATE TABLE ai_critical_reviews (
-                id            INTEGER PRIMARY KEY AUTOINCREMENT,
-                ticker        TEXT NOT NULL UNIQUE,
-                status        TEXT NOT NULL DEFAULT "pending",
-                content       TEXT,
-                sources       TEXT,
-                error_message TEXT,
-                model         TEXT,
-                tokens_input  INTEGER NOT NULL DEFAULT 0,
-                tokens_output INTEGER NOT NULL DEFAULT 0,
-                generated_by  INTEGER,
-                started_at    TEXT NOT NULL,
-                generated_at  TEXT
+                id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticker                TEXT NOT NULL,
+                provider              TEXT NOT NULL DEFAULT "claude",
+                status                TEXT NOT NULL DEFAULT "pending",
+                content               TEXT,
+                sources               TEXT,
+                error_message         TEXT,
+                model                 TEXT,
+                tokens_input          INTEGER NOT NULL DEFAULT 0,
+                tokens_output         INTEGER NOT NULL DEFAULT 0,
+                bull_probability      INTEGER,
+                bear_probability      INTEGER,
+                probability_rationale TEXT,
+                generated_by          INTEGER,
+                started_at            TEXT NOT NULL,
+                generated_at          TEXT,
+                UNIQUE (ticker, provider)
             )
         ');
 

@@ -9,6 +9,7 @@ use CVS\Ai\AiCriticalReviewRepository;
 use CVS\Ai\CacheableSystem;
 use CVS\Ai\ClaudeClient;
 use CVS\Ai\ClaudeClientFactory;
+use CVS\Ai\CriticalReviewProvider;
 use DateTimeImmutable;
 
 /**
@@ -54,8 +55,8 @@ class LlmFreeContextGatherer
         foreach ($candidateTickers as $ticker) {
             $ticker = strtoupper($ticker);
 
-            if ($this->reviewRepo->isFresh($ticker)) {
-                $row = $this->reviewRepo->findByTicker($ticker);
+            if ($this->reviewRepo->isFresh($ticker, CriticalReviewProvider::CLAUDE)) {
+                $row = $this->reviewRepo->findByTickerAndProvider($ticker, CriticalReviewProvider::CLAUDE);
                 if ($row !== null && isset($row['content'])) {
                     $context[$ticker] = "Krytyczna recenzja (świeża):\n" . (string) $row['content'];
                     continue;

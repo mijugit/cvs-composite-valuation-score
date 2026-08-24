@@ -81,6 +81,7 @@ use CVS\Ai\AiCriticalReviewRepository;
 use CVS\Ai\AiCriticalReviewService;
 use CVS\Ai\AiDivergenceService;
 use CVS\Ai\ClaudeClientFactory;
+use CVS\Ai\CriticalReviewProvider;
 use CVS\Ai\FairPriceCalculator;
 use CVS\Api\FinancialDataFetcher;
 use CVS\CVS\CVSModel;
@@ -93,7 +94,7 @@ $reviewRepo = new AiCriticalReviewRepository();
 try {
     $stage1 = (new AiAnalysisRepository())->findByTicker($ticker);
     if ($stage1 === null || !isset($stage1['content'])) {
-        $reviewRepo->markFailed($ticker, 'Brak analizy etapu 1 dla tej spółki.');
+        $reviewRepo->markFailed($ticker, CriticalReviewProvider::CLAUDE, 'Brak analizy etapu 1 dla tej spółki.');
         $log("generate_critical_review: FAILED {$ticker} — no stage-1 analysis");
         exit(0);
     }
@@ -101,7 +102,7 @@ try {
     $fetcher    = new FinancialDataFetcher($cvsConfig['data_source']);
     $financials = $fetcher->fetch($ticker);
     if ($financials === null) {
-        $reviewRepo->markFailed($ticker, 'Nie udało się pobrać danych rynkowych.');
+        $reviewRepo->markFailed($ticker, CriticalReviewProvider::CLAUDE, 'Nie udało się pobrać danych rynkowych.');
         $log("generate_critical_review: FAILED {$ticker} — fetch failed");
         exit(0);
     }
@@ -144,7 +145,7 @@ try {
     );
 
     if (!$result->ok) {
-        $reviewRepo->markFailed($ticker, (string) ($result->failureMessage ?? 'Nieznany błąd generowania.'));
+        $reviewRepo->markFailed($ticker, CriticalReviewProvider::CLAUDE, (string) ($result->failureMessage ?? 'Nieznany błąd generowania.'));
         $log(sprintf('generate_critical_review: FAILED %s — %s', $ticker, $result->failureMessage ?? 'unknown'));
         exit(0);
     }
@@ -155,11 +156,15 @@ try {
 
     $reviewRepo->markCompleted(
         $ticker,
+        CriticalReviewProvider::CLAUDE,
         (string) $result->text,
         $result->citations,
         (string) ($result->model ?? ''),
         $tokensIn,
-        $tokensOut
+        $tokensOut,
+        null,
+        null,
+        null
     );
 
     $log(sprintf(
@@ -170,7 +175,7 @@ try {
         $result->searchDegraded ? 'true' : 'false'
     ));
 } catch (Throwable $e) {
-    $reviewRepo->markFailed($ticker, 'Błąd wewnętrzny generowania recenzji.');
+    $reviewRepo->markFailed($ticker, CriticalReviewProvider::CLAUDE, 'Błąd wewnętrzny generowania recenzji.');
     $log(sprintf('generate_critical_review: FATAL %s — %s in %s:%d', $ticker, $e->getMessage(), $e->getFile(), $e->getLine()));
     exit(1);
 }

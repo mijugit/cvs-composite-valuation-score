@@ -6,6 +6,7 @@ namespace CVS\CVS;
 
 use CVS\Ai\AiAnalysisRepository;
 use CVS\Ai\AiCriticalReviewRepository;
+use CVS\Ai\CriticalReviewProvider;
 use CVS\Ai\FundamentalsValidationRunRepository;
 use CVS\Alerts\AlertRepository;
 use CVS\Alerts\PriceAlertRepository;
@@ -248,7 +249,7 @@ class AnalysisController
         // Stage-2 "Recenzja krytyczna" (change: cvs-ai-critical-review) — server-side
         // render of an already-completed review; pending/failed just drive the button
         // label and (for pending) resume polling on page load without losing state.
-        $criticalReviewRow    = (new AiCriticalReviewRepository())->findByTicker($ticker);
+        $criticalReviewRow    = (new AiCriticalReviewRepository())->findByTickerAndProvider($ticker, CriticalReviewProvider::CLAUDE);
         $criticalReviewStatus = $criticalReviewRow['status'] ?? 'none';
         $cachedCriticalReview = null;
         if ($criticalReviewStatus === 'completed') {

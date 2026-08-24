@@ -332,7 +332,7 @@ class AiAnalysisController
             return;
         }
 
-        if ($this->criticalReviewRepo->isPending($ticker)) {
+        if ($this->criticalReviewRepo->isPending($ticker, CriticalReviewProvider::CLAUDE)) {
             Response::json([
                 'ok'      => false,
                 'message' => 'Recenzja krytyczna jest już w trakcie generowania.',
@@ -357,7 +357,7 @@ class AiAnalysisController
         // land in ai_critical_reviews via markCompleted(); this entry only
         // enforces the PRO usage quota against a duplicate rapid-fire request.
         $this->usageRepo->log($userId, $this->gate->getSessionCode(), 0, 0);
-        $this->criticalReviewRepo->markPending($ticker, $userId);
+        $this->criticalReviewRepo->markPending($ticker, CriticalReviewProvider::CLAUDE, $userId);
 
         $phpBin = '/usr/local/bin/php82';
         $script = dirname(__DIR__, 2) . '/bin/generate_critical_review.php';
@@ -391,7 +391,7 @@ class AiAnalysisController
             return;
         }
 
-        $row = $this->criticalReviewRepo->findByTicker($ticker);
+        $row = $this->criticalReviewRepo->findByTickerAndProvider($ticker, CriticalReviewProvider::CLAUDE);
         if ($row === null) {
             Response::json(['ok' => true, 'status' => 'none']);
             return;
