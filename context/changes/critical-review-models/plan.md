@@ -613,11 +613,11 @@ inline).
 
 #### Automated
 
-- [x] 2.1 `vendor/bin/phpunit tests/Ai/CriticalReviewPromptTest.php` passes
-- [x] 2.2 `vendor/bin/phpunit tests/Ai/CriticalReviewProbabilityParserTest.php` passes
-- [x] 2.3 `vendor/bin/phpunit tests/Ai/AiCriticalReviewServiceTest.php` passes
-- [x] 2.4 `vendor/bin/phpunit tests/Ai/GeminiCriticalReviewServiceTest.php` passes
-- [x] 2.5 `composer stan` reports no new errors
+- [x] 2.1 `vendor/bin/phpunit tests/Ai/CriticalReviewPromptTest.php` passes — 9008c37
+- [x] 2.2 `vendor/bin/phpunit tests/Ai/CriticalReviewProbabilityParserTest.php` passes — 9008c37
+- [x] 2.3 `vendor/bin/phpunit tests/Ai/AiCriticalReviewServiceTest.php` passes — 9008c37
+- [x] 2.4 `vendor/bin/phpunit tests/Ai/GeminiCriticalReviewServiceTest.php` passes — 9008c37
+- [x] 2.5 `composer stan` reports no new errors — 9008c37
 
 #### Manual
 
@@ -628,8 +628,8 @@ inline).
 
 #### Automated
 
-- [ ] 3.1 `vendor/bin/phpunit tests/Ai/AiAnalysisControllerCriticalReviewTest.php` passes
-- [ ] 3.2 `composer stan` reports no new errors
+- [x] 3.1 `vendor/bin/phpunit tests/Ai/AiAnalysisControllerCriticalReviewTest.php` passes
+- [x] 3.2 `composer stan` reports no new errors
 
 #### Manual
 

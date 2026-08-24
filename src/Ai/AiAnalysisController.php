@@ -25,8 +25,11 @@ use DateTimeImmutable;
  * generate(): auth → PRO gate → cache check → Claude → log → save → respond.
  * sharePrompt(): auth → cache check → rebuild data block → assemble export prompt → respond.
  * criticalReview(): auth → require fresh stage-1 → PRO gate → log → markPending →
- *   fire bin/generate_critical_review.php in the background → 202 (change: cvs-ai-critical-review).
- * criticalReviewStatus(): auth → read ai_critical_reviews row → respond per status.
+ *   fire bin/generate_critical_review(_gemini).php in the background → 202
+ *   (change: cvs-ai-critical-review). Optional `provider` param (claude|gemini,
+ *   defaults to claude) selects which worker/row — change: critical-review-models.
+ * criticalReviewStatus(): auth → read ai_critical_reviews row for (ticker, provider)
+ *   → respond per status (completed responses include probability fields).
  * Always returns JSON; never throws.
  */
 class AiAnalysisController
@@ -289,9 +292,12 @@ class AiAnalysisController
 
     /**
      * Start a stage-2 "Recenzja krytyczna" background job. Returns immediately
-     * (202) — the actual Claude call (web search enabled, measured 90-140s+)
-     * runs in a detached CLI process (bin/generate_critical_review.php) fired
-     * via exec($cmd . ' &'). Poll criticalReviewStatus() for the result.
+     * (202) — the actual Claude/Gemini call (web search enabled, measured
+     * 90-140s+) runs in a detached CLI process (bin/generate_critical_review.php
+     * or bin/generate_critical_review_gemini.php, selected by the `provider`
+     * param) fired via exec($cmd . ' &'). Poll criticalReviewStatus() for the
+     * result. Each provider is an independent row/job — triggering one never
+     * blocks or is blocked by the other (change: critical-review-models).
      */
     public function criticalReview(Request $req): void
     {
@@ -305,6 +311,14 @@ class AiAnalysisController
         $ticker = strtoupper(trim((string) $req->param('ticker', '')));
         if ($ticker === '') {
             Response::json(['ok' => false, 'message' => 'Brak symbolu spółki.'], 400);
+            return;
+        }
+
+        // Backward-compatible: no provider param defaults to Claude — old
+        // callers keep working unchanged (change: critical-review-models).
+        $provider = strtolower(trim((string) $req->param('provider', CriticalReviewProvider::CLAUDE)));
+        if (!CriticalReviewProvider::isValid($provider)) {
+            Response::json(['ok' => false, 'message' => 'Nieprawidłowy dostawca.'], 400);
             return;
         }
 
@@ -332,7 +346,7 @@ class AiAnalysisController
             return;
         }
 
-        if ($this->criticalReviewRepo->isPending($ticker, CriticalReviewProvider::CLAUDE)) {
+        if ($this->criticalReviewRepo->isPending($ticker, $provider)) {
             Response::json([
                 'ok'      => false,
                 'message' => 'Recenzja krytyczna jest już w trakcie generowania.',
@@ -357,15 +371,21 @@ class AiAnalysisController
         // land in ai_critical_reviews via markCompleted(); this entry only
         // enforces the PRO usage quota against a duplicate rapid-fire request.
         $this->usageRepo->log($userId, $this->gate->getSessionCode(), 0, 0);
-        $this->criticalReviewRepo->markPending($ticker, CriticalReviewProvider::CLAUDE, $userId);
+        $this->criticalReviewRepo->markPending($ticker, $provider, $userId);
 
-        $phpBin = '/usr/local/bin/php82';
-        $script = dirname(__DIR__, 2) . '/bin/generate_critical_review.php';
+        $phpBin     = '/usr/local/bin/php82';
+        $scriptName = $provider === CriticalReviewProvider::GEMINI
+            ? 'generate_critical_review_gemini.php'
+            : 'generate_critical_review.php';
+        $logName    = $provider === CriticalReviewProvider::GEMINI
+            ? 'critical_review_gemini.log'
+            : 'critical_review.log';
+        $script = dirname(__DIR__, 2) . '/bin/' . $scriptName;
         $logDir = dirname(__DIR__, 2) . '/logs';
         $cmd    = $phpBin . ' ' . escapeshellarg($script)
                 . ' ' . escapeshellarg($ticker)
                 . ' ' . escapeshellarg((string) $userId)
-                . ' >> ' . escapeshellarg($logDir . '/critical_review.log')
+                . ' >> ' . escapeshellarg($logDir . '/' . $logName)
                 . ' 2>&1';
         exec($cmd . ' &');
 
@@ -386,12 +406,18 @@ class AiAnalysisController
             return;
         }
 
+        $provider = strtolower(trim((string) $req->param('provider', CriticalReviewProvider::CLAUDE)));
+        if (!CriticalReviewProvider::isValid($provider)) {
+            Response::json(['ok' => false, 'message' => 'Nieprawidłowy dostawca.'], 400);
+            return;
+        }
+
         if ($this->criticalReviewRepo === null) {
             Response::json(['ok' => false, 'message' => 'Controller not configured for AI generation.'], 500);
             return;
         }
 
-        $row = $this->criticalReviewRepo->findByTickerAndProvider($ticker, CriticalReviewProvider::CLAUDE);
+        $row = $this->criticalReviewRepo->findByTickerAndProvider($ticker, $provider);
         if ($row === null) {
             Response::json(['ok' => true, 'status' => 'none']);
             return;
@@ -410,12 +436,15 @@ class AiAnalysisController
             $sources = json_decode((string) ($row['sources'] ?? '[]'), true);
 
             Response::json([
-                'ok'           => true,
-                'status'       => 'completed',
-                'content'      => (string) ($row['content'] ?? ''),
-                'sources'      => is_array($sources) ? $sources : [],
-                'generated_at' => $generatedAt,
-                'stale'        => $stale,
+                'ok'                => true,
+                'status'            => 'completed',
+                'content'           => (string) ($row['content'] ?? ''),
+                'sources'           => is_array($sources) ? $sources : [],
+                'generated_at'      => $generatedAt,
+                'stale'             => $stale,
+                'bull_probability'  => isset($row['bull_probability']) ? (int) $row['bull_probability'] : null,
+                'bear_probability'  => isset($row['bear_probability']) ? (int) $row['bear_probability'] : null,
+                'probability_rationale' => $row['probability_rationale'] ?? null,
             ]);
             return;
         }

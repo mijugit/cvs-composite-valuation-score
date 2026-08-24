@@ -246,23 +246,41 @@ class AnalysisController
         $translationRepo   = new TranslationRepository();
         $cachedDescriptionPl = $translationRepo->find($ticker, 'pl', 'long_description');
 
-        // Stage-2 "Recenzja krytyczna" (change: cvs-ai-critical-review) — server-side
-        // render of an already-completed review; pending/failed just drive the button
-        // label and (for pending) resume polling on page load without losing state.
-        $criticalReviewRow    = (new AiCriticalReviewRepository())->findByTickerAndProvider($ticker, CriticalReviewProvider::CLAUDE);
-        $criticalReviewStatus = $criticalReviewRow['status'] ?? 'none';
-        $cachedCriticalReview = null;
-        if ($criticalReviewStatus === 'completed') {
-            $generatedAt = (string) ($criticalReviewRow['generated_at'] ?? '');
-            $generatedAtDt = $generatedAt !== '' ? DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $generatedAt) : false;
-            $sources = json_decode((string) ($criticalReviewRow['sources'] ?? '[]'), true);
-            $cachedCriticalReview = [
-                'content'      => (string) ($criticalReviewRow['content'] ?? ''),
-                'sources'      => is_array($sources) ? $sources : [],
-                'generated_at' => $generatedAt,
-                'stale'        => $generatedAtDt !== false ? $generatedAtDt < (new DateTimeImmutable())->modify('-48 hours') : true,
-            ];
+        // Stage-2 "Recenzja krytyczna" (change: cvs-ai-critical-review, extended
+        // by change: critical-review-models) — server-side render of each
+        // provider's already-completed review; pending/failed just drive that
+        // provider's button label and (for pending) resume polling on page
+        // load without losing state. Both providers are fetched in one query
+        // so BOTH tabs can resume polling independently on load, regardless
+        // of which tab is active by default.
+        $criticalReviewRowsByProvider = (new AiCriticalReviewRepository())->findAllProvidersForTicker($ticker);
+        $criticalReviewByProvider     = [];
+        foreach (CriticalReviewProvider::ALL as $providerKey) {
+            $row    = $criticalReviewRowsByProvider[$providerKey] ?? null;
+            $status = $row['status'] ?? 'none';
+            $cached = null;
+            if ($status === 'completed') {
+                $generatedAt   = (string) ($row['generated_at'] ?? '');
+                $generatedAtDt = $generatedAt !== '' ? DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $generatedAt) : false;
+                $sources       = json_decode((string) ($row['sources'] ?? '[]'), true);
+                $cached = [
+                    'content'               => (string) ($row['content'] ?? ''),
+                    'sources'               => is_array($sources) ? $sources : [],
+                    'generated_at'          => $generatedAt,
+                    'stale'                 => $generatedAtDt !== false ? $generatedAtDt < (new DateTimeImmutable())->modify('-48 hours') : true,
+                    'bull_probability'      => isset($row['bull_probability']) ? (int) $row['bull_probability'] : null,
+                    'bear_probability'      => isset($row['bear_probability']) ? (int) $row['bear_probability'] : null,
+                    'probability_rationale' => $row['probability_rationale'] ?? null,
+                ];
+            }
+            $criticalReviewByProvider[$providerKey] = ['status' => $status, 'cached' => $cached];
         }
+
+        // Legacy single-provider view keys — kept so templates/analysis.php's
+        // existing (pre-tabs) Claude-only rendering keeps working unchanged
+        // until it's migrated to read criticalReviewByProvider directly.
+        $criticalReviewStatus = $criticalReviewByProvider[CriticalReviewProvider::CLAUDE]['status'];
+        $cachedCriticalReview = $criticalReviewByProvider[CriticalReviewProvider::CLAUDE]['cached'];
 
         Response::view('analysis', [
             'ticker'               => $ticker,
@@ -279,8 +297,9 @@ class AnalysisController
             'trajectory'           => $trajectory,           // Phase 8 slice 1 — CVS sparkline
             'execPlan'             => $execPlan,             // Phase 8 slice 2 — ATR entry zone + stops
             'priceAlertEnabled'    => $priceAlertEnabled,    // Phase 8 slice 3 — "price in zone" alert
-            'criticalReviewStatus' => $criticalReviewStatus, // change: cvs-ai-critical-review
-            'cachedCriticalReview' => $cachedCriticalReview, // change: cvs-ai-critical-review
+            'criticalReviewStatus' => $criticalReviewStatus, // change: cvs-ai-critical-review (legacy, Claude only)
+            'cachedCriticalReview' => $cachedCriticalReview, // change: cvs-ai-critical-review (legacy, Claude only)
+            'criticalReviewByProvider' => $criticalReviewByProvider, // change: critical-review-models
             'fieldStates'          => $fieldStates,          // change: fundamentals-validation
             'validationRun'        => $validationRun,        // change: fundamentals-validation
             'isAdmin'              => !empty($_SESSION['is_admin']), // change: fundamentals-validation
