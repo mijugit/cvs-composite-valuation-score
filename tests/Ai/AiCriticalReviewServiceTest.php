@@ -154,6 +154,22 @@ class AiCriticalReviewServiceTest extends TestCase
         $this->assertStringContainsString('NO META-COMMENTARY', $systemText);
     }
 
+    public function test_system_prompt_mandates_trailing_probability_json_block(): void
+    {
+        $transport = new FakeTransport([['status' => 200, 'body' => $this->okBody(), 'error' => null]]);
+        $client    = new ClaudeClient($this->config(), $transport);
+        $service   = $this->service($client);
+
+        $service->generate('MU', $this->cvsResult(), $this->financials(), 'x');
+
+        $sentBody   = json_decode($transport->requests[0]['body'], true);
+        $systemText = $sentBody['system'][0]['text'];
+
+        $this->assertStringContainsString('PROBABILITY BLOCK', $systemText);
+        $this->assertStringContainsString('bull_probability', $systemText);
+        $this->assertStringContainsString('bear_probability', $systemText);
+    }
+
     public function test_generate_surfaces_degraded_search_without_failing(): void
     {
         $body = (string) json_encode([

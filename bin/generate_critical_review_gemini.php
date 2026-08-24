@@ -3,20 +3,26 @@
 declare(strict_types=1);
 
 /**
- * Background worker for the stage-2 "Recenzja krytyczna" feature — change:
- * cvs-ai-critical-review.
+ * Background worker for the Gemini side of the stage-2 "Recenzja krytyczna"
+ * feature — change: critical-review-models.
  *
- * Fired via `exec($cmd . ' &')` from AiAnalysisController::criticalReview() —
- * a real Claude call with web search enabled measured at 90-140s+, far beyond
- * a synchronous PHP request on CF (see plan.md's Phase 1 spike). The endpoint
- * already validated the PRO gate, logged usage, and called markPending()
- * before firing this process — this script only ever does the slow work and
- * writes the result back via markCompleted()/markFailed().
+ * Mirrors bin/generate_critical_review.php's structure (CLI guard, .env
+ * parsing, $_SESSION reset, stage-1 + CVS re-enrichment, try/catch envelope)
+ * but is wired to GeminiCriticalReviewService/GeminiClientFactory instead of
+ * the Claude wiring — a deliberately separate script so the proven Claude
+ * worker carries zero regression risk from this addition.
+ *
+ * Unlike the Claude worker, no config/gemini.php override merge is needed —
+ * its defaults (180s timeout / 200s total budget) are already sized for a
+ * slow, web-search-enabled call; config/ai.php's 'critical_review' override
+ * exists only because the Claude *synchronous* defaults are much tighter.
  *
  * No HTTP session access here (background CLI process) — ticker and userId
- * arrive as positional CLI arguments, not from $_SESSION.
+ * arrive as positional CLI arguments, not from $_SESSION. Provider is
+ * implicit in which script runs — not a third CLI arg — so a caller can
+ * never pass a mismatched provider value.
  *
- * Contract: php bin/generate_critical_review.php <ticker> <userId>
+ * Contract: php bin/generate_critical_review_gemini.php <ticker> <userId>
  *
  * Cron: none — invoked ad hoc by the controller, never scheduled.
  */
@@ -29,7 +35,7 @@ if (PHP_SAPI !== 'cli') {
 
 define('ROOT_PATH', dirname(__DIR__));
 
-$logFile = ROOT_PATH . '/logs/critical_review.log';
+$logFile = ROOT_PATH . '/logs/critical_review_gemini.log';
 if (!is_dir(ROOT_PATH . '/logs')) {
     mkdir(ROOT_PATH . '/logs', 0755, true);
 }
@@ -43,13 +49,13 @@ $ticker = trim((string) ($argv[1] ?? ''));
 $userId = (int) ($argv[2] ?? 0);
 
 if ($ticker === '' || $userId <= 0) {
-    $log(sprintf('generate_critical_review: ERROR invalid args — ticker=%s userId=%s', $argv[1] ?? '', $argv[2] ?? ''));
+    $log(sprintf('generate_critical_review_gemini: ERROR invalid args — ticker=%s userId=%s', $argv[1] ?? '', $argv[2] ?? ''));
     exit(1);
 }
 
 $ticker = strtoupper($ticker);
 
-$log("generate_critical_review: start ticker={$ticker} userId={$userId}");
+$log("generate_critical_review_gemini: start ticker={$ticker} userId={$userId}");
 
 require ROOT_PATH . '/vendor/autoload.php';
 
@@ -72,18 +78,20 @@ if (file_exists($envFile)) {
 // for the run's lifetime (same workaround as bin/rescore.php).
 $_SESSION = [];
 
-$cvsConfig = require ROOT_PATH . '/config/cvs-weights.php';
-$aiConfig  = require ROOT_PATH . '/config/ai.php';
+$cvsConfig    = require ROOT_PATH . '/config/cvs-weights.php';
+$aiConfig     = require ROOT_PATH . '/config/ai.php';
+$geminiConfig = require ROOT_PATH . '/config/gemini.php';
 
 use CVS\CVS\Valuation\MedianResolver;
 use CVS\Ai\AiAnalysisRepository;
 use CVS\Ai\AiCriticalReviewRepository;
-use CVS\Ai\AiCriticalReviewService;
 use CVS\Ai\AiDivergenceService;
 use CVS\Ai\ClaudeClientFactory;
 use CVS\Ai\CriticalReviewProbabilityParser;
 use CVS\Ai\CriticalReviewProvider;
 use CVS\Ai\FairPriceCalculator;
+use CVS\Ai\GeminiClientFactory;
+use CVS\Ai\GeminiCriticalReviewService;
 use CVS\Api\FinancialDataFetcher;
 use CVS\CVS\CVSModel;
 use CVS\Execution\AtrZoneCalculator;
@@ -95,16 +103,16 @@ $reviewRepo = new AiCriticalReviewRepository();
 try {
     $stage1 = (new AiAnalysisRepository())->findByTicker($ticker);
     if ($stage1 === null || !isset($stage1['content'])) {
-        $reviewRepo->markFailed($ticker, CriticalReviewProvider::CLAUDE, 'Brak analizy etapu 1 dla tej spółki.');
-        $log("generate_critical_review: FAILED {$ticker} — no stage-1 analysis");
+        $reviewRepo->markFailed($ticker, CriticalReviewProvider::GEMINI, 'Brak analizy etapu 1 dla tej spółki.');
+        $log("generate_critical_review_gemini: FAILED {$ticker} — no stage-1 analysis");
         exit(0);
     }
 
     $fetcher    = new FinancialDataFetcher($cvsConfig['data_source']);
     $financials = $fetcher->fetch($ticker);
     if ($financials === null) {
-        $reviewRepo->markFailed($ticker, CriticalReviewProvider::CLAUDE, 'Nie udało się pobrać danych rynkowych.');
-        $log("generate_critical_review: FAILED {$ticker} — fetch failed");
+        $reviewRepo->markFailed($ticker, CriticalReviewProvider::GEMINI, 'Nie udało się pobrać danych rynkowych.');
+        $log("generate_critical_review_gemini: FAILED {$ticker} — fetch failed");
         exit(0);
     }
 
@@ -125,13 +133,13 @@ try {
         ? AtrZoneCalculator::compute($financials['daily_ohlc'], (float) $financials['current_price'], $atrCfg)
         : null;
 
-    // The web-search-enabled call runs detached from any HTTP request lifecycle —
-    // override the client's timeout with the much larger budget config/ai.php
-    // reserves for it (measured 138.8s live; the synchronous defaults are ~20-25s).
-    $reviewAiConfig = array_merge($aiConfig, is_array($aiConfig['critical_review'] ?? null) ? $aiConfig['critical_review'] : []);
-
-    $service = new AiCriticalReviewService(
-        ClaudeClientFactory::fromConfig($reviewAiConfig),
+    // AiDivergenceService::buildDataBlock() is reused unmodified regardless
+    // of transport — the divergence service itself is only used for the data
+    // block here, never for a network call, so it's wired to the (unused
+    // for network purposes) Claude client the same way the Claude worker
+    // wires its own AiDivergenceService instance.
+    $service = new GeminiCriticalReviewService(
+        GeminiClientFactory::fromConfig($geminiConfig),
         new AiDivergenceService(ClaudeClientFactory::fromConfig($aiConfig))
     );
 
@@ -146,8 +154,8 @@ try {
     );
 
     if (!$result->ok) {
-        $reviewRepo->markFailed($ticker, CriticalReviewProvider::CLAUDE, (string) ($result->failureMessage ?? 'Nieznany błąd generowania.'));
-        $log(sprintf('generate_critical_review: FAILED %s — %s', $ticker, $result->failureMessage ?? 'unknown'));
+        $reviewRepo->markFailed($ticker, CriticalReviewProvider::GEMINI, (string) ($result->failureMessage ?? 'Nieznany błąd generowania.'));
+        $log(sprintf('generate_critical_review_gemini: FAILED %s — %s', $ticker, $result->failureMessage ?? 'unknown'));
         exit(0);
     }
 
@@ -162,7 +170,7 @@ try {
 
     $reviewRepo->markCompleted(
         $ticker,
-        CriticalReviewProvider::CLAUDE,
+        CriticalReviewProvider::GEMINI,
         $parsed['narrative'],
         $result->citations,
         (string) ($result->model ?? ''),
@@ -174,7 +182,7 @@ try {
     );
 
     $log(sprintf(
-        'generate_critical_review: done ticker=%s tokens_in=%d tokens_out=%d search_degraded=%s probability_parsed=%s',
+        'generate_critical_review_gemini: done ticker=%s tokens_in=%d tokens_out=%d search_degraded=%s probability_parsed=%s',
         $ticker,
         $tokensIn,
         $tokensOut,
@@ -182,8 +190,8 @@ try {
         $parsed['bull_probability'] !== null ? 'true' : 'false'
     ));
 } catch (Throwable $e) {
-    $reviewRepo->markFailed($ticker, CriticalReviewProvider::CLAUDE, 'Błąd wewnętrzny generowania recenzji.');
-    $log(sprintf('generate_critical_review: FATAL %s — %s in %s:%d', $ticker, $e->getMessage(), $e->getFile(), $e->getLine()));
+    $reviewRepo->markFailed($ticker, CriticalReviewProvider::GEMINI, 'Błąd wewnętrzny generowania recenzji.');
+    $log(sprintf('generate_critical_review_gemini: FATAL %s — %s in %s:%d', $ticker, $e->getMessage(), $e->getFile(), $e->getLine()));
     exit(1);
 }
 

@@ -600,24 +600,24 @@ inline).
 
 #### Automated
 
-- [x] 1.1 Migration applies cleanly against the local/dev DB
-- [x] 1.2 `vendor/bin/phpunit tests/Ai/AiCriticalReviewRepositoryTest.php` passes
-- [x] 1.3 `composer stan` reports no new errors
+- [x] 1.1 Migration applies cleanly against the local/dev DB — a445da2
+- [x] 1.2 `vendor/bin/phpunit tests/Ai/AiCriticalReviewRepositoryTest.php` passes — a445da2
+- [x] 1.3 `composer stan` reports no new errors — a445da2
 
 #### Manual
 
-- [x] 1.4 `SHOW CREATE TABLE ai_critical_reviews` shows the new unique key and columns
-- [x] 1.5 Pre-existing Claude rows show `provider = 'claude'` after migration
+- [x] 1.4 `SHOW CREATE TABLE ai_critical_reviews` shows the new unique key and columns — a445da2
+- [x] 1.5 Pre-existing Claude rows show `provider = 'claude'` after migration — a445da2
 
 ### Phase 2: Shared prompt/parsing helpers + Gemini service + Gemini worker
 
 #### Automated
 
-- [ ] 2.1 `vendor/bin/phpunit tests/Ai/CriticalReviewPromptTest.php` passes
-- [ ] 2.2 `vendor/bin/phpunit tests/Ai/CriticalReviewProbabilityParserTest.php` passes
-- [ ] 2.3 `vendor/bin/phpunit tests/Ai/AiCriticalReviewServiceTest.php` passes
-- [ ] 2.4 `vendor/bin/phpunit tests/Ai/GeminiCriticalReviewServiceTest.php` passes
-- [ ] 2.5 `composer stan` reports no new errors
+- [x] 2.1 `vendor/bin/phpunit tests/Ai/CriticalReviewPromptTest.php` passes
+- [x] 2.2 `vendor/bin/phpunit tests/Ai/CriticalReviewProbabilityParserTest.php` passes
+- [x] 2.3 `vendor/bin/phpunit tests/Ai/AiCriticalReviewServiceTest.php` passes
+- [x] 2.4 `vendor/bin/phpunit tests/Ai/GeminiCriticalReviewServiceTest.php` passes
+- [x] 2.5 `composer stan` reports no new errors
 
 #### Manual
 
