@@ -642,7 +642,7 @@ inline).
 
 #### Automated
 
-- [x] 4.1 `composer stan` reports no new errors
+- [x] 4.1 `composer stan` reports no new errors — 3612595
 
 #### Manual
 
@@ -658,5 +658,5 @@ inline).
 
 #### Automated
 
-- [ ] 5.1 Full `vendor/bin/phpunit` suite passes with zero failures
-- [ ] 5.2 `composer stan` reports no errors
+- [x] 5.1 Full `vendor/bin/phpunit` suite passes with zero failures
+- [x] 5.2 `composer stan` reports no errors

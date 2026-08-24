@@ -92,6 +92,24 @@ class AiAnalysisControllerCriticalReviewTest extends TestCase
         );
     }
 
+    /**
+     * Guards against an accidental route-shape change: the `provider` param
+     * (change: critical-review-models) travels as a request param, not a
+     * path segment, so no new route was added for it — still exactly the
+     * same 2 critical-review routes as before.
+     */
+    public function test_exactly_two_critical_review_routes_are_registered(): void
+    {
+        $routesFile = dirname(__DIR__, 2) . '/src/Core/routes.php';
+        $contents   = file_get_contents($routesFile);
+        $this->assertIsString($contents);
+
+        $count = substr_count($contents, "/analysis/{ticker}/critical-review'")
+            + substr_count($contents, "/analysis/{ticker}/critical-review/status'");
+
+        $this->assertSame(2, $count, 'Expected exactly 2 critical-review route registrations');
+    }
+
     // ------------------------------------------------------------------
     // (3) Constructor: injected test doubles skip the critical-review repo too
     // ------------------------------------------------------------------
