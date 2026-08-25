@@ -175,6 +175,54 @@ class EarningsCalendarParserTest extends TestCase
     }
 
     // ------------------------------------------------------------------
+    // Calendar-day counting — regression for the 2026-08-25 NVDA production
+    // bug: a raw ceil()/floor() on the exact second-count gap depends on the
+    // time-of-day of both epochs, not just the calendar dates crossed.
+    // ------------------------------------------------------------------
+
+    public function test_days_to_earnings_counts_calendar_days_not_exact_24h_periods(): void
+    {
+        // Reference: today at 15:26 UTC (rescore ran mid-afternoon).
+        $ref = new DateTimeImmutable('2026-08-25 15:26:00', new \DateTimeZone('UTC'));
+        // Earnings: TOMORROW at 20:00 UTC — a 28.6-hour gap, but only ONE
+        // calendar day (Aug 25 -> Aug 26) is actually being crossed.
+        $raw = $this->rawWithEarningsDate($this->num((new DateTimeImmutable('2026-08-26 20:00:00', new \DateTimeZone('UTC')))->getTimestamp()));
+
+        $result = EarningsCalendarParser::parse($raw, $ref);
+
+        // Before the fix this returned 2 (ceil(28.6/24)) — a human calls this
+        // "jutro" / 1 day away, not 2.
+        $this->assertSame(1, $result['days_to_earnings']);
+    }
+
+    public function test_days_to_earnings_same_calendar_day_is_zero_regardless_of_clock_time(): void
+    {
+        // Reference: today at 09:00 UTC. Earnings later THE SAME DAY at 20:00 UTC.
+        $ref = new DateTimeImmutable('2026-08-25 09:00:00', new \DateTimeZone('UTC'));
+        $raw = $this->rawWithEarningsDate($this->num((new DateTimeImmutable('2026-08-25 20:00:00', new \DateTimeZone('UTC')))->getTimestamp()));
+
+        $result = EarningsCalendarParser::parse($raw, $ref);
+
+        $this->assertSame(0, $result['days_to_earnings']);
+    }
+
+    public function test_days_since_earnings_counts_calendar_days_not_exact_24h_periods(): void
+    {
+        // mostRecentQuarter reported yesterday at 20:00 UTC; reference is
+        // today at 09:00 UTC — only a 13-hour gap, but ONE calendar day
+        // (Aug 24 -> Aug 25) has passed.
+        $ref = new DateTimeImmutable('2026-08-25 09:00:00', new \DateTimeZone('UTC'));
+        $raw = $this->rawWithMostRecentQuarter((new DateTimeImmutable('2026-08-24 20:00:00', new \DateTimeZone('UTC')))->getTimestamp());
+
+        $result = EarningsCalendarParser::parse($raw, $ref);
+
+        // Before the fix, floor(13h/24h) = 0 — this UNDER-counted a real
+        // calendar-day boundary crossing the same way daysToNextEarnings
+        // over-counted one.
+        $this->assertSame(1, $result['days_since_earnings']);
+    }
+
+    // ------------------------------------------------------------------
     // Determinism — same inputs, same reference date -> identical output
     // ------------------------------------------------------------------
 
