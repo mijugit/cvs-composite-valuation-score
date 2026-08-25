@@ -56,6 +56,15 @@ class CriticalReviewPromptTest extends TestCase
         $this->assertStringContainsString('invent or guess', $system->text);
     }
 
+    public function test_system_prompt_forbids_inline_citations_in_narrative(): void
+    {
+        $system = CriticalReviewPrompt::buildSystemPrompt();
+
+        $this->assertStringContainsString('NO INLINE CITATIONS', $system->text);
+        $this->assertStringContainsString('never insert a markdown link', $system->text);
+        $this->assertStringContainsString('do not also repeat these URLs in', $system->text);
+    }
+
     public function test_system_prompt_ends_narrative_with_fixed_disclaimer(): void
     {
         $system = CriticalReviewPrompt::buildSystemPrompt();

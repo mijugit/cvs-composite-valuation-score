@@ -35,6 +35,16 @@ use DateTimeImmutable;
  * all four providers, instead of depending on four different citation-API
  * quirks (Gemini's groundingMetadata and GPT's annotations happen to fire
  * reliably; Claude's does not for this content style).
+ *
+ * NO INLINE CITATIONS guardrail (same follow-up fix): the `sources` field
+ * above only fixed providers that were citing too little (Claude). GPT
+ * Terra/Luna turned out to cite too much in the wrong place — its Responses
+ * API `web_search` tool has a strong RLHF-trained habit of writing
+ * `([domain.com](url))` markdown links inline, mid-sentence, in the prose
+ * itself, in addition to (correctly) populating `sources`. Claude and
+ * Gemini don't exhibit this. The guardrail below tells every provider the
+ * narrative body is citation-free prose and `sources` is the ONLY place a
+ * URL may appear — verified live against GPT Luna/NVDA, 2026-08-25.
  */
 final class CriticalReviewPrompt
 {
@@ -111,6 +121,14 @@ search for...", "Mam wystarczające dane..."). Output ONLY the four narrative
 sections below plus the trailing JSON block — no preamble, no meta text
 before section 1.
 
+NO INLINE CITATIONS (MANDATORY): The four narrative sections are plain prose
+— never insert a markdown link, a bare URL, or a parenthetical source tag
+like "([nazwa.com](url))" mid-sentence or at the end of a sentence. State
+facts directly (e.g. "Reuters informuje, że..." is fine as plain text; a
+clickable link after it is not). Every URL you used belongs ONLY in the
+`sources` field of the trailing JSON block described below — nowhere else in
+your output.
+
 Structure your response in exactly these 4 sections using the exact headers
 below:
 
@@ -157,9 +175,10 @@ URL your web search actually returned and that informed section 1 or 2 above
 — copy the URLs exactly as they appeared in your search results, never
 invent or guess one. Deduplicate repeated URLs. If your web search returned
 no usable results, `sources` MUST be an empty array `[]` — never omit the
-field and never fabricate an entry to avoid an empty list. This field is
-YOUR way of showing your sources directly in your answer text — do not rely
-on any other citation mechanism to convey them.
+field and never fabricate an entry to avoid an empty list. This field is the
+ONLY place your sources appear — see NO INLINE CITATIONS above — do not
+rely on any other citation mechanism, and do not also repeat these URLs in
+the narrative sections.
 
 Output nothing after this JSON block.
 
