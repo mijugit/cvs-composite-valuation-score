@@ -316,7 +316,10 @@ class AiAnalysisController
 
         // Backward-compatible: no provider param defaults to Claude — old
         // callers keep working unchanged (change: critical-review-models).
-        $provider = strtolower(trim((string) $req->param('provider', CriticalReviewProvider::CLAUDE)));
+        // NOTE: `provider` travels in the POST body (form-urlencoded), not
+        // the route path — must read via input(), not param() (param() only
+        // reads {ticker}-style route params, see Request::param()).
+        $provider = strtolower(trim((string) $req->input('provider', CriticalReviewProvider::CLAUDE)));
         if (!CriticalReviewProvider::isValid($provider)) {
             Response::json(['ok' => false, 'message' => 'Nieprawidłowy dostawca.'], 400);
             return;
@@ -406,7 +409,9 @@ class AiAnalysisController
             return;
         }
 
-        $provider = strtolower(trim((string) $req->param('provider', CriticalReviewProvider::CLAUDE)));
+        // `provider` travels as a query-string param on this GET endpoint —
+        // must read via query(), not param() (see note in criticalReview()).
+        $provider = strtolower(trim((string) $req->query('provider', CriticalReviewProvider::CLAUDE)));
         if (!CriticalReviewProvider::isValid($provider)) {
             Response::json(['ok' => false, 'message' => 'Nieprawidłowy dostawca.'], 400);
             return;

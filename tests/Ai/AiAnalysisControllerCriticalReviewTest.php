@@ -110,6 +110,31 @@ class AiAnalysisControllerCriticalReviewTest extends TestCase
         $this->assertSame(2, $count, 'Expected exactly 2 critical-review route registrations');
     }
 
+    /**
+     * Regression guard for a real production bug (2026-08-25): `provider`
+     * was read via `Request::param()`, which ONLY reads {ticker}-style
+     * route params — never POST body or query string. Every "Gemini"
+     * trigger/poll silently fell back to the 'claude' default instead,
+     * so the Gemini worker was never invoked and its poll always returned
+     * Claude's row. `provider` must be read via input() (POST body, in
+     * criticalReview()) and query() (query string, in criticalReviewStatus()) —
+     * never via param() for this key.
+     */
+    public function test_provider_param_is_read_via_input_and_query_never_via_param(): void
+    {
+        $controllerFile = dirname(__DIR__, 2) . '/src/Ai/AiAnalysisController.php';
+        $contents       = file_get_contents($controllerFile);
+        $this->assertIsString($contents);
+
+        $this->assertStringNotContainsString(
+            "\$req->param('provider'",
+            $contents,
+            "Request::param() only reads route-path params — 'provider' is a POST body/query value, not a route segment."
+        );
+        $this->assertStringContainsString("\$req->input('provider'", $contents, 'criticalReview() must read provider via input() (POST body).');
+        $this->assertStringContainsString("\$req->query('provider'", $contents, 'criticalReviewStatus() must read provider via query() (query string).');
+    }
+
     // ------------------------------------------------------------------
     // (3) Constructor: injected test doubles skip the critical-review repo too
     // ------------------------------------------------------------------
