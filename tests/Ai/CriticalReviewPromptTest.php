@@ -47,6 +47,15 @@ class CriticalReviewPromptTest extends TestCase
         $this->assertStringContainsString('```json', $system->text);
     }
 
+    public function test_system_prompt_mandates_sources_field_in_the_same_json_block(): void
+    {
+        $system = CriticalReviewPrompt::buildSystemPrompt();
+
+        $this->assertStringContainsString('SOURCES FIELD', $system->text);
+        $this->assertStringContainsString('"sources"', $system->text);
+        $this->assertStringContainsString('invent or guess', $system->text);
+    }
+
     public function test_system_prompt_ends_narrative_with_fixed_disclaimer(): void
     {
         $system = CriticalReviewPrompt::buildSystemPrompt();

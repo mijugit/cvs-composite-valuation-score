@@ -22,6 +22,19 @@ use DateTimeImmutable;
  * mandatory instruction: a trailing fenced JSON block carrying the bull/bear
  * scenario probabilities plus a short justification — parsed by
  * CriticalReviewProbabilityParser.
+ *
+ * The same JSON block also carries a `sources` array (change: critical-
+ * review-openai's follow-up fix, 2026-08-25) — deliberately NOT relying on
+ * any provider's own automatic citation mechanism (Claude's Messages API
+ * citation attachment is a heuristic that reliably fires on text closely
+ * reproducing a source, but NOT on heavily synthesized analytical text —
+ * exactly what this prompt asks every provider to write — so it silently
+ * returned zero citations for Claude despite genuinely using web search).
+ * Explicitly instructing every provider to write its own sources list as
+ * parseable text puts source extraction under our control uniformly across
+ * all four providers, instead of depending on four different citation-API
+ * quirks (Gemini's groundingMetadata and GPT's annotations happen to fire
+ * reliably; Claude's does not for this content style).
  */
 final class CriticalReviewPrompt
 {
@@ -133,11 +146,21 @@ you give, not just state it. After section 4, on its own lines, output a
 fenced JSON block with EXACTLY this shape:
 
 ```json
-{"bull_probability": <integer 0-100>, "bear_probability": <integer 0-100>, "rationale": "<one or two Polish sentences justifying both numbers, referencing a specific driver from your analysis above>"}
+{"bull_probability": <integer 0-100>, "bear_probability": <integer 0-100>, "rationale": "<one or two Polish sentences justifying both numbers, referencing a specific driver from your analysis above>", "sources": [{"url": "<full URL you actually saw in your web search results>", "title": "<short source name, e.g. the publication or domain>"}]}
 ```
 
 bull_probability and bear_probability are independent scenario-confidence
 estimates, not a forced two-outcome split — they do NOT need to sum to 100.
+
+SOURCES FIELD (MANDATORY, part of the same JSON block): list every distinct
+URL your web search actually returned and that informed section 1 or 2 above
+— copy the URLs exactly as they appeared in your search results, never
+invent or guess one. Deduplicate repeated URLs. If your web search returned
+no usable results, `sources` MUST be an empty array `[]` — never omit the
+field and never fabricate an entry to avoid an empty list. This field is
+YOUR way of showing your sources directly in your answer text — do not rely
+on any other citation mechanism to convey them.
+
 Output nothing after this JSON block.
 
 OUTPUT REQUIREMENTS:

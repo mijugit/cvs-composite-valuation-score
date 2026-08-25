@@ -160,11 +160,18 @@ try {
     // stored, probability fields just stay null (see parser docblock).
     $parsed = CriticalReviewProbabilityParser::parse((string) $result->text);
 
+    // Prefer the model's own explicit sources list (parsed above) over
+    // Claude's native citation metadata — the native mechanism is a
+    // heuristic that doesn't reliably fire on synthesized analytical text
+    // (see CriticalReviewProbabilityParser's docblock). Only fall back to
+    // the native citations if the model forgot the sources field entirely.
+    $sources = $parsed['sources'] !== [] ? $parsed['sources'] : $result->citations;
+
     $reviewRepo->markCompleted(
         $ticker,
         CriticalReviewProvider::CLAUDE,
         $parsed['narrative'],
-        $result->citations,
+        $sources,
         (string) ($result->model ?? ''),
         $tokensIn,
         $tokensOut,

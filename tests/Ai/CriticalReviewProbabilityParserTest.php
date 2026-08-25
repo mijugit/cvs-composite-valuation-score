@@ -112,4 +112,90 @@ TEXT;
         $this->assertSame(50, $result['bull_probability']);
         $this->assertNull($result['rationale']);
     }
+
+    // ------------------------------------------------------------------
+    // Sources — change: critical-review-openai follow-up fix (2026-08-25).
+    // The JSON block now nests {url, title} objects inside `sources`, which
+    // is the regression case for the fence/fallback regexes (they used to
+    // assume no braces could appear inside the outer object).
+    // ------------------------------------------------------------------
+
+    public function test_parses_sources_array_with_nested_objects_in_fenced_block(): void
+    {
+        $raw = 'Narracja z linkami.' . "\n\n"
+            . '```json' . "\n"
+            . '{"bull_probability": 60, "bear_probability": 40, "rationale": "Uzasadnienie.", '
+            . '"sources": [{"url": "https://example.com/a", "title": "Example A"}, {"url": "https://example.com/b", "title": "Example B"}]}' . "\n"
+            . '```';
+
+        $result = CriticalReviewProbabilityParser::parse($raw);
+
+        $this->assertSame(60, $result['bull_probability']);
+        $this->assertCount(2, $result['sources']);
+        $this->assertSame(['url' => 'https://example.com/a', 'title' => 'Example A'], $result['sources'][0]);
+        $this->assertSame(['url' => 'https://example.com/b', 'title' => 'Example B'], $result['sources'][1]);
+        $this->assertStringContainsString('Narracja z linkami.', $result['narrative']);
+        $this->assertStringNotContainsString('example.com', $result['narrative'], 'the JSON block must be fully stripped from the narrative, nested braces included');
+    }
+
+    public function test_parses_sources_array_with_nested_objects_in_bare_fallback(): void
+    {
+        $raw = "Narracja bez fence'a z linkami.\n\n"
+            . '{"bull_probability": 55, "bear_probability": 45, "rationale": "X", '
+            . '"sources": [{"url": "https://example.com/c", "title": "Example C"}]}';
+
+        $result = CriticalReviewProbabilityParser::parse($raw);
+
+        $this->assertSame(55, $result['bull_probability']);
+        $this->assertCount(1, $result['sources']);
+        $this->assertSame('https://example.com/c', $result['sources'][0]['url']);
+    }
+
+    public function test_missing_sources_field_defaults_to_empty_array(): void
+    {
+        $raw = 'Narracja.' . "\n\n"
+            . '```json' . "\n"
+            . '{"bull_probability": 50, "bear_probability": 50, "rationale": "Bez źródeł."}' . "\n"
+            . '```';
+
+        $result = CriticalReviewProbabilityParser::parse($raw);
+
+        $this->assertSame([], $result['sources']);
+    }
+
+    public function test_sources_are_deduplicated_by_url(): void
+    {
+        $raw = 'Narracja.' . "\n\n"
+            . '```json' . "\n"
+            . '{"bull_probability": 50, "bear_probability": 50, "rationale": "X", '
+            . '"sources": [{"url": "https://example.com/a", "title": "First"}, {"url": "https://example.com/a", "title": "Duplicate"}]}' . "\n"
+            . '```';
+
+        $result = CriticalReviewProbabilityParser::parse($raw);
+
+        $this->assertCount(1, $result['sources']);
+    }
+
+    public function test_malformed_source_entries_are_skipped(): void
+    {
+        $raw = 'Narracja.' . "\n\n"
+            . '```json' . "\n"
+            . '{"bull_probability": 50, "bear_probability": 50, "rationale": "X", '
+            . '"sources": [{"title": "Brak URL"}, "not-an-object", {"url": "https://example.com/ok", "title": "OK"}]}' . "\n"
+            . '```';
+
+        $result = CriticalReviewProbabilityParser::parse($raw);
+
+        $this->assertCount(1, $result['sources']);
+        $this->assertSame('https://example.com/ok', $result['sources'][0]['url']);
+    }
+
+    public function test_missing_block_degrades_with_empty_sources(): void
+    {
+        $raw = 'Tylko narracja, model zapomniał o bloku JSON.';
+
+        $result = CriticalReviewProbabilityParser::parse($raw);
+
+        $this->assertSame([], $result['sources']);
+    }
 }

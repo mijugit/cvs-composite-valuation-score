@@ -168,11 +168,17 @@ try {
     // stored, probability fields just stay null (see parser docblock).
     $parsed = CriticalReviewProbabilityParser::parse((string) $result->text);
 
+    // Prefer the model's own explicit sources list over Gemini's native
+    // groundingMetadata citations — kept uniform with the other 3 workers
+    // (see CriticalReviewProbabilityParser's docblock). Gemini's native
+    // mechanism is reliable, but a single extraction path avoids drift.
+    $sources = $parsed['sources'] !== [] ? $parsed['sources'] : $result->citations;
+
     $reviewRepo->markCompleted(
         $ticker,
         CriticalReviewProvider::GEMINI,
         $parsed['narrative'],
-        $result->citations,
+        $sources,
         (string) ($result->model ?? ''),
         $tokensIn,
         $tokensOut,

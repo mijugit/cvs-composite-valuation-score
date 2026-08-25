@@ -165,11 +165,16 @@ try {
     // stored, probability fields just stay null (see parser docblock).
     $parsed = CriticalReviewProbabilityParser::parse((string) $result->text);
 
+    // Prefer the model's own explicit sources list over GPTClient's
+    // url_citation annotations — kept uniform with the other 3 workers (see
+    // CriticalReviewProbabilityParser's docblock).
+    $sources = $parsed['sources'] !== [] ? $parsed['sources'] : $result->citations;
+
     $reviewRepo->markCompleted(
         $ticker,
         CriticalReviewProvider::GPT_TERRA,
         $parsed['narrative'],
-        $result->citations,
+        $sources,
         (string) ($result->model ?? ''),
         $tokensIn,
         $tokensOut,
