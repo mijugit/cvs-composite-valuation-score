@@ -1239,6 +1239,22 @@
                 </div>
             </div>
 
+            <!-- Critical review generation modals (Claude, Gemini) — same chrome as
+                 #ai-modal above, one independent instance per provider since both
+                 can generate concurrently (change: critical-review-loading-modal) -->
+            <?php foreach (($crProviderLabels ?? []) as $crProviderKey => $crProviderLabel): ?>
+            <div id="critical-review-modal-<?= $crProviderKey ?>" class="ai-modal" hidden>
+                <div class="ai-modal__inner">
+                    <div class="ai-modal__spinner"></div>
+                    <p id="critical-review-modal-status-<?= $crProviderKey ?>" class="ai-modal__status">Przeszukuję newsy…</p>
+                    <button type="button" class="btn btn--ghost btn--sm cr-modal-dismiss-btn"
+                            data-provider="<?= $crProviderKey ?>" style="margin-top:1rem;">
+                        Zamknij
+                    </button>
+                </div>
+            </div>
+            <?php endforeach; ?>
+
             <!-- Share-it-for-your-LLM export modal -->
             <div id="share-modal" class="ai-modal" hidden>
                 <div class="ai-modal__inner" style="max-width:660px;width:95vw;">
@@ -1274,34 +1290,46 @@
             (function () {
                 'use strict';
 
+                // ── Shared async-model-processing modal — standard pattern for ──
+                // ── ANY future async model trigger on this page (change:      ──
+                // ── critical-review-loading-modal). One implementation, not a  ──
+                // ── convention to remember and re-copy per flow — see          ──
+                // ── lessons.md "Dwie implementacje jednej reguły zawsze się    ──
+                // ── rozjadą". Owns one modal's show/hide/stage-rotation        ──
+                // ── lifecycle; null-safe if the element ids aren't in the DOM. ──
+                function createProcessingModal(modalId, statusId, stages, intervalMs) {
+                    var modalEl  = document.getElementById(modalId);
+                    var statusEl = document.getElementById(statusId);
+                    var stageIdx = 0;
+                    var timer    = null;
+
+                    return {
+                        show: function () {
+                            stageIdx = 0;
+                            if (statusEl) statusEl.textContent = stages[0];
+                            if (modalEl) modalEl.hidden = false;
+                            timer = setInterval(function () {
+                                stageIdx = (stageIdx + 1) % stages.length;
+                                if (statusEl) statusEl.textContent = stages[stageIdx];
+                            }, intervalMs);
+                        },
+                        hide: function () {
+                            clearInterval(timer);
+                            if (modalEl) modalEl.hidden = true;
+                        },
+                    };
+                }
+
                 var stages   = [
                     'Przygotowuję dane…',
                     'Analizuję CVS vs analitycy…',
                     'Piszę raport…',
                     'Kończę analizę…'
                 ];
-                var stageIdx  = 0;
-                var stageTimer = null;
-                var modal     = document.getElementById('ai-modal');
-                var statusEl  = document.getElementById('ai-modal-status');
+                var aiModal   = createProcessingModal('ai-modal', 'ai-modal-status', stages, 7000);
                 var resultEl  = document.getElementById('ai-result');
                 var placeholder = document.getElementById('ai-placeholder');
                 var csrf      = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
-
-                function showModal() {
-                    stageIdx = 0;
-                    if (statusEl) statusEl.textContent = stages[0];
-                    modal.hidden = false;
-                    stageTimer = setInterval(function () {
-                        stageIdx = (stageIdx + 1) % stages.length;
-                        if (statusEl) statusEl.textContent = stages[stageIdx];
-                    }, 7000);
-                }
-
-                function hideModal() {
-                    clearInterval(stageTimer);
-                    modal.hidden = true;
-                }
 
                 function renderAnalysis(content, generatedAt) {
                     if (!resultEl) return;
@@ -1344,7 +1372,7 @@
                 }
 
                 function doGenerate(ticker, force) {
-                    showModal();
+                    aiModal.show();
                     fetch('/analysis/' + encodeURIComponent(ticker) + '/generate-ai', {
                         method: 'POST',
                         headers: {
@@ -1356,7 +1384,7 @@
                     })
                     .then(function (resp) { return resp.json(); })
                     .then(function (data) {
-                        hideModal();
+                        aiModal.hide();
                         if (data.ok) {
                             renderAnalysis(data.content, data.generated_at);
                         } else {
@@ -1368,7 +1396,7 @@
                         }
                     })
                     .catch(function () {
-                        hideModal();
+                        aiModal.hide();
                         var errEl = document.createElement('div');
                         errEl.className = 'alert alert--error';
                         errEl.style.marginTop = '1rem';
@@ -1451,7 +1479,7 @@
 
                 var btnCancel = document.getElementById('btn-ai-cancel');
                 if (btnCancel) {
-                    btnCancel.addEventListener('click', hideModal);
+                    btnCancel.addEventListener('click', function () { aiModal.hide(); });
                 }
 
                 // ── Share-it-for-your-LLM ────────────────────────────────────────
@@ -1596,10 +1624,9 @@
                         probabilityEl: document.getElementById('critical-review-probability-' + provider),
                         placeholderEl: document.getElementById('critical-review-placeholder-' + provider),
                         btn:           document.getElementById('btn-critical-review-' + provider),
+                        modal:         createProcessingModal('critical-review-modal-' + provider, 'critical-review-modal-status-' + provider, crStages, 8000),
                         pollTimer:     null,
-                        stageTimer:    null,
                         pollStart:     null,
-                        stageIdx:      0,
                     };
                 });
 
@@ -1739,7 +1766,7 @@
                 function crStopPolling(provider) {
                     var st = crState[provider];
                     if (st.pollTimer) { clearInterval(st.pollTimer); st.pollTimer = null; }
-                    if (st.stageTimer) { clearInterval(st.stageTimer); st.stageTimer = null; }
+                    st.modal.hide();
                     if (st.btn) st.btn.disabled = false;
                 }
 
@@ -1776,12 +1803,7 @@
                     var st = crState[provider];
                     st.pollStart = Date.now();
                     if (st.btn) st.btn.disabled = true;
-                    st.stageIdx = 0;
-                    crShowMessage(provider, crStages[0], false);
-                    st.stageTimer = setInterval(function () {
-                        st.stageIdx = (st.stageIdx + 1) % crStages.length;
-                        crShowMessage(provider, crStages[st.stageIdx], false);
-                    }, 8000);
+                    st.modal.show();
                     st.pollTimer = setInterval(function () { crPoll(provider); }, CR_POLL_INTERVAL_MS);
                     crPoll(provider);
                 }
@@ -1796,6 +1818,15 @@
                         if (proInput) proInput.value = '';
                         proModal.hidden = false;
                         setTimeout(function () { if (proInput) proInput.focus(); }, 50);
+                    });
+                });
+
+                // Dismiss only hides the modal — the background job (poll timer)
+                // keeps running underneath, identical to #btn-ai-cancel's semantics
+                // for stage-1 above.
+                document.querySelectorAll('.cr-modal-dismiss-btn').forEach(function (btn) {
+                    btn.addEventListener('click', function () {
+                        crState[btn.dataset.provider].modal.hide();
                     });
                 });
 
