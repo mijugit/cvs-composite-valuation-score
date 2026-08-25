@@ -621,8 +621,8 @@ inline).
 
 #### Manual
 
-- [ ] 2.6 Manual worker run for Gemini produces a correct `completed` row with probabilities
-- [ ] 2.7 Existing Claude worker still produces a correct `completed` row (regression check)
+- [x] 2.6 Manual worker run for Gemini produces a correct `completed` row with probabilities — 9008c37
+- [x] 2.7 Existing Claude worker still produces a correct `completed` row (regression check) — 9008c37
 
 ### Phase 3: Controller, routes, and page-load provider-awareness
 
@@ -633,10 +633,10 @@ inline).
 
 #### Manual
 
-- [ ] 3.3 No-provider-param request defaults to Claude (backward compatibility)
-- [ ] 3.4 Gemini trigger while Claude `completed` succeeds without disturbing Claude's row
-- [ ] 3.5 Gemini trigger while Claude `pending` succeeds immediately (not blocked)
-- [ ] 3.6 Status endpoint with `provider=gemini` returns the Gemini row independently
+- [x] 3.3 No-provider-param request defaults to Claude (backward compatibility) — 57b5465
+- [x] 3.4 Gemini trigger while Claude `completed` succeeds without disturbing Claude's row — 57b5465
+- [x] 3.5 Gemini trigger while Claude `pending` succeeds immediately (not blocked) — 57b5465
+- [x] 3.6 Status endpoint with `provider=gemini` returns the Gemini row independently — 57b5465
 
 ### Phase 4: UI — tab strip, dual panes, JS refactor, CSS
 
@@ -646,17 +646,17 @@ inline).
 
 #### Manual
 
-- [ ] 4.2 Both tabs render; switching tabs preserves the other pane's content
-- [ ] 4.3 Triggering one tab doesn't affect the other tab's button/content
-- [ ] 4.4 Reload mid-generation resumes polling correctly regardless of active tab
-- [ ] 4.5 Probability box renders consistently across both tabs
-- [ ] 4.6 Probability-parse failure degrades gracefully (narrative shown, no error)
-- [ ] 4.7 Pre-migration Claude reviews render unchanged under the Claude tab
-- [ ] 4.8 No regression on stage-1 AI analysis or the rest of the analysis page
+- [x] 4.2 Both tabs render; switching tabs preserves the other pane's content — 3612595
+- [x] 4.3 Triggering one tab doesn't affect the other tab's button/content — 3612595
+- [x] 4.4 Reload mid-generation resumes polling correctly regardless of active tab — 3612595
+- [x] 4.5 Probability box renders consistently across both tabs — 3612595
+- [x] 4.6 Probability-parse failure degrades gracefully (narrative shown, no error) — covered by CriticalReviewProbabilityParserTest (automated); not separately reproduced live against a real malformed LLM response — 3612595
+- [x] 4.7 Pre-migration Claude reviews render unchanged under the Claude tab — 3612595
+- [x] 4.8 No regression on stage-1 AI analysis or the rest of the analysis page — 3612595
 
 ### Phase 5: Test suite completion
 
 #### Automated
 
-- [x] 5.1 Full `vendor/bin/phpunit` suite passes with zero failures
-- [x] 5.2 `composer stan` reports no errors
+- [x] 5.1 Full `vendor/bin/phpunit` suite passes with zero failures — 854eca9
+- [x] 5.2 `composer stan` reports no errors — 854eca9
