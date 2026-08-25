@@ -621,7 +621,7 @@ inline).
 
 #### Manual
 
-- [x] 2.6 Manual worker run for Gemini produces a correct `completed` row with probabilities — 9008c37
+- [ ] 2.6 Manual worker run for Gemini produces a correct `completed` row with probabilities (reopened bc3dc88 — original "success" was actually the Claude worker mislabeled Gemini due to the param()/input() bug; no gemini row ever existed in DB)
 - [x] 2.7 Existing Claude worker still produces a correct `completed` row (regression check) — 9008c37
 
 ### Phase 3: Controller, routes, and page-load provider-awareness
@@ -633,10 +633,10 @@ inline).
 
 #### Manual
 
-- [x] 3.3 No-provider-param request defaults to Claude (backward compatibility) — 57b5465
-- [x] 3.4 Gemini trigger while Claude `completed` succeeds without disturbing Claude's row — 57b5465
-- [x] 3.5 Gemini trigger while Claude `pending` succeeds immediately (not blocked) — 57b5465
-- [x] 3.6 Status endpoint with `provider=gemini` returns the Gemini row independently — 57b5465
+- [ ] 3.3 No-provider-param request defaults to Claude (backward compatibility) (reopened bc3dc88 — needs re-verification against the input()/query() fix, not just the earlier always-claude bug)
+- [ ] 3.4 Gemini trigger while Claude `completed` succeeds without disturbing Claude's row (reopened bc3dc88 — this actually FAILED under test: the mislabeled "Gemini" trigger silently re-ran and overwrote the Claude row, see logs 2026-08-25 00:06/00:12)
+- [ ] 3.5 Gemini trigger while Claude `pending` succeeds immediately (not blocked) (reopened bc3dc88 — never genuinely exercised, provider always resolved to claude)
+- [ ] 3.6 Status endpoint with `provider=gemini` returns the Gemini row independently (reopened bc3dc88 — never genuinely exercised)
 
 ### Phase 4: UI — tab strip, dual panes, JS refactor, CSS
 
@@ -646,13 +646,13 @@ inline).
 
 #### Manual
 
-- [x] 4.2 Both tabs render; switching tabs preserves the other pane's content — 3612595
-- [x] 4.3 Triggering one tab doesn't affect the other tab's button/content — 3612595
-- [x] 4.4 Reload mid-generation resumes polling correctly regardless of active tab — 3612595
-- [x] 4.5 Probability box renders consistently across both tabs — 3612595
-- [x] 4.6 Probability-parse failure degrades gracefully (narrative shown, no error) — covered by CriticalReviewProbabilityParserTest (automated); not separately reproduced live against a real malformed LLM response — 3612595
-- [x] 4.7 Pre-migration Claude reviews render unchanged under the Claude tab — 3612595
-- [x] 4.8 No regression on stage-1 AI analysis or the rest of the analysis page — 3612595
+- [ ] 4.2 Both tabs render; switching tabs preserves the other pane's content (reopened bc3dc88 — tab mechanics likely fine, but re-verify with real Gemini data now that the provider bug is fixed)
+- [ ] 4.3 Triggering one tab doesn't affect the other tab's button/content (reopened bc3dc88 — this FAILED under test, see 3.4)
+- [ ] 4.4 Reload mid-generation resumes polling correctly regardless of active tab (reopened bc3dc88 — re-verify with a genuine gemini row)
+- [ ] 4.5 Probability box renders consistently across both tabs (reopened bc3dc88 — Gemini tab never showed genuine Gemini data)
+- [x] 4.6 Probability-parse failure degrades gracefully (narrative shown, no error) — covered by CriticalReviewProbabilityParserTest (automated); unaffected by the provider-param bug — 3612595
+- [ ] 4.7 Pre-migration Claude reviews render unchanged under the Claude tab (reopened bc3dc88 — re-verify since Claude row was inadvertently regenerated twice during the buggy test)
+- [ ] 4.8 No regression on stage-1 AI analysis or the rest of the analysis page (reopened bc3dc88 — re-verify)
 
 ### Phase 5: Test suite completion
 
