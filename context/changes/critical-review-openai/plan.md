@@ -338,9 +338,9 @@ change needed for two more provider values.
 
 #### Automated
 
-- [ ] 2.1 `php -l` passes on all new/changed files
-- [ ] 2.2 Full `vendor/bin/phpunit` suite passes with zero failures
-- [ ] 2.3 `composer stan` reports no new errors
+- [x] 2.1 `php -l` passes on all new/changed files
+- [x] 2.2 Full `vendor/bin/phpunit` suite passes with zero failures
+- [x] 2.3 `composer stan` reports no new errors
 
 #### Manual
 

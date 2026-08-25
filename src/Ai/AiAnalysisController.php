@@ -376,13 +376,16 @@ class AiAnalysisController
         $this->usageRepo->log($userId, $this->gate->getSessionCode(), 0, 0);
         $this->criticalReviewRepo->markPending($ticker, $provider, $userId);
 
-        $phpBin     = '/usr/local/bin/php82';
-        $scriptName = $provider === CriticalReviewProvider::GEMINI
-            ? 'generate_critical_review_gemini.php'
-            : 'generate_critical_review.php';
-        $logName    = $provider === CriticalReviewProvider::GEMINI
-            ? 'critical_review_gemini.log'
-            : 'critical_review.log';
+        $phpBin = '/usr/local/bin/php82';
+        // Per-provider worker/log filenames — a lookup, not a ternary, since
+        // a two-way ternary can't scale past 2 providers cleanly (change:
+        // critical-review-openai added GPT_TERRA/GPT_LUNA as the 3rd/4th).
+        [$scriptName, $logName] = match ($provider) {
+            CriticalReviewProvider::GEMINI    => ['generate_critical_review_gemini.php', 'critical_review_gemini.log'],
+            CriticalReviewProvider::GPT_TERRA => ['generate_critical_review_gpt_terra.php', 'critical_review_gpt_terra.log'],
+            CriticalReviewProvider::GPT_LUNA  => ['generate_critical_review_gpt_luna.php', 'critical_review_gpt_luna.log'],
+            default                           => ['generate_critical_review.php', 'critical_review.log'],
+        };
         $script = dirname(__DIR__, 2) . '/bin/' . $scriptName;
         $logDir = dirname(__DIR__, 2) . '/logs';
         $cmd    = $phpBin . ' ' . escapeshellarg($script)

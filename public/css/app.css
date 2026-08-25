@@ -1233,6 +1233,7 @@ code { background: var(--c-bg); padding: .1em .4em; border-radius: 4px; font-siz
 /* --- Critical review provider tabs (change: critical-review-models) --- */
 .cr-tabs {
     display: flex;
+    flex-wrap: wrap;
     gap: .35rem;
     border-bottom: 1px solid var(--c-border);
     margin: 0 0 1rem;

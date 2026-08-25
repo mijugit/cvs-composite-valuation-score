@@ -1055,10 +1055,12 @@
             <!-- ===================================================== -->
             <?php if (!empty($cachedAi)): ?>
             <?php
-                $crProviderLabels = ['claude' => 'Claude', 'gemini' => 'Gemini'];
+                $crProviderLabels = ['claude' => 'Claude', 'gemini' => 'Gemini', 'gpt_terra' => 'GPT Terra', 'gpt_luna' => 'GPT Luna'];
                 $crByProvider = $criticalReviewByProvider ?? [
-                    'claude' => ['status' => $criticalReviewStatus ?? 'none', 'cached' => $cachedCriticalReview ?? null],
-                    'gemini' => ['status' => 'none', 'cached' => null],
+                    'claude'    => ['status' => $criticalReviewStatus ?? 'none', 'cached' => $cachedCriticalReview ?? null],
+                    'gemini'    => ['status' => 'none', 'cached' => null],
+                    'gpt_terra' => ['status' => 'none', 'cached' => null],
+                    'gpt_luna'  => ['status' => 'none', 'cached' => null],
                 ];
             ?>
             <div class="card ai-analysis-card" id="critical-review-section">
@@ -1610,11 +1612,11 @@
                 // click handler only toggles pane visibility, it never touches polling.
                 var crTicker      = <?= json_encode($ticker) ?>;
                 var crCanGenerate = <?= json_encode(!empty($canGenerateAi)) ?>;
-                var crInitialData = <?= json_encode($crByProvider ?? ['claude' => ['status' => 'none'], 'gemini' => ['status' => 'none']]) ?>;
+                var crInitialData = <?= json_encode($crByProvider ?? ['claude' => ['status' => 'none'], 'gemini' => ['status' => 'none'], 'gpt_terra' => ['status' => 'none'], 'gpt_luna' => ['status' => 'none']]) ?>;
                 var crStages = ['Przeszukuję newsy…', 'Konfrontuję z modelem…', 'Piszę recenzję…', 'Prawie gotowe…'];
                 var CR_MAX_WAIT_MS      = 5 * 60 * 1000;
                 var CR_POLL_INTERVAL_MS = 5000;
-                var CR_PROVIDERS = ['claude', 'gemini'];
+                var CR_PROVIDERS = ['claude', 'gemini', 'gpt_terra', 'gpt_luna'];
 
                 var crState = {};
                 CR_PROVIDERS.forEach(function (provider) {
