@@ -192,8 +192,8 @@ Not applicable — no data model or deployment changes.
 
 #### Automated
 
-- [x] 1.1 `php -l templates/analysis.php` passes
-- [x] 1.2 `composer stan` reports no new errors
+- [x] 1.1 `php -l templates/analysis.php` passes — 39c47ef
+- [x] 1.2 `composer stan` reports no new errors — 39c47ef
 
 #### Manual
 
