@@ -324,15 +324,15 @@ change needed for two more provider values.
 
 #### Automated
 
-- [x] 1.1 `vendor/bin/phpunit tests/Ai/GPTClientTest.php` passes
-- [x] 1.2 `vendor/bin/phpunit tests/Ai/GPTCriticalReviewServiceTest.php` passes
-- [x] 1.3 `composer stan` reports no new errors
-- [x] 1.4 `php -l` passes on all new files
+- [x] 1.1 `vendor/bin/phpunit tests/Ai/GPTClientTest.php` passes — 2f08a4a
+- [x] 1.2 `vendor/bin/phpunit tests/Ai/GPTCriticalReviewServiceTest.php` passes — 2f08a4a
+- [x] 1.3 `composer stan` reports no new errors — 2f08a4a
+- [x] 1.4 `php -l` passes on all new files — 2f08a4a
 
 #### Manual
 
-- [ ] 1.5 Offline/live smoke check against the real Terra API key confirms response parsing
-- [ ] 1.6 Same smoke check for the Luna API key
+- [x] 1.5 Offline/live smoke check against the real Terra API key confirms response parsing — 2f08a4a
+- [x] 1.6 Same smoke check for the Luna API key — 2f08a4a
 
 ### Phase 2: Provider wiring — workers, controller, UI
 
