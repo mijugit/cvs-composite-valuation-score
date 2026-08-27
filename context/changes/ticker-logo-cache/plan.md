@@ -463,14 +463,14 @@ kod bez rozgałęzień.
 
 #### Automated
 
-- [ ] 1.1 Migracja aplikuje się czysto: uruchomienie `042_create_ticker_logos.sql` na bazie deweloperskiej/testowej
+- [x] 1.1 Migracja aplikuje się czysto: uruchomienie `042_create_ticker_logos.sql` na bazie deweloperskiej/testowej
 - [x] 1.2 `vendor/bin/phpunit tests/Logo/` przechodzi zielono — 350770d
 - [x] 1.3 Pełny `vendor/bin/phpunit` nadal zielony (zero regresji) — 350770d
 - [x] 1.4 `composer stan` czysty dla `src/Logo/` — 350770d
 
 #### Manual
 
-- [ ] 1.5 Ręczny smoke-test `searchDomain('Airbnb')` i `fetchImageBytes('airbnb.com')` z prawdziwym kluczem zwraca sensowną domenę i niepuste bajty obrazka
+- [x] 1.5 Ręczny smoke-test `searchDomain('Airbnb')` i `fetchImageBytes('airbnb.com')` z prawdziwym kluczem zwraca sensowną domenę i niepuste bajty obrazka (potwierdzone pośrednio: realny przebieg `bin/fetch_logos.php` na produkcji użył obu ścieżek klienta i zapisał 594 obrazki)
 
 ### Phase 2: Skrypt CLI/cron `bin/fetch_logos.php`
 
@@ -481,8 +481,8 @@ kod bez rozgałęzień.
 
 #### Manual
 
-- [ ] 2.3 Ręczne uruchomienie zapisuje pliki `.webp` i wiersze w `ticker_logos` (spot-check US → found, .WA/.KS → prawdopodobnie not_found)
-- [ ] 2.4 Drugie uruchomienie przetwarza 0 nowych tickerów (skip-lista działa)
+- [x] 2.3 Ręczne uruchomienie zapisuje pliki `.webp` i wiersze w `ticker_logos` (produkcja: found=594 not_found=2 (FISV, SATS) skipped=0 errors=0 total=596)
+- [x] 2.4 Drugie uruchomienie przetwarza 0 nowych tickerów (produkcja: found=0 not_found=0 skipped=596 errors=0 — skip-lista działa)
 - [ ] 2.5 Cron założony ręcznie na Cyber_Folks wg instrukcji z planu
 
 ### Phase 3: Rendering — placeholder, CSS, wstrzyknięcie logo w UI
@@ -494,6 +494,6 @@ kod bez rozgałęzień.
 
 #### Manual
 
-- [ ] 3.3 `/screener`, `/portfolio`, `/track-record`, `/track-record/{ticker}` pokazują logo/placeholder bez przesunięcia layoutu i błędów w konsoli
-- [ ] 3.4 Hover-hint nadal działa poprawnie po dodaniu logo
-- [ ] 3.5 Ticker `not_found` pokazuje placeholder inicjałów, nie zepsuty `<img>`
+- [x] 3.3 `/screener`, `/portfolio`, `/track-record`, `/track-record/{ticker}` pokazują logo/placeholder bez przesunięcia layoutu i błędów w konsoli (produkcja: 0 błędów konsoli, 0 broken img na wszystkich 4 widokach — screener 128/128, portfolio 51/51, track-record 100/100, track-record/AAPL działa)
+- [x] 3.4 Hover-hint nadal działa poprawnie po dodaniu logo (produkcja: `.ticker-hint-portal--visible` + nazwa spółki potwierdzone programowo)
+- [x] 3.5 Ticker `not_found` pokazuje placeholder inicjałów, nie zepsuty `<img>` (produkcja: fallbackCount>0 na każdym widoku, brokenImgCount=0 wszędzie)

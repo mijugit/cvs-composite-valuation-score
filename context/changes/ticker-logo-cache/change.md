@@ -68,11 +68,30 @@ Powiązane wcześniejsze zmiany: [[cvs-screener-ticker-links]] (wzorzec CRUD per
 
 ## Implementacja (2026-08-27)
 
-Wszystkie 3 fazy zaimplementowane i scommitowane (350770d, be0b172, fc890a5).
-Automatyczna weryfikacja (phpunit, phpstan, php -l) zielona na każdym etapie.
-Ręczna weryfikacja — migracja na realnej bazie, smoke-test `LogoDevClient` z
-prawdziwymi kluczami, faktyczne uruchomienie `bin/fetch_logos.php`, założenie
-crona na Cyber_Folks, wygląd w przeglądarce — **świadomie odłożona na deploy**
-(brak lokalnego MySQL i kluczy logo.dev w tym środowisku). Sprawdzane na
-produkcji przy najbliższym wdrożeniu; szczegółowa checklist w `## Progress`
-sekcji `plan.md` (pozycje bez `[x]`).
+Wszystkie 3 fazy zaimplementowane i scommitowane (350770d, be0b172, fc890a5,
+epilogue b6e7ea9). Automatyczna weryfikacja (phpunit, phpstan, php -l) zielona
+na każdym etapie.
+
+## Deploy i weryfikacja na produkcji (2026-08-27)
+
+Wdrożone na `cvs.timeflow.fun` (Cyber_Folks) tego samego dnia — `git push`
+origin/main (4 commity nie były wcześniej wypchnięte), `git pull` na
+serwerze, `composer dump-autoload --optimize` (pełny `composer install`
+wywalał się na CF-specyficznym buncie `ext-cf:-version-hardening` niezwiązanym
+z tą zmianą — dump-autoload wystarczył, bo composer.json się nie zmienił),
+migracja 042 na produkcyjnej bazie.
+
+Pierwsze uruchomienie `bin/fetch_logos.php` na produkcji (596 tickerów,
+~12 min): **found=594, not_found=2 (FISV, SATS), errors=0** — 99,7%
+trafności, potwierdza że priorytet `website` z Yahoo nad Search API działa
+świetnie. Drugie uruchomienie: `skipped=596` — skip-lista działa. Weryfikacja
+w przeglądarce (Chrome, konto usera): `/screener` (128/128 tickerów, logo
+lub placeholder, 0 broken img), `/portfolio` (51/51), `/track-record`
+(100/100), `/track-record/AAPL` (logo w nagłówku). Hover-hint zweryfikowany
+programowo (`.ticker-hint-portal--visible` + nazwa spółki) — nie koliduje
+z logo. Zero błędów w konsoli.
+
+**Jedyna pozycja bez `[x]` w `plan.md` → `## Progress`: 2.5 (cron na
+Cyber_Folks)** — wymaga konfiguracji w panelu cyber_Admin, user zakłada
+ręcznie. Komenda: codziennie, PHP 8.2 binarka:
+`/usr/local/bin/php82 /home/amjsystem/sites/cvs.timeflow.fun/bin/fetch_logos.php`
