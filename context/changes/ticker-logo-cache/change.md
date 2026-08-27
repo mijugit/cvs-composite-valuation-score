@@ -95,3 +95,26 @@ z logo. Zero błędów w konsoli.
 Cyber_Folks)** — wymaga konfiguracji w panelu cyber_Admin, user zakłada
 ręcznie. Komenda: codziennie, PHP 8.2 binarka:
 `/usr/local/bin/php82 /home/amjsystem/sites/cvs.timeflow.fun/bin/fetch_logos.php`
+
+## Poprawka po testach usera na telefonie (2026-08-27, commit `75339c2`)
+
+Dwa zgłoszenia po realnym użyciu:
+1. **`/analysis/{ticker}` (karta analizy) nie miała logo** — pominięta w
+   oryginalnym zakresie Fazy 3 (lista punktów integracji w tym pliku wyżej
+   jej nie wymieniała). Dodane: `AnalysisController::show()` (oba branche —
+   błąd fetchu i pełny render) przekazuje `tickerLogo` z
+   `TickerLogoRepository::findByTicker()`, `templates/analysis.php` renderuje
+   `TickerLogoPresenter` w `<h1>`.
+2. **Rozmiar logo miał być "wielkości dużej litery" nagłówka**, nie sztywne
+   20px wszędzie — `.ticker-logo`/`.ticker-logo-fallback` przełączone na
+   `width/height: 1em` (żaden z selektorów nie deklaruje własnego
+   `font-size`, więc `1em` liczy się względem OTACZAJĄCEGO kontekstu — mała
+   czcionka tabeli, duży `<h1>`). Inicjały placeholdera przeniesione do
+   zagnieżdżonego `<span class="ticker-logo-fallback__text">` z własnym
+   `font-size:.5em`, bo gdyby font-size był na tym samym elemencie co
+   `width:1em`, `1em` liczyłoby się względem WŁASNEGO (zmniejszonego)
+   rozmiaru, nie otaczającego — classic CSS em-cascading gotcha.
+
+Zweryfikowane na produkcji: `/analysis/AAPL` → box 32×32px (= `1em` z
+`h1{font-size:32px}`), `/screener` → box ~13.6px (= rozmiar czcionki
+tabeli), 0 broken img na obu.
