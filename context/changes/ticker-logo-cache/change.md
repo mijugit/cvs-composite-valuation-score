@@ -1,7 +1,7 @@
 ---
 change_id: ticker-logo-cache
 title: Cache logo spółek z logo.dev po stronie serwera (nie hotlink)
-status: implementing
+status: implemented
 created: 2026-08-27
 updated: 2026-08-27
 archived_at: null
@@ -65,3 +65,14 @@ Kontekst z researchu (2026-08-27):
 Powiązane wcześniejsze zmiany: [[cvs-screener-ticker-links]] (wzorzec CRUD per-ticker),
 [[cvs-ticker-hover-hints]] + [[cvs-ticker-hint-clipping-fix]] (komponent hover-hint),
 [[cvs-long-name-quotetype-fix]] (company_name/long_name).
+
+## Implementacja (2026-08-27)
+
+Wszystkie 3 fazy zaimplementowane i scommitowane (350770d, be0b172, fc890a5).
+Automatyczna weryfikacja (phpunit, phpstan, php -l) zielona na każdym etapie.
+Ręczna weryfikacja — migracja na realnej bazie, smoke-test `LogoDevClient` z
+prawdziwymi kluczami, faktyczne uruchomienie `bin/fetch_logos.php`, założenie
+crona na Cyber_Folks, wygląd w przeglądarce — **świadomie odłożona na deploy**
+(brak lokalnego MySQL i kluczy logo.dev w tym środowisku). Sprawdzane na
+produkcji przy najbliższym wdrożeniu; szczegółowa checklist w `## Progress`
+sekcji `plan.md` (pozycje bez `[x]`).

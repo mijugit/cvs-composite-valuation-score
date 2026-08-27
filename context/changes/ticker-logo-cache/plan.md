@@ -489,8 +489,8 @@ kod bez rozgałęzień.
 
 #### Automated
 
-- [x] 3.1 `composer stan` czysty dla `TickerLogoPresenter.php` i zmienionych templates
-- [x] 3.2 Pełny `vendor/bin/phpunit` zielony (zero regresji)
+- [x] 3.1 `composer stan` czysty dla `TickerLogoPresenter.php` i zmienionych templates — fc890a5
+- [x] 3.2 Pełny `vendor/bin/phpunit` zielony (zero regresji) — fc890a5
 
 #### Manual
 
