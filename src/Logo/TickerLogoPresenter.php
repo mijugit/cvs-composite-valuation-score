@@ -25,14 +25,20 @@ final class TickerLogoPresenter
         if (($logoRow['status'] ?? null) === 'found' && is_string($logoPath) && $logoPath !== '') {
             $alt = htmlspecialchars($companyName ?? $ticker, ENT_QUOTES);
             return '<img class="ticker-logo" src="' . htmlspecialchars($logoPath, ENT_QUOTES)
-                . '" alt="' . $alt . '" width="20" height="20" loading="lazy">';
+                . '" alt="' . $alt . '" loading="lazy">';
         }
 
         $initials = self::initials($ticker, $companyName);
         $color    = self::colorFor($ticker);
 
+        // Initials text sits in a nested span carrying its own (smaller) font-size:
+        // the outer box is sized in `em` against the SURROUNDING context (so it
+        // matches a capital letter of whatever heading/cell it's placed in — see
+        // components.css), and declaring font-size on the box itself would make
+        // that `em` resolve against its own (shrunk) font-size instead.
         return '<span class="ticker-logo-fallback" style="background:#' . $color . ';" aria-hidden="true">'
-            . htmlspecialchars($initials, ENT_QUOTES) . '</span>';
+            . '<span class="ticker-logo-fallback__text">' . htmlspecialchars($initials, ENT_QUOTES) . '</span>'
+            . '</span>';
     }
 
     /** Always 2 characters, so every placeholder badge has the same visual weight. */

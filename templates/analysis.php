@@ -1,6 +1,6 @@
 <section class="analysis-detail">
     <div class="analysis-detail__heading">
-        <h1>Analiza: <?= htmlspecialchars($ticker) ?>
+        <h1><?= \CVS\Logo\TickerLogoPresenter::render($ticker, $financials['long_name'] ?? null, $tickerLogo ?? null) ?>Analiza: <?= htmlspecialchars($ticker) ?>
             <?php if (!empty($financials['long_name'])): ?>
                 <span style="font-size:var(--text-base);font-weight:400;color:var(--c-muted);margin-left:.5rem;">
                     <?= htmlspecialchars((string) $financials['long_name']) ?>

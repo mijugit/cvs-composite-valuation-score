@@ -259,25 +259,31 @@
 
 /* --- Ticker company logo (change: ticker-logo-cache) --------
    Both the real <img> and the initials placeholder resolve to the same box
-   so swapping one for the other never shifts the surrounding row layout. */
+   so swapping one for the other never shifts the surrounding row layout.
+   Sized in `em` (not a fixed px) so the icon always matches a capital
+   letter of whatever heading/cell it sits in — a small table row and a
+   large <h1> both get a proportionally-sized logo, no per-page overrides.
+   Neither rule declares its own font-size, so `1em` here resolves against
+   the INHERITED (surrounding) font-size, not a shrunk local one. */
 .ticker-logo,
 .ticker-logo-fallback {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 20px;
-    height: 20px;
+    width: 1em;
+    height: 1em;
     border-radius: 4px;
     vertical-align: middle;
-    margin-right: .35rem;
+    margin-right: .3em;
     flex-shrink: 0;
 }
 .ticker-logo { object-fit: contain; background: var(--c-surface-2, rgba(255,255,255,.06)); }
-.ticker-logo-fallback {
-    color: #fff;
-    font-size: .6rem;
+.ticker-logo-fallback { color: #fff; }
+.ticker-logo-fallback__text {
+    font-size: .5em;
     font-weight: 600;
     letter-spacing: .02em;
+    line-height: 1;
 }
 
 .tr-delta--flat { color: var(--c-text-muted, #888); }

@@ -18,6 +18,7 @@ use CVS\Api\SuspectFieldDetector;
 use CVS\Core\Request;
 use CVS\Core\Response;
 use CVS\History\HistoryRepository;
+use CVS\Logo\TickerLogoRepository;
 use CVS\Pro\AiUsageRepository;
 use CVS\Pro\ProGate;
 use CVS\Pro\ProRepository;
@@ -188,6 +189,7 @@ class AnalysisController
                 'isWatched'  => $this->watchlist->isWatched($userId, $ticker),
                 'trajectory' => null,
                 'execPlan'   => null,
+                'tickerLogo' => (new TickerLogoRepository())->findByTicker($ticker), // change: ticker-logo-cache
                 'error'      => 'Nie udało się pobrać danych. Sprawdź symbol.',
             ]);
             return;
@@ -303,6 +305,7 @@ class AnalysisController
             'fieldStates'          => $fieldStates,          // change: fundamentals-validation
             'validationRun'        => $validationRun,        // change: fundamentals-validation
             'isAdmin'              => !empty($_SESSION['is_admin']), // change: fundamentals-validation
+            'tickerLogo'           => (new TickerLogoRepository())->findByTicker($ticker), // change: ticker-logo-cache
             'error'                => null,
         ]);
     }
