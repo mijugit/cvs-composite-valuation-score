@@ -464,9 +464,9 @@ kod bez rozgałęzień.
 #### Automated
 
 - [ ] 1.1 Migracja aplikuje się czysto: uruchomienie `042_create_ticker_logos.sql` na bazie deweloperskiej/testowej
-- [x] 1.2 `vendor/bin/phpunit tests/Logo/` przechodzi zielono
-- [x] 1.3 Pełny `vendor/bin/phpunit` nadal zielony (zero regresji)
-- [x] 1.4 `composer stan` czysty dla `src/Logo/`
+- [x] 1.2 `vendor/bin/phpunit tests/Logo/` przechodzi zielono — 350770d
+- [x] 1.3 Pełny `vendor/bin/phpunit` nadal zielony (zero regresji) — 350770d
+- [x] 1.4 `composer stan` czysty dla `src/Logo/` — 350770d
 
 #### Manual
 
@@ -476,8 +476,8 @@ kod bez rozgałęzień.
 
 #### Automated
 
-- [ ] 2.1 `php -l bin/fetch_logos.php` — składnia czysta
-- [ ] 2.2 `composer stan` czysty dla `bin/fetch_logos.php` i zmienionego `CvsSnapshotRepository.php`
+- [x] 2.1 `php -l bin/fetch_logos.php` — składnia czysta
+- [x] 2.2 `composer stan` czysty dla `bin/fetch_logos.php` i zmienionego `CvsSnapshotRepository.php`
 
 #### Manual
 

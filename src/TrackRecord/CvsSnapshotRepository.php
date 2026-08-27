@@ -369,6 +369,41 @@ class CvsSnapshotRepository
     }
 
     /**
+     * Latest known company name per ticker (change: ticker-logo-cache) — a
+     * slim variant of findAllLatest() that selects only ticker/company_name
+     * instead of the full snapshot row, for bin/fetch_logos.php's Search API
+     * fallback query (used only when Yahoo's live `website` field is empty).
+     * Same origin/MAX(score_date) filtering as findAllLatest(); tickers with
+     * a null company_name are omitted rather than returned as ''.
+     *
+     * @return array<string, string> ticker => company_name
+     */
+    public function latestCompanyNames(): array
+    {
+        $stmt = $this->db->prepare('
+            SELECT s.ticker, s.company_name
+            FROM cvs_snapshots s
+            INNER JOIN (
+                SELECT ticker, MAX(score_date) AS max_date
+                FROM cvs_snapshots
+                WHERE origin = :origin
+                GROUP BY ticker
+            ) latest ON s.ticker = latest.ticker AND s.score_date = latest.max_date
+            WHERE s.origin = :origin_join AND s.company_name IS NOT NULL
+        ');
+        $stmt->execute([
+            ':origin'      => self::ORIGIN_RESCORE,
+            ':origin_join' => self::ORIGIN_RESCORE,
+        ]);
+
+        $names = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $names[(string) $row['ticker']] = (string) $row['company_name'];
+        }
+        return $names;
+    }
+
+    /**
      * History for a ticker from a given date onward (for track record S-02).
      *
      * @return array<int, array<string, mixed>>
