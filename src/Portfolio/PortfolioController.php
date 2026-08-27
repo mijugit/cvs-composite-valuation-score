@@ -11,6 +11,7 @@ use CVS\Core\Database;
 use CVS\Core\Request;
 use CVS\Core\Response;
 use CVS\LlmFree\LlmFreeCycleRepository;
+use CVS\Logo\TickerLogoRepository;
 use DateTimeImmutable;
 use DateTimeZone;
 
@@ -84,6 +85,22 @@ class PortfolioController
         // S-04: screener-recommended tickers not yet held (SILNE KUPUJ / AKUMULUJ).
         $heldTickers = array_keys(array_fill_keys(array_column($holdings, 'ticker'), true));
         $recommended = $portfolioRepo->getScreenerRecommendationsNotHeld($heldTickers, $liveModelVersion);
+
+        // change: ticker-logo-cache — one bulk read covering both tables on
+        // this page (holdings + recommended), instead of querying twice.
+        $logoTickers = array_unique(array_merge(
+            array_map('strtoupper', array_column($holdings, 'ticker')),
+            array_map('strtoupper', array_column($recommended, 'ticker'))
+        ));
+        $tickerLogos = (new TickerLogoRepository($db))->findByTickers($logoTickers);
+        foreach ($holdings as &$h) {
+            $h['ticker_logo'] = $tickerLogos[strtoupper((string) $h['ticker'])] ?? null;
+        }
+        unset($h);
+        foreach ($recommended as &$rec) {
+            $rec['ticker_logo'] = $tickerLogos[strtoupper((string) $rec['ticker'])] ?? null;
+        }
+        unset($rec);
 
         // NAV comparison chart (change: wallet-nav-chart) — same four series
         // (LLM Bazowy, LLM Free, S&P 500, Nasdaq 100) shown on /llm-free.

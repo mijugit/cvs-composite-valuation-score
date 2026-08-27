@@ -476,8 +476,8 @@ kod bez rozgałęzień.
 
 #### Automated
 
-- [x] 2.1 `php -l bin/fetch_logos.php` — składnia czysta
-- [x] 2.2 `composer stan` czysty dla `bin/fetch_logos.php` i zmienionego `CvsSnapshotRepository.php`
+- [x] 2.1 `php -l bin/fetch_logos.php` — składnia czysta — be0b172
+- [x] 2.2 `composer stan` czysty dla `bin/fetch_logos.php` i zmienionego `CvsSnapshotRepository.php` — be0b172
 
 #### Manual
 
@@ -489,8 +489,8 @@ kod bez rozgałęzień.
 
 #### Automated
 
-- [ ] 3.1 `composer stan` czysty dla `TickerLogoPresenter.php` i zmienionych templates
-- [ ] 3.2 Pełny `vendor/bin/phpunit` zielony (zero regresji)
+- [x] 3.1 `composer stan` czysty dla `TickerLogoPresenter.php` i zmienionych templates
+- [x] 3.2 Pełny `vendor/bin/phpunit` zielony (zero regresji)
 
 #### Manual
 

@@ -7,6 +7,7 @@ namespace CVS\TrackRecord;
 use CVS\Auth\AuthController;
 use CVS\Core\Request;
 use CVS\Core\Response;
+use CVS\Logo\TickerLogoRepository;
 
 /**
  * Track record views — /track-record and /track-record/{ticker}.
@@ -58,6 +59,10 @@ class TrackRecordController
         // method/shape as the dashboard watchlist tooltip (AnalysisController).
         $latestInfo = $this->buildLatestInfoMap($liveVersion);
 
+        // change: ticker-logo-cache — one bulk read for every ticker in this
+        // accordion, same shape as $latestInfo above.
+        $tickerLogos = (new TickerLogoRepository())->findByTickers(array_keys($byTicker));
+
         // One row per ticker for the accordion: summary stats + delta + the full
         // evaluation list (rendered collapsed, expanded on click).
         $tickerSummaries = [];
@@ -66,6 +71,7 @@ class TrackRecordController
             $summary['delta']   = TrackRecordCalculator::deltaHitRatePct($rows, $olderByTicker[$ticker] ?? []);
             $summary['rows']    = $rows;
             $summary['info']    = $latestInfo[$ticker] ?? null;
+            $summary['logo']    = $tickerLogos[$ticker] ?? null;
             $tickerSummaries[$ticker] = $summary;
         }
 
@@ -142,8 +148,14 @@ class TrackRecordController
         $stats       = TrackRecordCalculator::summarise($enriched);
         $all         = $this->repo->getAllForTicker($ticker); // for CVS chart
 
+        // change: ticker-logo-cache — single-ticker lookups for the page header.
+        $companyName = $this->snapshots->latestCompanyNames()[$ticker] ?? null;
+        $tickerLogo  = (new TickerLogoRepository())->findByTicker($ticker);
+
         Response::view('track-record-ticker', [
             'ticker'      => $ticker,
+            'companyName' => $companyName,
+            'tickerLogo'  => $tickerLogo,
             'evaluations' => $enriched,
             'all'         => $all,
             'stats'       => $stats,

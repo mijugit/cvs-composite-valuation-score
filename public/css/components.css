@@ -257,6 +257,29 @@
 }
 .ticker-hint-portal--visible { display: block; }
 
+/* --- Ticker company logo (change: ticker-logo-cache) --------
+   Both the real <img> and the initials placeholder resolve to the same box
+   so swapping one for the other never shifts the surrounding row layout. */
+.ticker-logo,
+.ticker-logo-fallback {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    vertical-align: middle;
+    margin-right: .35rem;
+    flex-shrink: 0;
+}
+.ticker-logo { object-fit: contain; background: var(--c-surface-2, rgba(255,255,255,.06)); }
+.ticker-logo-fallback {
+    color: #fff;
+    font-size: .6rem;
+    font-weight: 600;
+    letter-spacing: .02em;
+}
+
 .tr-delta--flat { color: var(--c-text-muted, #888); }
 
 /* Toast */

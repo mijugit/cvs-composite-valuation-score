@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CVS\Screener;
 
 use CVS\Core\Database;
+use CVS\Logo\TickerLogoRepository;
 use CVS\TrackRecord\CvsSnapshotRepository;
 use CVS\TrackRecord\TrajectoryCalculator;
 use DateTimeImmutable;
@@ -135,11 +136,17 @@ class ScreenerRepository
         $tickers      = array_map(fn($r) => strtoupper((string) ($r['ticker'] ?? '')), $rows);
         $tickerLinks  = $this->findTickerLinksMap($tickers);
 
+        // change: ticker-logo-cache — same bulk-query-then-enrich pattern as
+        // $tickerLinks above; read-only here, writes only ever come from
+        // bin/fetch_logos.php.
+        $tickerLogos = (new TickerLogoRepository($this->db))->findByTickers($tickers);
+
         foreach ($rows as &$row) {
             $ticker = strtoupper((string) ($row['ticker'] ?? ''));
             $price  = $row['price_at_snapshot'] ?? null;
             $row['market_suffix'] = MarketResolver::suffixForTicker($ticker);
             $row['ticker_links']  = $tickerLinks[$ticker] ?? [];
+            $row['ticker_logo']   = $tickerLogos[$ticker] ?? null;
             $row['atr_state'] = ($price !== null && isset($zones[$ticker]))
                 ? $this->classifyAtrState((float) $price, $zones[$ticker]['low'], $zones[$ticker]['high'])
                 : null;

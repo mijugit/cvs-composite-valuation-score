@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use CVS\Logo\TickerLogoPresenter;
 use CVS\Screener\SnapshotFreshness;
 
 /** @var array<int, array<string, mixed>> $rows */
@@ -448,6 +449,7 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
             data-company="<?= htmlspecialchars((string) ($row['company_name'] ?? '')) ?>"
             data-links="<?= htmlspecialchars(json_encode($row['ticker_links'] ?? [], JSON_UNESCAPED_UNICODE) ?: '[]', ENT_QUOTES) ?>">
             <td>
+                <?= TickerLogoPresenter::render((string) $row['ticker'], $row['company_name'] ?? null, $row['ticker_logo'] ?? null) ?>
                 <span class="ticker-hint">
                     <a href="/analysis/<?= urlencode((string) $row['ticker']) ?>"
                        style="color:var(--c-fund);">

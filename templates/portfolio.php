@@ -1,4 +1,7 @@
 <?php declare(strict_types=1);
+
+use CVS\Logo\TickerLogoPresenter;
+
 /**
  * S-01: Global virtual portfolio — read-only view.
  *
@@ -111,6 +114,7 @@ $statusChip = static function (?string $status): string {
             ?>
             <tr>
                 <td>
+                    <?= TickerLogoPresenter::render((string) $h['ticker'], $h['company_name'] ?? null, $h['ticker_logo'] ?? null) ?>
                     <span class="ticker-hint">
                         <a href="/analysis/<?= urlencode((string) $h['ticker']) ?>"
                            style="font-weight:700;color:var(--c-fund);"><?= htmlspecialchars($h['ticker']) ?></a>
@@ -223,6 +227,7 @@ $statusChip = static function (?string $status): string {
         ?>
         <tr>
             <td>
+                <?= TickerLogoPresenter::render((string) $rec['ticker'], $rec['company_name'] ?? null, $rec['ticker_logo'] ?? null) ?>
                 <span class="ticker-hint">
                     <a href="/analysis/<?= urlencode((string) $rec['ticker']) ?>"
                        style="font-weight:700;color:var(--c-fund);"><?= $recTicker ?></a>

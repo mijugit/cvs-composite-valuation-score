@@ -1,5 +1,10 @@
 <?php declare(strict_types=1);
+
+use CVS\Logo\TickerLogoPresenter;
+
 /** @var string $ticker */
+/** @var string|null $companyName */
+/** @var array{domain: string|null, logo_path: string|null, status: string}|null $tickerLogo */
 /** @var array<int, array<string, mixed>> $evaluations enriched with 'result' */
 /** @var array<int, array<string, mixed>> $all all snapshots for chart */
 /** @var array{total: int, hits: int, misses: int, neutral: int, pending: int,
@@ -18,7 +23,7 @@ $resultChip = static function (string $result): string {
 ?>
 
 <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1.25rem;">
-    <h1 style="margin:0;">Historia CVS: <?= htmlspecialchars($ticker) ?></h1>
+    <h1 style="margin:0;"><?= TickerLogoPresenter::render($ticker, $companyName, $tickerLogo) ?>Historia CVS: <?= htmlspecialchars($ticker) ?></h1>
     <a href="/analysis/<?= urlencode($ticker) ?>" class="btn btn--ghost btn--sm">← Analiza</a>
     <a href="/track-record" class="btn btn--ghost btn--sm">← Track Record</a>
 </div>

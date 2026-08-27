@@ -1,4 +1,7 @@
 <?php declare(strict_types=1);
+
+use CVS\Logo\TickerLogoPresenter;
+
 /** @var array<int, array<string, mixed>> $evaluations */
 /** @var array<string, array<string, mixed>> $tickerSummaries Per-ticker: total/hits/misses/neutral/hit_rate_pct/avg_change_pct/delta/rows */
 /** @var array{total: int, hits: int, misses: int, neutral: int, pending: int,
@@ -143,6 +146,7 @@ $tickerHint = static function (string $ticker, ?array $info) use ($recoColor): s
         <tr class="tr-summary-row" data-ticker="<?= htmlspecialchars($ticker) ?>">
             <td>
                 <span class="tr-summary-row__arrow">▶</span>
+                <?= TickerLogoPresenter::render($ticker, $summary['info']['companyName'] ?? null, $summary['logo'] ?? null) ?>
                 <span class="ticker-hint">
                     <a href="/track-record/<?= urlencode($ticker) ?>" style="font-weight:700;color:var(--c-fund);">
                         <?= htmlspecialchars($ticker) ?>
