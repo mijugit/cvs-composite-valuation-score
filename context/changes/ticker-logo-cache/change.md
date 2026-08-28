@@ -141,3 +141,7 @@ Ramka propaguje się automatycznie na screener/portfolio/track-record (ta sama
 klasa CSS), proporcjonalnie mniejsza dzięki `em`. Zweryfikowane na produkcji:
 `diff` obrazek-vs-tekst = 0px na `/analysis/SNDK`, 0 broken img na
 screener (128) / portfolio (51) / track-record (100).
+
+Bezpośrednio po tym w tej samej sesji poszła osobna, niezwiązana runda
+porządków UX (menu, zwijany panel filtrów, czytelniejsze wykresy, 3-way NAV
+comparison) — patrz `context/changes/screener-ux-polish/change.md`.
