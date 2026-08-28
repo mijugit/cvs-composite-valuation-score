@@ -470,7 +470,7 @@ startuje od zera (seed 10 000 USD) jak każdy poprzedni.
 
 #### Manual
 
-- [ ] 1.5 Ręczny SELECT na świeżo zmigrowanej bazie potwierdza wiersz w `llm_gpt_luna_state` (cash=10000.00, initial_capital=10000.00)
+- [x] 1.5 Ręczny SELECT na świeżo zmigrowanej bazie potwierdza wiersz w `llm_gpt_luna_state` (cash=10000.00, initial_capital=10000.00)
 
 ### Phase 2: Silnik decyzyjny (GPT-Luna-specyficzny)
 
@@ -482,8 +482,8 @@ startuje od zera (seed 10 000 USD) jak każdy poprzedni.
 
 #### Manual
 
-- [ ] 2.4 Ręczny smoke-test `LlmGptLunaContextGatherer::gather(['AAPL'])` z prawdziwym kluczem zwraca niepusty kontekst
-- [ ] 2.5 Ręczny smoke-test `LlmGptLunaDecisionService::generate(...)` z prawdziwym kluczem zwraca ok=true, niepuste decisions i legend
+- [x] 2.4 Ręczny smoke-test `LlmGptLunaContextGatherer::gather(['AAPL'])` z prawdziwym kluczem zwraca niepusty kontekst
+- [x] 2.5 Ręczny smoke-test `LlmGptLunaDecisionService::generate(...)` z prawdziwym kluczem zwraca ok=true, niepuste decisions i legend
 
 ### Phase 3: Cron entrypoint + widoczność
 
@@ -496,7 +496,7 @@ startuje od zera (seed 10 000 USD) jak każdy poprzedni.
 
 #### Manual
 
-- [ ] 3.5 `/llm-gpt-luna` renderuje się bez błędów, pokazuje 10 000 USD gotówki, brak pozycji
-- [ ] 3.6 Nawigacja "Portfele" pokazuje 4 wpisy, aktywny stan poprawny na /llm-gpt-luna
-- [ ] 3.7 Wszystkie 4 strony portfeli pokazują identyczny wykres z 4 liniami portfeli + 2 benchmarkami
-- [ ] 3.8 Pierwsze prawdziwe uruchomienie bin/llm-gpt-luna-wallet-rebalance.php kończy się completed lub llm_failed, nigdy nieobsłużonym wyjątkiem
+- [x] 3.5 `/llm-gpt-luna` renderuje się bez błędów, pokazuje 10 000 USD gotówki, brak pozycji
+- [x] 3.6 Nawigacja "Portfele" pokazuje 4 wpisy, aktywny stan poprawny na /llm-gpt-luna
+- [x] 3.7 Wszystkie 4 strony portfeli pokazują identyczny wykres z 4 liniami portfeli + 2 benchmarkami
+- [x] 3.8 Pierwsze prawdziwe uruchomienie bin/llm-gpt-luna-wallet-rebalance.php kończy się completed lub llm_failed, nigdy nieobsłużonym wyjątkiem

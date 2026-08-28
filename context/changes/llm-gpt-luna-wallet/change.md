@@ -47,3 +47,30 @@ kluczowe ustalenia:
 
 Powiązane wcześniejsze zmiany: [[cvs-llm-gemini-wallet-plan]] (bezpośredni
 wzorzec), [[cvs-llm-free-wallet-plan]] (wzorzec bazowy).
+
+## Deploy i weryfikacja na produkcji (2026-08-28)
+
+`git pull` + `composer dump-autoload --optimize --no-dev` (workaround na
+`ext-cf:-version-hardening`, patrz [[cf-composer-install-hardening-bug]]) +
+migracja 043 na CF. Zweryfikowane na żywo na `cvs.timeflow.fun`:
+
+- Seed `llm_gpt_luna_state` (10 000/10 000 USD) potwierdzony SELECT-em.
+- Smoke-testy `LlmGptLunaContextGatherer`/`LlmGptLunaDecisionService` z
+  prawdziwym kluczem `GPT_Luna_CVS` — web_search działa, decyzja+legenda
+  poprawne (dry-run wiersz z `cycle_date='1999-01-01'` usunięty po teście).
+- `/llm-gpt-luna` renderuje się poprawnie; dropdown "Portfele" ma 4 wpisy z
+  poprawnym `aria-current`; wszystkie 4 strony portfeli
+  (`/portfolio`, `/llm-free`, `/llm-gemini`, `/llm-gpt-luna`) pokazują
+  identyczny zestaw 6 serii na wykresie NAV (4 portfele + S&P 500 + Nasdaq 100).
+- **Pierwszy prawdziwy cykl** `bin/llm-gpt-luna-wallet-rebalance.php`
+  uruchomiony ręcznie z CLI w oknie sesji NYSE (2026-08-28, ~13:37 ET):
+  status `completed`, 5 wykonanych transakcji BUY (MU, ADBE, AMD, PFE,
+  ENA.WA), gotówka 10 000,00 → 50,48 USD, `holdings` spójne z
+  `transactions`. W logu odnotowany jeden transient `429 rate_limited` w
+  trakcie context-gatheringu (jeden z 3 wywołań web_search) — nie przerwał
+  cyklu, brak nieobsłużonego wyjątku. Item 3.8 planu potwierdzony w pełni.
+- Cron w panelu CF pozostaje do samodzielnego założenia przez użytkownika
+  (przykładowa linia w nagłówku `bin/llm-gpt-luna-wallet-rebalance.php`) —
+  cel Fazy 3 (real cron firing on schedule) jest teraz nieformalnie
+  potwierdzony ręcznym uruchomieniem tego samego skryptu; automatyczne
+  uruchomienia zależą wyłącznie od konfiguracji crona przez użytkownika.
