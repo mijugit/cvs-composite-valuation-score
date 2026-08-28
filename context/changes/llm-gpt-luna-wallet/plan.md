@@ -464,9 +464,9 @@ startuje od zera (seed 10 000 USD) jak każdy poprzedni.
 #### Automated
 
 - [ ] 1.1 Migracja aplikuje się czysto: uruchomienie `043_*.sql` na bazie deweloperskiej/testowej
-- [x] 1.2 `vendor/bin/phpunit tests/LlmGptLuna/` przechodzi zielono
-- [x] 1.3 Pełny `vendor/bin/phpunit` nadal zielony (zero regresji)
-- [x] 1.4 `composer stan` czysty dla `src/LlmGptLuna/`
+- [x] 1.2 `vendor/bin/phpunit tests/LlmGptLuna/` przechodzi zielono — 54e313c
+- [x] 1.3 Pełny `vendor/bin/phpunit` nadal zielony (zero regresji) — 54e313c
+- [x] 1.4 `composer stan` czysty dla `src/LlmGptLuna/` — 54e313c
 
 #### Manual
 
@@ -476,9 +476,9 @@ startuje od zera (seed 10 000 USD) jak każdy poprzedni.
 
 #### Automated
 
-- [ ] 2.1 `vendor/bin/phpunit tests/LlmGptLuna/LlmGptLunaContextGathererTest.php tests/LlmGptLuna/LlmGptLunaDecisionServiceTest.php` przechodzi zielono
-- [ ] 2.2 Pełny `vendor/bin/phpunit` nadal zielony (zero regresji w tests/LlmGemini/, tests/Ai/)
-- [ ] 2.3 `composer stan` czysty dla `src/LlmGptLuna/`
+- [x] 2.1 `vendor/bin/phpunit tests/LlmGptLuna/LlmGptLunaContextGathererTest.php tests/LlmGptLuna/LlmGptLunaDecisionServiceTest.php` przechodzi zielono
+- [x] 2.2 Pełny `vendor/bin/phpunit` nadal zielony (zero regresji w tests/LlmGemini/, tests/Ai/)
+- [x] 2.3 `composer stan` czysty dla `src/LlmGptLuna/`
 
 #### Manual
 
