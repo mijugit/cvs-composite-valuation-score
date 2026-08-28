@@ -50,6 +50,7 @@ $asset = static function (string $path): string {
                     <li><a href="/portfolio" role="menuitem"<?= str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/portfolio') ? ' aria-current="page"' : '' ?>>LLM Bazowy</a></li>
                     <li><a href="/llm-free" role="menuitem"<?= str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/llm-free') ? ' aria-current="page"' : '' ?>>LLM Free</a></li>
                     <li><a href="/llm-gemini" role="menuitem"<?= str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/llm-gemini') ? ' aria-current="page"' : '' ?>>LLM Gemini</a></li>
+                    <li><a href="/llm-gpt-luna" role="menuitem"<?= str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/llm-gpt-luna') ? ' aria-current="page"' : '' ?>>LLM GPT Luna</a></li>
                 </ul>
             </div>
             <a href="/lab"<?= str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/lab') ? ' aria-current="page"' : '' ?>>Lab</a>

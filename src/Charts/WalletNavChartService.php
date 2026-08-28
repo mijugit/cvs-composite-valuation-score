@@ -8,24 +8,27 @@ use CVS\Api\FinancialDataFetcher;
 use CVS\Lab\LabMetrics;
 use CVS\LlmFree\LlmFreeCycleRepository;
 use CVS\LlmGemini\LlmGeminiCycleRepository;
+use CVS\LlmGptLuna\LlmGptLunaCycleRepository;
 use CVS\Portfolio\CycleRepository;
 
 /**
- * Builds the NAV comparison chart (LLM Bazowy, LLM Free, optionally LLM Gemini,
- * S&P 500, Nasdaq 100) shown on /portfolio, /llm-free, and /llm-gemini (change:
- * wallet-nav-chart, extended by change: llm-gemini-wallet) — same visual pattern
- * as /lab, so a page switching between wallets sees a consistent chart.
+ * Builds the NAV comparison chart (LLM Bazowy, LLM Free, LLM Gemini, LLM GPT
+ * Luna, S&P 500, Nasdaq 100) shown on /portfolio, /llm-free, /llm-gemini and
+ * /llm-gpt-luna (change: wallet-nav-chart, extended by llm-gemini-wallet and
+ * llm-gpt-luna-wallet) — same visual pattern as /lab, so a page switching
+ * between wallets sees a consistent chart.
  *
- * Deliberately outside CVS\Portfolio\, CVS\LlmFree\, and CVS\LlmGemini\: it
- * reads from each module's own repository (never their raw tables — same
- * "sanctioned read via the owning repository" rule LabRepository::
- * getLlmValueSeries() already established) plus CVS\Api\, so no single module
- * is a natural owner.
+ * Deliberately outside CVS\Portfolio\, CVS\LlmFree\, CVS\LlmGemini\, and
+ * CVS\LlmGptLuna\: it reads from each module's own repository (never their
+ * raw tables — same "sanctioned read via the owning repository" rule
+ * LabRepository::getLlmValueSeries() already established) plus CVS\Api\, so
+ * no single module is a natural owner.
  *
- * The Gemini series is a 4th constructor param, still nullable for test
- * convenience and backward compatibility, but all three callers (/portfolio,
- * /llm-free, /llm-gemini) now pass an LlmGeminiCycleRepository — every wallet
- * page shows the identical three-wallet + two-benchmark comparison.
+ * Both the Gemini and GPT Luna series are optional constructor params, still
+ * nullable for test convenience and backward compatibility, but all four
+ * callers (/portfolio, /llm-free, /llm-gemini, /llm-gpt-luna) now pass every
+ * cycle repository — every wallet page shows the identical four-wallet +
+ * two-benchmark comparison.
  *
  * build() is pure (no I/O) and unit-tested directly; fetch() is the thin,
  * untested wiring layer that gathers the raw inputs — same split as
@@ -38,6 +41,7 @@ final class WalletNavChartService
         private readonly LlmFreeCycleRepository $llmFreeCycles,
         private readonly FinancialDataFetcher $fetcher,
         private readonly ?LlmGeminiCycleRepository $llmGeminiCycles = null,
+        private readonly ?LlmGptLunaCycleRepository $llmGptLunaCycles = null,
     ) {
     }
 
@@ -52,6 +56,7 @@ final class WalletNavChartService
             $this->fetcher->fetchSpyDailyCloses(),
             $this->fetcher->fetchDailyCloses('QQQ'),
             $this->llmGeminiCycles?->getValueSeries(),
+            $this->llmGptLunaCycles?->getValueSeries(),
         );
     }
 
@@ -61,12 +66,13 @@ final class WalletNavChartService
      * @param array{date: string[], close: float[]}|null $spy             null when the fetch failed
      * @param array{date: string[], close: float[]}|null $qqq             null when the fetch failed
      * @param list<array{date: string, value: float}>|null $llmGeminiSeries LLM Gemini, oldest first; null = series omitted entirely (backward-compat default)
+     * @param list<array{date: string, value: float}>|null $llmGptLunaSeries LLM GPT Luna, oldest first; null = series omitted entirely (backward-compat default)
      * @return array{chartSeries: array<string, list<array{date: string, value: float}>>, d0: string|null}
      */
-    public static function build(array $portfolioSeries, array $llmFreeSeries, ?array $spy, ?array $qqq, ?array $llmGeminiSeries = null): array
+    public static function build(array $portfolioSeries, array $llmFreeSeries, ?array $spy, ?array $qqq, ?array $llmGeminiSeries = null, ?array $llmGptLunaSeries = null): array
     {
         $d0 = null;
-        foreach ([$portfolioSeries, $llmFreeSeries, $llmGeminiSeries ?? []] as $series) {
+        foreach ([$portfolioSeries, $llmFreeSeries, $llmGeminiSeries ?? [], $llmGptLunaSeries ?? []] as $series) {
             if ($series === []) {
                 continue;
             }
@@ -87,6 +93,10 @@ final class WalletNavChartService
 
         if ($llmGeminiSeries !== null) {
             $chartSeries['LLM Gemini'] = LabMetrics::normaliseToBase100($llmGeminiSeries, 'value');
+        }
+
+        if ($llmGptLunaSeries !== null) {
+            $chartSeries['LLM GPT Luna'] = LabMetrics::normaliseToBase100($llmGptLunaSeries, 'value');
         }
 
         // Benchmarks are rebased from their value AT $d0 (not their own fetch

@@ -176,4 +176,74 @@ class WalletNavChartServiceTest extends TestCase
 
         $this->assertSame('2026-01-01', $result['d0']);
     }
+
+    // ------------------------------------------------------------------
+    // Optional fourth series: LLM GPT Luna (change: llm-gpt-luna-wallet)
+    // ------------------------------------------------------------------
+
+    public function testGptLunaSeriesOmittedByDefaultPreservesOldBehaviour(): void
+    {
+        $portfolio = [['date' => '2026-06-01', 'value' => 10000.0]];
+        $llmFree   = [['date' => '2026-06-01', 'value' => 10000.0]];
+        $llmGemini = [['date' => '2026-06-01', 'value' => 10000.0]];
+
+        // Positional call with the 6th param omitted entirely (backward compatibility).
+        $result = WalletNavChartService::build($portfolio, $llmFree, null, null, $llmGemini);
+
+        $this->assertArrayNotHasKey('LLM GPT Luna', $result['chartSeries']);
+        $this->assertArrayHasKey('LLM Gemini', $result['chartSeries']);
+    }
+
+    public function testGptLunaSeriesIncludedAndNormalisedWhenProvided(): void
+    {
+        $portfolio  = [['date' => '2026-06-01', 'value' => 10000.0]];
+        $llmFree    = [['date' => '2026-06-01', 'value' => 10000.0]];
+        $llmGptLuna = [
+            ['date' => '2026-08-19', 'value' => 10000.0],
+            ['date' => '2026-08-20', 'value' => 10800.0],
+        ];
+
+        $result = WalletNavChartService::build($portfolio, $llmFree, null, null, null, $llmGptLuna);
+
+        $this->assertArrayHasKey('LLM GPT Luna', $result['chartSeries']);
+        $this->assertEqualsWithDelta(100.0, $result['chartSeries']['LLM GPT Luna'][0]['value'], 0.001);
+        $this->assertEqualsWithDelta(108.0, $result['chartSeries']['LLM GPT Luna'][1]['value'], 0.001);
+    }
+
+    public function testGptLunaSeriesEmptyArrayStillAddsKeyUnlikeNull(): void
+    {
+        $portfolio = [['date' => '2026-06-01', 'value' => 10000.0]];
+
+        $result = WalletNavChartService::build($portfolio, [], null, null, null, []);
+
+        $this->assertArrayHasKey('LLM GPT Luna', $result['chartSeries']);
+        $this->assertSame([], $result['chartSeries']['LLM GPT Luna']);
+    }
+
+    public function testGptLunaSeriesCanEstablishEarliestD0(): void
+    {
+        $portfolio  = [['date' => '2026-06-01', 'value' => 10000.0]];
+        $llmGptLuna = [['date' => '2026-01-01', 'value' => 10000.0]];
+
+        $result = WalletNavChartService::build($portfolio, [], null, null, null, $llmGptLuna);
+
+        $this->assertSame('2026-01-01', $result['d0']);
+    }
+
+    public function testAllFourWalletSeriesCoexistWithBothBenchmarks(): void
+    {
+        $portfolio  = [['date' => '2026-06-01', 'value' => 10000.0]];
+        $llmFree    = [['date' => '2026-06-01', 'value' => 10000.0]];
+        $llmGemini  = [['date' => '2026-06-01', 'value' => 10000.0]];
+        $llmGptLuna = [['date' => '2026-06-01', 'value' => 10000.0]];
+        $spy        = ['date' => ['2026-06-01'], 'close' => [500.0]];
+        $qqq        = ['date' => ['2026-06-01'], 'close' => [400.0]];
+
+        $result = WalletNavChartService::build($portfolio, $llmFree, $spy, $qqq, $llmGemini, $llmGptLuna);
+
+        $this->assertSame(
+            ['LLM Bazowy', 'LLM Free', 'LLM Gemini', 'LLM GPT Luna', 'S&P 500', 'Nasdaq 100'],
+            array_keys($result['chartSeries'])
+        );
+    }
 }

@@ -1,22 +1,24 @@
 <?php declare(strict_types=1);
 
 /**
- * Shared NAV comparison chart for the two autonomous LLM wallets — reused by
- * templates/portfolio.php and templates/llm-free.php (change: wallet-nav-chart).
- * Same visual pattern as /lab's NAV chart (canvas + Chart.js line, .chart-
- * zoom-target zoom modal) so a user switching between /lab, /portfolio and
- * /llm-free sees one consistent chart language.
+ * Shared NAV comparison chart for all four autonomous LLM wallets — reused by
+ * templates/portfolio.php, templates/llm-free.php, templates/llm-gemini.php
+ * and templates/llm-gpt-luna.php (change: wallet-nav-chart, extended by
+ * llm-gemini-wallet and llm-gpt-luna-wallet). Same visual pattern as /lab's
+ * NAV chart (canvas + Chart.js line, .chart-zoom-target zoom modal) so a
+ * user switching between any of these pages sees one consistent chart language.
  *
  * @var array<string, list<array{date: string, value: float}>> $chartSeries series label => base=100 points, from CVS\Charts\WalletNavChartService
- * @var string|null $chartD0 earliest date across the two wallets, or null when neither has history yet
+ * @var string|null $chartD0 earliest date across all wallets, or null when none has history yet
  */
 
 $walletChartPalette = [
-    'LLM Bazowy' => 'rgba(64,144,224,0.9)',
-    'LLM Free'   => 'rgba(250,204,21,0.9)',
-    'LLM Gemini' => 'rgba(52,211,153,0.9)',
+    'LLM Bazowy'   => 'rgba(64,144,224,0.9)',
+    'LLM Free'     => 'rgba(250,204,21,0.9)',
+    'LLM Gemini'   => 'rgba(52,211,153,0.9)',
+    'LLM GPT Luna' => 'rgba(251,146,60,0.9)',
     // Both benchmarks share a neutral grey family (var(--c-muted) territory)
-    // so they read as "reference lines", not competing wallets — the three
+    // so they read as "reference lines", not competing wallets — the four
     // wallet lines above keep the saturated colours that actually matter.
     'S&P 500'    => 'rgba(148,163,184,0.85)',
     'Nasdaq 100' => 'rgba(100,116,139,0.85)',

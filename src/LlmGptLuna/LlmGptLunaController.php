@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace CVS\LlmGemini;
+namespace CVS\LlmGptLuna;
 
 use CVS\Api\FinancialDataFetcher;
 use CVS\Auth\AuthController;
@@ -10,46 +10,45 @@ use CVS\Charts\WalletNavChartService;
 use CVS\Core\Database;
 use CVS\Core\Request;
 use CVS\Core\Response;
-use CVS\LlmGptLuna\LlmGptLunaCycleRepository;
 use CVS\Portfolio\CycleRepository;
 use CVS\Portfolio\LivePriceProvider;
 use CVS\LlmFree\LlmFreeCycleRepository;
+use CVS\LlmGemini\LlmGeminiCycleRepository;
 
 /**
- * Read-only LLM_Gemini_Wallet view controller.
+ * Read-only LLM_GPT_Luna_Wallet view controller.
  *
- * Renders the wallet page at GET /llm-gemini. Structural clone of
- * CVS\LlmFree\LlmFreeController::index() (change: llm-gemini-wallet) — same
- * live-repricing shape, same legend history, and (since llm-gpt-luna-wallet)
- * passes all four wallets' cycle repositories into WalletNavChartService for
- * a full four-way NAV comparison (Bazowy + Free + Gemini + GPT Luna +
- * benchmarks) instead of just two.
+ * Renders the wallet page at GET /llm-gpt-luna. Structural clone of
+ * CVS\LlmGemini\LlmGeminiController::index() (change: llm-gpt-luna-wallet) —
+ * same live-repricing shape, same legend history, but passes all four
+ * wallets' cycle repositories into WalletNavChartService for a full
+ * four-way NAV comparison (Bazowy + Free + Gemini + GPT Luna + benchmarks).
  */
-class LlmGeminiController
+class LlmGptLunaController
 {
     public function index(Request $req): void
     {
         AuthController::requireAuth();
 
         $cvsConfig        = require dirname(__DIR__, 2) . '/config/cvs-weights.php';
-        $walletConfig     = require dirname(__DIR__, 2) . '/config/llm-gemini-wallet.php';
+        $walletConfig     = require dirname(__DIR__, 2) . '/config/llm-gpt-luna-wallet.php';
         // holidays only — shared NYSE calendar fact, not module logic (same
-        // reuse as bin/llm-gemini-wallet-rebalance.php).
+        // reuse as bin/llm-gpt-luna-wallet-rebalance.php).
         $portfolioConfig  = require dirname(__DIR__, 2) . '/config/portfolio.php';
         $marketHolidays   = $portfolioConfig['holidays'] ?? [];
         $liveModelVersion = (string) ($cvsConfig['model_version'] ?? '4.0');
 
         $db         = Database::connection();
-        $walletRepo = new LlmGeminiRepository($db);
+        $walletRepo = new LlmGptLunaRepository($db);
 
         $state    = $walletRepo->getCurrentState();
         $holdings = $walletRepo->getCurrentHoldingsWithPrice($liveModelVersion);
 
         // Live re-pricing: refresh quotes on load (≤ every 15 min, session-cached),
         // falling back to the last snapshot price per ticker if the quote fails.
-        // Own cache key (cvs_llmgemini_px) — distinct from both other wallets'
-        // (cvs_llmfree_px / baseline) so page loads don't overwrite each other's
-        // cached entries with a different ticker subset.
+        // Own cache key (cvs_llmgptluna_px) — distinct from every other wallet's
+        // so page loads don't overwrite each other's cached entries with a
+        // different ticker subset.
         $tickers  = array_map(static fn(array $h): string => (string) $h['ticker'], $holdings);
         $fallback = [];
         foreach ($holdings as $h) {
@@ -79,7 +78,8 @@ class LlmGeminiController
         // matches what the model "remembers" on the next cycle.
         $legendHistory = $walletRepo->getLegendHistory((int) ($walletConfig['legend_context_count'] ?? 10));
 
-        // NAV comparison chart — all four wallets + both benchmarks (change:
+        // NAV comparison chart — all four wallets + both benchmarks. Every
+        // wallet page wires the same set of cycle repositories (change:
         // llm-gpt-luna-wallet, continuing the ticker-logo-cache UX
         // follow-up's "mandatory-in-practice" pattern) so every wallet page
         // shows the identical comparison.
@@ -93,7 +93,7 @@ class LlmGeminiController
         $chartSeries = $navChart['chartSeries'];
         $chartD0     = $navChart['d0'];
 
-        Response::view('llm-gemini', compact(
+        Response::view('llm-gpt-luna', compact(
             'state',
             'holdings',
             'totalValue',
@@ -118,7 +118,7 @@ class LlmGeminiController
         }
 
         $ttl = 900; // 15 minutes
-        $key = 'cvs_llmgemini_px';
+        $key = 'cvs_llmgptluna_px';
         $now = time();
 
         $cached   = $_SESSION[$key]             ?? null;

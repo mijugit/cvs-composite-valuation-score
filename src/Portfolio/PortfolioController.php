@@ -12,6 +12,7 @@ use CVS\Core\Request;
 use CVS\Core\Response;
 use CVS\LlmFree\LlmFreeCycleRepository;
 use CVS\LlmGemini\LlmGeminiCycleRepository;
+use CVS\LlmGptLuna\LlmGptLunaCycleRepository;
 use CVS\Logo\TickerLogoRepository;
 use DateTimeImmutable;
 use DateTimeZone;
@@ -103,14 +104,15 @@ class PortfolioController
         }
         unset($rec);
 
-        // NAV comparison chart (change: wallet-nav-chart, three-way since
-        // ticker-logo-cache UX follow-up) — all three wallets + both
-        // benchmarks, same as /llm-gemini.
+        // NAV comparison chart (change: wallet-nav-chart, four-way since
+        // llm-gpt-luna-wallet) — all four wallets + both benchmarks, same as
+        // every other wallet page.
         $navChart = (new WalletNavChartService(
             new CycleRepository($db),
             new LlmFreeCycleRepository($db),
             new FinancialDataFetcher($cvsConfig['data_source'] ?? []),
             new LlmGeminiCycleRepository($db),
+            new LlmGptLunaCycleRepository($db),
         ))->fetch();
         $chartSeries = $navChart['chartSeries'];
         $chartD0     = $navChart['d0'];

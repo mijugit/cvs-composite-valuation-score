@@ -24,6 +24,7 @@ use CVS\Translation\TranslationController;
 use CVS\Portfolio\PortfolioController;
 use CVS\LlmFree\LlmFreeController;
 use CVS\LlmGemini\LlmGeminiController;
+use CVS\LlmGptLuna\LlmGptLunaController;
 use CVS\Lab\LabController;
 use CVS\Links\TickerLinkController;
 
@@ -187,6 +188,13 @@ $router->get('/llm-free', fn($req) => $llmFree->index($req));
 
 $llmGemini = new LlmGeminiController();
 $router->get('/llm-gemini', fn($req) => $llmGemini->index($req));
+
+// ------------------------------------------------------------------
+// LLM_GPT_Luna_Wallet — fourth, GPT-Luna-executed portfolio (change: llm-gpt-luna-wallet)
+// ------------------------------------------------------------------
+
+$llmGptLuna = new LlmGptLunaController();
+$router->get('/llm-gpt-luna', fn($req) => $llmGptLuna->index($req));
 
 // ------------------------------------------------------------------
 // Lab — experimental paper portfolios (change: cvs-experimental-portfolios)

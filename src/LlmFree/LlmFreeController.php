@@ -11,6 +11,7 @@ use CVS\Core\Database;
 use CVS\Core\Request;
 use CVS\Core\Response;
 use CVS\LlmGemini\LlmGeminiCycleRepository;
+use CVS\LlmGptLuna\LlmGptLunaCycleRepository;
 use CVS\Portfolio\CycleRepository;
 use CVS\Portfolio\LivePriceProvider;
 
@@ -76,16 +77,16 @@ class LlmFreeController
         // matches what the model "remembers" on the next cycle.
         $legendHistory = $walletRepo->getLegendHistory((int) ($walletConfig['legend_context_count'] ?? 10));
 
-        // NAV comparison chart (change: wallet-nav-chart, three-way since
-        // ticker-logo-cache UX follow-up) — all three wallets + both
-        // benchmarks, same as /llm-gemini, so every wallet page shows the
-        // identical comparison instead of the viewer's own wallet plus a
-        // partial subset of the others.
+        // NAV comparison chart (change: wallet-nav-chart, four-way since
+        // llm-gpt-luna-wallet) — all four wallets + both benchmarks, so
+        // every wallet page shows the identical comparison instead of the
+        // viewer's own wallet plus a partial subset of the others.
         $navChart = (new WalletNavChartService(
             new CycleRepository($db),
             new LlmFreeCycleRepository($db),
             new FinancialDataFetcher($cvsConfig['data_source'] ?? []),
             new LlmGeminiCycleRepository($db),
+            new LlmGptLunaCycleRepository($db),
         ))->fetch();
         $chartSeries = $navChart['chartSeries'];
         $chartD0     = $navChart['d0'];

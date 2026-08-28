@@ -476,9 +476,9 @@ startuje od zera (seed 10 000 USD) jak każdy poprzedni.
 
 #### Automated
 
-- [x] 2.1 `vendor/bin/phpunit tests/LlmGptLuna/LlmGptLunaContextGathererTest.php tests/LlmGptLuna/LlmGptLunaDecisionServiceTest.php` przechodzi zielono
-- [x] 2.2 Pełny `vendor/bin/phpunit` nadal zielony (zero regresji w tests/LlmGemini/, tests/Ai/)
-- [x] 2.3 `composer stan` czysty dla `src/LlmGptLuna/`
+- [x] 2.1 `vendor/bin/phpunit tests/LlmGptLuna/LlmGptLunaContextGathererTest.php tests/LlmGptLuna/LlmGptLunaDecisionServiceTest.php` przechodzi zielono — c0ba7ac
+- [x] 2.2 Pełny `vendor/bin/phpunit` nadal zielony (zero regresji w tests/LlmGemini/, tests/Ai/) — c0ba7ac
+- [x] 2.3 `composer stan` czysty dla `src/LlmGptLuna/` — c0ba7ac
 
 #### Manual
 
@@ -489,10 +489,10 @@ startuje od zera (seed 10 000 USD) jak każdy poprzedni.
 
 #### Automated
 
-- [ ] 3.1 `php -l bin/llm-gpt-luna-wallet-rebalance.php` — składnia czysta
-- [ ] 3.2 `vendor/bin/phpunit tests/Charts/WalletNavChartServiceTest.php` przechodzi zielono
-- [ ] 3.3 Pełny `vendor/bin/phpunit` zielony (zero regresji w tests/LlmGemini/, tests/Portfolio/, tests/LlmFree/)
-- [ ] 3.4 `composer stan` czysty dla src/LlmGptLuna/, src/Charts/, zmienionych kontrolerów
+- [x] 3.1 `php -l bin/llm-gpt-luna-wallet-rebalance.php` — składnia czysta
+- [x] 3.2 `vendor/bin/phpunit tests/Charts/WalletNavChartServiceTest.php` przechodzi zielono
+- [x] 3.3 Pełny `vendor/bin/phpunit` zielony (zero regresji w tests/LlmGemini/, tests/Portfolio/, tests/LlmFree/)
+- [x] 3.4 `composer stan` czysty dla src/LlmGptLuna/, src/Charts/, zmienionych kontrolerów
 
 #### Manual
 
