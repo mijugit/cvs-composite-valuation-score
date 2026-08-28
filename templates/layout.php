@@ -47,10 +47,10 @@ $asset = static function (string $path): string {
                     Portfele <span class="admin-menu__caret">▾</span>
                 </button>
                 <ul class="admin-menu__dropdown" role="menu">
-                    <li><a href="/portfolio" role="menuitem"<?= str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/portfolio') ? ' aria-current="page"' : '' ?>>LLM Bazowy</a></li>
-                    <li><a href="/llm-free" role="menuitem"<?= str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/llm-free') ? ' aria-current="page"' : '' ?>>LLM Free</a></li>
-                    <li><a href="/llm-gemini" role="menuitem"<?= str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/llm-gemini') ? ' aria-current="page"' : '' ?>>LLM Gemini</a></li>
-                    <li><a href="/llm-gpt-luna" role="menuitem"<?= str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/llm-gpt-luna') ? ' aria-current="page"' : '' ?>>LLM GPT Luna</a></li>
+                    <li><a href="/portfolio" role="menuitem"<?= str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/portfolio') ? ' aria-current="page"' : '' ?>>Portfel Bazowy Claude</a></li>
+                    <li><a href="/llm-free" role="menuitem"<?= str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/llm-free') ? ' aria-current="page"' : '' ?>>Portfel Free Claude</a></li>
+                    <li><a href="/llm-gemini" role="menuitem"<?= str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/llm-gemini') ? ' aria-current="page"' : '' ?>>Portfel Free Gemini</a></li>
+                    <li><a href="/llm-gpt-luna" role="menuitem"<?= str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/llm-gpt-luna') ? ' aria-current="page"' : '' ?>>Portfel Free GPT Luna</a></li>
                 </ul>
             </div>
             <a href="/lab"<?= str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/lab') ? ' aria-current="page"' : '' ?>>Lab</a>
