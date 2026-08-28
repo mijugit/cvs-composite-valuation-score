@@ -264,16 +264,24 @@
    letter of whatever heading/cell it sits in — a small table row and a
    large <h1> both get a proportionally-sized logo, no per-page overrides.
    Neither rule declares its own font-size, so `1em` here resolves against
-   the INHERITED (surrounding) font-size, not a shrunk local one. */
+   the INHERITED (surrounding) font-size, not a shrunk local one.
+   `box-sizing: content-box` (overriding the global border-box reset) keeps
+   the 1em×1em content area — the logo itself — at that exact size; the
+   frame below is added OUTSIDE it, on purpose, rather than eating into it.
+   `vertical-align: baseline` (not `middle`) puts the frame's bottom edge
+   flush with the surrounding text's baseline, per design review. */
 .ticker-logo,
 .ticker-logo-fallback {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    box-sizing: content-box;
     width: 1em;
     height: 1em;
-    border-radius: 4px;
-    vertical-align: middle;
+    padding: .1em;
+    border: 1px solid var(--c-primary);
+    border-radius: var(--radius-sm);
+    vertical-align: baseline;
     margin-right: .3em;
     flex-shrink: 0;
 }

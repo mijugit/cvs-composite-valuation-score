@@ -1,11 +1,9 @@
 <section class="analysis-detail">
     <div class="analysis-detail__heading">
-        <h1><?= \CVS\Logo\TickerLogoPresenter::render($ticker, $financials['long_name'] ?? null, $tickerLogo ?? null) ?>Analiza: <?= htmlspecialchars($ticker) ?>
-            <?php if (!empty($financials['long_name'])): ?>
-                <span style="font-size:var(--text-base);font-weight:400;color:var(--c-muted);margin-left:.5rem;">
-                    <?= htmlspecialchars((string) $financials['long_name']) ?>
-                </span>
-            <?php endif; ?>
+        <h1><?= \CVS\Logo\TickerLogoPresenter::render($ticker, $financials['long_name'] ?? null, $tickerLogo ?? null) ?><?= htmlspecialchars($ticker) ?>
+            <span style="font-size:var(--text-base);font-weight:400;color:var(--c-muted);margin-left:.5rem;">
+                <?php if (!empty($financials['long_name'])): ?><?= htmlspecialchars((string) $financials['long_name']) ?> - <?php endif; ?>Analiza
+            </span>
         </h1>
         <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
             <a href="/track-record/<?= urlencode($ticker) ?>" class="btn btn--ghost btn--sm">Historia CVS</a>
