@@ -1,7 +1,7 @@
 ---
 change_id: llm-gpt-luna-wallet
 title: Czwarty portfel eksperymentalny — klon LLM Gemini wykonywany przez GPT (wariant Luna)
-status: implementing
+status: implemented
 created: 2026-08-28
 updated: 2026-08-28
 archived_at: null

@@ -489,10 +489,10 @@ startuje od zera (seed 10 000 USD) jak każdy poprzedni.
 
 #### Automated
 
-- [x] 3.1 `php -l bin/llm-gpt-luna-wallet-rebalance.php` — składnia czysta
-- [x] 3.2 `vendor/bin/phpunit tests/Charts/WalletNavChartServiceTest.php` przechodzi zielono
-- [x] 3.3 Pełny `vendor/bin/phpunit` zielony (zero regresji w tests/LlmGemini/, tests/Portfolio/, tests/LlmFree/)
-- [x] 3.4 `composer stan` czysty dla src/LlmGptLuna/, src/Charts/, zmienionych kontrolerów
+- [x] 3.1 `php -l bin/llm-gpt-luna-wallet-rebalance.php` — składnia czysta — d783edd
+- [x] 3.2 `vendor/bin/phpunit tests/Charts/WalletNavChartServiceTest.php` przechodzi zielono — d783edd
+- [x] 3.3 Pełny `vendor/bin/phpunit` zielony (zero regresji w tests/LlmGemini/, tests/Portfolio/, tests/LlmFree/) — d783edd
+- [x] 3.4 `composer stan` czysty dla src/LlmGptLuna/, src/Charts/, zmienionych kontrolerów — d783edd
 
 #### Manual
 
