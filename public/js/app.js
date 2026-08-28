@@ -42,7 +42,12 @@ function renderCvsNavChart(canvasId, chartSeries, palette, opts) {
     });
     allDates.sort();
 
-    var datasets = Object.keys(chartSeries).map(function (label) {
+    // Same order as the datasets array below — legend onHover/onLeave use
+    // this (by datasetIndex) to look the ORIGINAL series key back up in
+    // palette, since dataset.label may have been overridden by opts.labelFor.
+    var seriesLabels = Object.keys(chartSeries);
+
+    var datasets = seriesLabels.map(function (label) {
         var byDate = {};
         chartSeries[label].forEach(function (p) { byDate[p.date] = p.value; });
         return {
@@ -54,6 +59,38 @@ function renderCvsNavChart(canvasId, chartSeries, palette, opts) {
             pointRadius: 0, pointHoverRadius: 3, borderWidth: 2, spanGaps: true,
         };
     });
+
+    // Legend hover → highlight: thicken + fully brighten the hovered line,
+    // fade the rest, so one trajectory can be read out of a dozen overlapping
+    // ones. Looked up fresh on every hover/leave (not cached on the dataset)
+    // because the zoom modal clones this chart's data/options via
+    // cloneForChart(), which strips any key starting with "_" — a cached
+    // "_baseColor" would silently vanish there. Reading from the palette/
+    // seriesLabels closures instead needs no per-dataset state at all, so it
+    // survives that clone for free (functions pass through by reference).
+    function fadedColor(rgba) {
+        var m = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+)\s*)?\)$/.exec(rgba);
+        if (!m) return rgba;
+        var a = m[4] !== undefined ? parseFloat(m[4]) : 1;
+        return 'rgba(' + m[1] + ',' + m[2] + ',' + m[3] + ',' + (a * 0.15) + ')';
+    }
+
+    function setLegendHighlight(chart, hoveredIndex) {
+        chart.data.datasets.forEach(function (ds, i) {
+            var base = palette[seriesLabels[i]] || ds.borderColor;
+            if (hoveredIndex === null) {
+                ds.borderColor = base;
+                ds.borderWidth = 2;
+            } else if (i === hoveredIndex) {
+                ds.borderColor = base;
+                ds.borderWidth = 4;
+            } else {
+                ds.borderColor = fadedColor(base);
+                ds.borderWidth = 1;
+            }
+        });
+        chart.update('none'); // no animation — instant feedback while the mouse moves across the legend
+    }
 
     // Crosshair: a vertical line snapped to the hovered date (same index the
     // tooltip reads) + a horizontal line following the raw mouse Y, so any
@@ -121,7 +158,18 @@ function renderCvsNavChart(canvasId, chartSeries, palette, opts) {
             plugins: {
                 legend: opts.showLegend === false
                     ? { display: false }
-                    : { position: 'top', labels: { color: 'rgba(255,255,255,.7)', boxWidth: 12, font: { size: 11 } } },
+                    : {
+                        position: 'top',
+                        labels: { color: 'rgba(255,255,255,.7)', boxWidth: 12, font: { size: 11 } },
+                        // onClick intentionally left at Chart.js's default (toggles
+                        // that dataset's visibility) — only hover behavior is custom here.
+                        onHover: function (event, legendItem, legendInstance) {
+                            setLegendHighlight(legendInstance.chart, legendItem.datasetIndex);
+                        },
+                        onLeave: function (event, legendItem, legendInstance) {
+                            setLegendHighlight(legendInstance.chart, null);
+                        },
+                    },
                 tooltip: {
                     callbacks: {
                         label: function (item) {

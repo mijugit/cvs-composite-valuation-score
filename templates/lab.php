@@ -127,15 +127,14 @@ $palette = [
     'Portfel Free GPT Luna' => 'rgba(251,146,60,0.9)',
 ];
 
-// Every line on this chart is dashed (change: llm-lab-wallets, user request
-// to unify with the wallet pages' dashed-benchmark convention) — P0-P8 use
-// one rhythm, the four live wallet series a tighter one, so the two
-// categories stay visually distinguishable even where a wallet's brand
-// color happens to coincide with a P-code's (P1/P2/P3/P6 above).
-$dashPatterns = [];
-foreach (array_keys($palette) as $seriesLabel) {
-    $dashPatterns[$seriesLabel] = str_starts_with($seriesLabel, 'Portfel ') ? [3, 2] : [6, 4];
-}
+// Dashed = reference/index line, solid = an actual portfolio being compared
+// (same convention as the wallet pages' S&P 500/Nasdaq 100 lines) — P0 IS
+// that reference point here: config/lab-portfolios.php names it "Benchmark
+// SPY" and its own hypothesis is explicitly null ("control / reference
+// point, not itself a research claim"). P1-P8 and the four wallets are real
+// strategies under comparison, so they stay solid (change: llm-lab-wallets,
+// corrected after first pass dashed everything).
+$dashPatterns = ['P0' => [6, 4]];
 ?>
 
 <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1.25rem;">
