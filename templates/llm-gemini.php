@@ -55,7 +55,7 @@ $tickerHint = static function (
 ?>
 
 <div style="margin-bottom:1.5rem;">
-    <h1 style="margin:0 0 .25rem;">LLM Gemini</h1>
+    <h1 style="margin:0 0 .25rem;">Portfel Free Gemini</h1>
     <p style="color:var(--c-muted);font-size:var(--text-sm);margin:0;">
         Trzeci portfel wirtualny &mdash; ten sam model CVS jako źródło sygnałów i ta sama pełna swoboda
         decyzyjna co w LLM Free, ale wykonawcą jest Gemini, z własnym, natywnym wyszukiwaniem

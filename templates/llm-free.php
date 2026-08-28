@@ -57,7 +57,7 @@ $tickerHint = static function (
 ?>
 
 <div style="margin-bottom:1.5rem;">
-    <h1 style="margin:0 0 .25rem;">LLM Free</h1>
+    <h1 style="margin:0 0 .25rem;">Portfel Free Claude</h1>
     <p style="color:var(--c-muted);font-size:var(--text-sm);margin:0;">
         Drugi portfel wirtualny &mdash; ten sam model CVS jako źródło sygnałów, ale bez twardych reguł:
         model interpretuje dane sam, może się nie zgodzić z rekomendacją, i musi uzasadnić swoje rozumowanie.

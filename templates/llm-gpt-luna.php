@@ -55,7 +55,7 @@ $tickerHint = static function (
 ?>
 
 <div style="margin-bottom:1.5rem;">
-    <h1 style="margin:0 0 .25rem;">LLM GPT Luna</h1>
+    <h1 style="margin:0 0 .25rem;">Portfel Free GPT Luna</h1>
     <p style="color:var(--c-muted);font-size:var(--text-sm);margin:0;">
         Czwarty portfel wirtualny &mdash; ten sam model CVS jako źródło sygnałów i ta sama pełna swoboda
         decyzyjna co w pozostałych portfelach, ale wykonawcą jest GPT (wariant Luna), z własnym,

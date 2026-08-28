@@ -73,7 +73,7 @@ $statusChip = static function (?string $status): string {
 ?>
 
 <div style="margin-bottom:1.5rem;">
-    <h1 style="margin:0 0 .25rem;">Wirtualny Portfel</h1>
+    <h1 style="margin:0 0 .25rem;">Portfel Bazowy Claude</h1>
     <p style="color:var(--c-muted);font-size:var(--text-sm);margin:0;">
         Portfel globalny CVS &mdash; zarządzany autonomicznie przez model CVS + LLM
     </p>
