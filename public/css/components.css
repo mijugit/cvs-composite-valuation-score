@@ -269,12 +269,15 @@
    the 1em×1em content area — the logo itself — at that exact size; the
    frame below is added OUTSIDE it, on purpose, rather than eating into it.
    `vertical-align: baseline` (not `middle`) puts the frame's bottom edge
-   flush with the surrounding text's baseline, per design review. */
+   flush with the surrounding text's baseline, per design review. `<img>`
+   stays `inline-block` (a real image's own baseline IS its bottom margin
+   edge) — giving it `inline-flex` instead, as a shared rule with the
+   fallback once did, makes Chrome synthesize a DIFFERENT baseline for it
+   (flex baseline rules, not replaced-element rules) and the frame sits
+   several px too high. Only the fallback needs flex, to center its
+   initials text. */
 .ticker-logo,
 .ticker-logo-fallback {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
     box-sizing: content-box;
     width: 1em;
     height: 1em;
@@ -285,8 +288,8 @@
     margin-right: .3em;
     flex-shrink: 0;
 }
-.ticker-logo { object-fit: contain; background: var(--c-surface-2, rgba(255,255,255,.06)); }
-.ticker-logo-fallback { color: #fff; }
+.ticker-logo { display: inline-block; object-fit: contain; background: var(--c-surface-2, rgba(255,255,255,.06)); }
+.ticker-logo-fallback { display: inline-flex; align-items: center; justify-content: center; color: #fff; }
 .ticker-logo-fallback__text {
     font-size: .5em;
     font-weight: 600;
