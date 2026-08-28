@@ -286,6 +286,10 @@
     vertical-align: -.25em;
     margin-right: .3em;
     flex-shrink: 0;
+    /* Same lift as .card (var(--shadow), app.css) — reads as raised off the
+       page rather than flat against it, consistent with the module cards
+       around it. */
+    box-shadow: var(--shadow);
 }
 .ticker-logo { display: inline-block; object-fit: contain; background: var(--c-surface-2, rgba(255,255,255,.06)); }
 .ticker-logo-fallback { display: inline-flex; align-items: center; justify-content: center; color: #fff; }
