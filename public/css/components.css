@@ -268,14 +268,13 @@
    `box-sizing: content-box` (overriding the global border-box reset) keeps
    the 1em×1em content area — the logo itself — at that exact size; the
    frame below is added OUTSIDE it, on purpose, rather than eating into it.
-   `vertical-align: baseline` (not `middle`) puts the frame's bottom edge
-   flush with the surrounding text's baseline, per design review. `<img>`
-   stays `inline-block` (a real image's own baseline IS its bottom margin
-   edge) — giving it `inline-flex` instead, as a shared rule with the
-   fallback once did, makes Chrome synthesize a DIFFERENT baseline for it
-   (flex baseline rules, not replaced-element rules) and the frame sits
-   several px too high. Only the fallback needs flex, to center its
-   initials text. */
+   `vertical-align: baseline` puts the frame's bottom edge at the text
+   baseline, but measured live it still sits ~0.25em too high (a plain
+   `<img>`'s own baseline is its bottom margin edge, yet Chrome leaves this
+   gap regardless of inline-block vs inline-flex — reproduced with both).
+   The `-.25em` nudge below closes it to sub-pixel precision at the h1 size
+   this was measured at (cvs.timeflow.fun/analysis, 2026-08-28) and, being
+   in `em`, should track proportionally at other sizes for the same font. */
 .ticker-logo,
 .ticker-logo-fallback {
     box-sizing: content-box;
@@ -284,7 +283,7 @@
     padding: .1em;
     border: 1px solid var(--c-primary);
     border-radius: var(--radius-sm);
-    vertical-align: baseline;
+    vertical-align: -.25em;
     margin-right: .3em;
     flex-shrink: 0;
 }
