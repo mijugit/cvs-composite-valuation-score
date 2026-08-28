@@ -118,3 +118,26 @@ Dwa zgłoszenia po realnym użyciu:
 Zweryfikowane na produkcji: `/analysis/AAPL` → box 32×32px (= `1em` z
 `h1{font-size:32px}`), `/screener` → box ~13.6px (= rozmiar czcionki
 tabeli), 0 broken img na obu.
+
+## Poprawka wizualna: ramka, baseline, kolejność (2026-08-28, commity `f93a214`…`1cc9271`)
+
+Kolejne zgłoszenie usera po zerknięciu na `/analysis/SNDK`:
+1. **Ramka** — `.ticker-logo`/`.ticker-logo-fallback` dostały
+   `border: 1px solid var(--c-primary)` (#4090e0 — to dokładnie ta zmienna,
+   spójne z `.card--result`) i `padding: .1em`, `box-sizing: content-box`
+   (żeby ramka rosła NA ZEWNĄTRZ obrazka 1em, nie zjadała go).
+2. **Wyrównanie do baseline** — `vertical-align: middle` → `baseline`, ale
+   samo `baseline` zostawiało ~0.25em (8px przy h1 32px) luki nad tekstem
+   (zmierzone `Range.getBoundingClientRect()` vs `img.getBoundingClientRect()`
+   na żywej stronie) — dociągnięte `vertical-align: -.25em`. Próba "to pewnie
+   inline-flex na obrazku" (zmiana na inline-block dla samego `<img>`) NIE
+   zmieniła wyniku pomiaru ani o piksel — czysty magic-number fix na
+   podstawie pomiaru, nie teorii.
+3. **Kolejność nagłówka** — `templates/analysis.php`: "Analiza" przeniesione
+   za nazwę firmy: `[logo] TICKER Nazwa Sp. - Analiza` zamiast
+   `Analiza: TICKER Nazwa Sp.`.
+
+Ramka propaguje się automatycznie na screener/portfolio/track-record (ta sama
+klasa CSS), proporcjonalnie mniejsza dzięki `em`. Zweryfikowane na produkcji:
+`diff` obrazek-vs-tekst = 0px na `/analysis/SNDK`, 0 broken img na
+screener (128) / portfolio (51) / track-record (100).
