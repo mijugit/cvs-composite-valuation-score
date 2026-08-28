@@ -77,10 +77,11 @@ class LlmGeminiController
         // matches what the model "remembers" on the next cycle.
         $legendHistory = $walletRepo->getLegendHistory((int) ($walletConfig['legend_context_count'] ?? 10));
 
-        // NAV comparison chart — extended to a third series (LLM Gemini) via
-        // WalletNavChartService's optional 4th constructor param (change:
-        // llm-gemini-wallet). /portfolio and /llm-free omit this param, so
-        // their own chartSeries stay two-wallet + benchmarks, unchanged.
+        // NAV comparison chart — three wallets + both benchmarks. /portfolio
+        // and /llm-free wire the same 4th constructor param (change:
+        // llm-gemini-wallet's optional param, made mandatory-in-practice by
+        // the ticker-logo-cache UX follow-up) so every wallet page shows the
+        // identical comparison.
         $navChart = (new WalletNavChartService(
             new CycleRepository($db),
             new LlmFreeCycleRepository($db),

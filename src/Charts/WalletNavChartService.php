@@ -22,11 +22,10 @@ use CVS\Portfolio\CycleRepository;
  * getLlmValueSeries() already established) plus CVS\Api\, so no single module
  * is a natural owner.
  *
- * The Gemini series is additive and optional (4th constructor param, defaults
- * null) — /portfolio and /llm-free instantiate this class without it, so their
- * own chartSeries stay exactly two-wallet + benchmarks, unchanged. Only
- * /llm-gemini passes an LlmGeminiCycleRepository, getting the full three-way
- * comparison.
+ * The Gemini series is a 4th constructor param, still nullable for test
+ * convenience and backward compatibility, but all three callers (/portfolio,
+ * /llm-free, /llm-gemini) now pass an LlmGeminiCycleRepository — every wallet
+ * page shows the identical three-wallet + two-benchmark comparison.
  *
  * build() is pure (no I/O) and unit-tested directly; fetch() is the thin,
  * untested wiring layer that gathers the raw inputs — same split as

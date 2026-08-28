@@ -28,6 +28,10 @@
 function renderCvsNavChart(canvasId, chartSeries, palette, opts) {
     opts = opts || {};
     var dashedLabels = opts.dashedLabels || [];
+    // Per-label dash pattern (e.g. distinguishing a dashed benchmark from a
+    // dash-dotted one) — checked first; dashedLabels stays the simpler
+    // single-pattern shortcut existing callers (e.g. /lab) already use.
+    var dashPatterns = opts.dashPatterns || {};
 
     var ctx = document.getElementById(canvasId);
     if (!ctx || typeof Chart === 'undefined') return null;
@@ -46,7 +50,7 @@ function renderCvsNavChart(canvasId, chartSeries, palette, opts) {
             data: allDates.map(function (d) { return byDate.hasOwnProperty(d) ? byDate[d] : null; }),
             borderColor: palette[label] || 'rgba(255,255,255,0.6)',
             backgroundColor: 'transparent',
-            borderDash: dashedLabels.indexOf(label) !== -1 ? [6, 4] : [],
+            borderDash: dashPatterns[label] || (dashedLabels.indexOf(label) !== -1 ? [6, 4] : []),
             pointRadius: 0, pointHoverRadius: 3, borderWidth: 2, spanGaps: true,
         };
     });
@@ -103,6 +107,10 @@ function renderCvsNavChart(canvasId, chartSeries, palette, opts) {
         },
     };
 
+    var yScale = { grid: { color: 'rgba(128,128,128,.08)' }, ticks: { color: 'rgba(255,255,255,.45)', font: { size: 10 } } };
+    if (typeof opts.yMin === 'number') yScale.min = opts.yMin;
+    if (typeof opts.yMax === 'number') yScale.max = opts.yMax;
+
     return new Chart(ctx.getContext('2d'), {
         type: 'line',
         data: { labels: allDates, datasets: datasets },
@@ -111,7 +119,9 @@ function renderCvsNavChart(canvasId, chartSeries, palette, opts) {
             animation: false, responsive: true, maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
             plugins: {
-                legend: { position: 'top', labels: { color: 'rgba(255,255,255,.7)', boxWidth: 12, font: { size: 11 } } },
+                legend: opts.showLegend === false
+                    ? { display: false }
+                    : { position: 'top', labels: { color: 'rgba(255,255,255,.7)', boxWidth: 12, font: { size: 11 } } },
                 tooltip: {
                     callbacks: {
                         label: function (item) {
@@ -122,7 +132,7 @@ function renderCvsNavChart(canvasId, chartSeries, palette, opts) {
             },
             scales: {
                 x: { grid: { color: 'rgba(128,128,128,.08)' }, ticks: { color: 'rgba(255,255,255,.45)', font: { size: 10 } } },
-                y: { grid: { color: 'rgba(128,128,128,.08)' }, ticks: { color: 'rgba(255,255,255,.45)', font: { size: 10 } } },
+                y: yScale,
             },
         },
     });

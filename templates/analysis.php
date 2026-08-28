@@ -2210,61 +2210,22 @@
             </script>
             <?php endif; ?>
 
-            <?php if ($hasTrajChart): ?>
+            <?php if ($hasTrajChart):
+                // change: ticker-logo-cache UX follow-up — same renderCvsNavChart()
+                // the wallet NAV charts use, instead of a one-off Chart.js config
+                // with a visible dot per day (the "kropki zaciemniają obraz"
+                // complaint at 90 points). The zoom wrapper above already targets
+                // #trajectory-chart by id, so it keeps working unchanged.
+                $trajectoryChartSeries = ['CVS Swing' => array_map(
+                    static fn(array $p): array => ['date' => (string) $p['date'], 'value' => (float) $p['cvs']],
+                    $trajectory['points']
+                )];
+                $trajectoryPalette = ['CVS Swing' => 'rgba(79,142,247,0.9)'];
+            ?>
             <script>
             window.addEventListener('load', function () {
-                if (typeof Chart === 'undefined') return;
-                var tCtx = document.getElementById('trajectory-chart');
-                if (!tCtx) return;
-
-                var points = <?= json_encode($trajectory['points']) ?>;
-                if (!points.length) return;
-
-                var labels = points.map(function(p){
-                    var d = new Date(p.date);
-                    return d.toLocaleDateString('pl-PL', { day: '2-digit', month: 'short' });
-                });
-                var data = points.map(function(p){ return parseFloat(p.cvs); });
-
-                new Chart(tCtx.getContext('2d'), {
-                    type: 'line',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            label: 'CVS Swing',
-                            data: data,
-                            borderColor: 'rgba(79, 142, 247, 0.9)',
-                            backgroundColor: 'transparent',
-                            borderWidth: 2,
-                            pointRadius: 2,
-                            tension: 0.15,
-                        }],
-                    },
-                    options: {
-                        animation: false,
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { display: false },
-                            tooltip: {
-                                callbacks: {
-                                    label: function(c){ return 'CVS ' + c.parsed.y.toFixed(1); },
-                                },
-                            },
-                        },
-                        scales: {
-                            x: {
-                                grid: { color: 'rgba(128,128,128,.08)' },
-                                ticks: { color: 'rgba(255,255,255,0.45)', font: { size: 10 }, maxRotation: 45 },
-                            },
-                            y: {
-                                min: 0,
-                                max: 100,
-                                grid: { color: 'rgba(128,128,128,.08)' },
-                                ticks: { color: 'rgba(255,255,255,0.45)', font: { size: 10 }, stepSize: 25 },
-                            },
-                        },
-                    },
+                renderCvsNavChart('trajectory-chart', <?= json_encode($trajectoryChartSeries) ?>, <?= json_encode($trajectoryPalette) ?>, {
+                    yMin: 0, yMax: 100, showLegend: false,
                 });
             });
             </script>

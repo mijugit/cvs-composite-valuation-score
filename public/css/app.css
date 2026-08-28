@@ -256,6 +256,18 @@ button, a { -webkit-tap-highlight-color: rgba(64, 144, 224, .2); }
 .screener-filter-card  { position: relative; z-index: 2; margin-bottom: 1.5rem; padding: 1.25rem 1.5rem; }
 .screener-results-card { position: relative; z-index: 1; }
 
+/* change: ticker-logo-cache (filter-panel collapse follow-up) — the whole
+   filter panel is now itself wrapped in the shared .accordion component
+   (collapsed by default), and .accordion sets `overflow: hidden` to clip
+   square content to a rounded-corner ancestor it doesn't have here. Left
+   as-is, it would ALSO clip .ac-dropdown (position:absolute, extends below
+   the search input) the same way the codebase already documented above for
+   the analysis/screener cards' own z-index stacking fix — same bug class,
+   different ancestor. This accordion instance has no rounded background of
+   its own to protect (that's .screener-filter-card's job), so overriding
+   back to visible costs nothing. */
+.screener-filters-accordion { overflow: visible; }
+
 /* Bounded, independently-scrolling box for the table only (not the "N
    spółek" count above it). This is what makes the sticky header (below)
    actually work: `position: sticky` sticks to the nearest ancestor that

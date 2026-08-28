@@ -39,61 +39,51 @@ $resultChip = static function (string $result): string {
     <?php endforeach; ?>
 </div>
 
-<!-- CVS history chart -->
+<!-- CVS history chart — same renderCvsNavChart() the wallet NAV charts use
+     (change: ticker-logo-cache UX follow-up), instead of a one-off Chart.js
+     config: dots-only-on-hover instead of a fat dot per day (the "kropki
+     zaciemniają obraz" complaint), plus the same click-to-zoom modal already
+     wired on /analysis. -->
 <?php if (!empty($all)): ?>
+<?php
+    $cvsHistorySeries = ['Swing' => [], 'Fundamentalny' => []];
+    foreach ($all as $row) {
+        $date = (string) $row['score_date'];
+        if ($row['cvs_swing'] !== null) {
+            $cvsHistorySeries['Swing'][] = ['date' => $date, 'value' => (float) $row['cvs_swing']];
+        }
+        if ($row['cvs_fund'] !== null) {
+            $cvsHistorySeries['Fundamentalny'][] = ['date' => $date, 'value' => (float) $row['cvs_fund']];
+        }
+    }
+    $cvsHistoryPalette = ['Swing' => 'rgba(64,144,224,0.9)', 'Fundamentalny' => 'rgba(250,204,21,0.9)'];
+?>
 <div class="card" style="margin-bottom:1.5rem;">
     <h3 style="margin-bottom:.75rem;font-size:var(--text-base);">Historia wyników CVS</h3>
-    <div style="position:relative;height:220px;">
+    <div class="chart-zoom-target" style="position:relative;height:220px;"
+         data-zoom-canvas="cvs-history-chart" data-zoom-title="Historia wyników CVS — <?= htmlspecialchars($ticker) ?>">
+        <span class="chart-zoom-target__hint" aria-hidden="true">🔍</span>
         <canvas id="cvs-history-chart"></canvas>
     </div>
 </div>
+
+<!-- Chart zoom modal (desktop only — see .chart-zoom-target click handler in
+     app.js). Moved to a direct <body> child by that same handler. -->
+<div id="chart-zoom-modal" class="ai-modal" hidden>
+    <div class="ai-modal__inner chart-zoom-modal__inner">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:1rem;">
+            <h3 id="chart-zoom-title" style="margin:0;font-size:var(--text-lg);">—</h3>
+            <button id="chart-zoom-close" class="btn btn--ghost btn--sm" type="button">✕</button>
+        </div>
+        <div class="chart-zoom-modal__canvas-wrap">
+            <canvas id="chart-zoom-canvas"></canvas>
+        </div>
+    </div>
+</div>
+
 <script>
 window.addEventListener('load', function () {
-    if (typeof Chart === 'undefined') return;
-    var ctx = document.getElementById('cvs-history-chart');
-    if (!ctx) return;
-
-    var data = <?= json_encode(array_values($all)) ?>;
-    var labels  = data.map(function(r){ return r.score_date; });
-    var swing   = data.map(function(r){ return r.cvs_swing !== null ? parseFloat(r.cvs_swing) : null; });
-    var fund    = data.map(function(r){ return r.cvs_fund  !== null ? parseFloat(r.cvs_fund)  : null; });
-
-    new Chart(ctx.getContext('2d'), {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    label: 'Swing',
-                    data: swing,
-                    borderColor: 'rgba(64, 144, 224, 0.9)',
-                    backgroundColor: 'transparent',
-                    pointRadius: 4, borderWidth: 2, spanGaps: true,
-                },
-                {
-                    label: 'Fundamentalny',
-                    data: fund,
-                    borderColor: 'rgba(250, 204, 21, 0.9)',
-                    backgroundColor: 'transparent',
-                    pointRadius: 4, borderWidth: 2, spanGaps: true,
-                },
-            ],
-        },
-        options: {
-            animation: false, responsive: true, maintainAspectRatio: false,
-            plugins: {
-                legend: { position: 'top', labels: { color: 'rgba(255,255,255,.7)', boxWidth: 12, font: { size: 11 } } },
-            },
-            scales: {
-                x: { grid: { color: 'rgba(128,128,128,.08)' }, ticks: { color: 'rgba(255,255,255,.45)', font: { size: 10 } } },
-                y: {
-                    min: 0, max: 100,
-                    grid: { color: 'rgba(128,128,128,.08)' },
-                    ticks: { color: 'rgba(255,255,255,.45)', font: { size: 10 } },
-                },
-            },
-        },
-    });
+    renderCvsNavChart('cvs-history-chart', <?= json_encode($cvsHistorySeries) ?>, <?= json_encode($cvsHistoryPalette) ?>, { yMin: 0, yMax: 100 });
 });
 </script>
 <?php endif; ?>

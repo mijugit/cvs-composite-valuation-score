@@ -15,8 +15,11 @@ $walletChartPalette = [
     'LLM Bazowy' => 'rgba(64,144,224,0.9)',
     'LLM Free'   => 'rgba(250,204,21,0.9)',
     'LLM Gemini' => 'rgba(52,211,153,0.9)',
+    // Both benchmarks share a neutral grey family (var(--c-muted) territory)
+    // so they read as "reference lines", not competing wallets — the three
+    // wallet lines above keep the saturated colours that actually matter.
     'S&P 500'    => 'rgba(148,163,184,0.85)',
-    'Nasdaq 100' => 'rgba(167,139,250,0.9)',
+    'Nasdaq 100' => 'rgba(100,116,139,0.85)',
 ];
 ?>
 
@@ -49,7 +52,9 @@ $walletChartPalette = [
 
 <script>
 window.addEventListener('load', function () {
-    renderCvsNavChart('wallet-nav-chart', <?= json_encode($chartSeries) ?>, <?= json_encode($walletChartPalette) ?>);
+    renderCvsNavChart('wallet-nav-chart', <?= json_encode($chartSeries) ?>, <?= json_encode($walletChartPalette) ?>, {
+        dashPatterns: { 'S&P 500': [6, 4], 'Nasdaq 100': [6, 3, 1, 3] },
+    });
 });
 </script>
 <?php endif; ?>

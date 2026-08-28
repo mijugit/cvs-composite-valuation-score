@@ -41,6 +41,14 @@ $recoOptions = [
 $hasAdvancedFilter = $filter_sector !== null || $filter_market !== null || $filter_atr !== null
     || $filter_min_swing > 0 || $filter_near_boundary || $filter_fv_only;
 
+// The whole panel (search + basic filters, not just "Więcej filtrów") is
+// itself collapsed by default — screener is the high-frequency page, most
+// visits don't touch filters at all, and the panel ate a full screen's
+// worth of space before a single result row was visible. Same auto-expand
+// principle as $hasAdvancedFilter above: any filter already active (basic
+// or advanced) opens the panel so it's never silently hiding an active state.
+$hasAnyFilter = $filter_reco !== null || $filter_signal !== null || $hasAdvancedFilter;
+
 $signalLabels = [
     'strong'    => '⭐⭐ Silny sygnał',
     'watchlist' => '⭐ Obserwuj',
@@ -265,8 +273,16 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
     <?php endif; ?>
 </div>
 
-<!-- Filter panel -->
+<!-- Filter panel — collapsed by default (see $hasAnyFilter above) -->
 <div class="card screener-filter-card">
+    <div class="accordion screener-filters-accordion">
+        <button type="button" class="accordion__toggle"
+                aria-expanded="<?= $hasAnyFilter ? 'true' : 'false' ?>"
+                aria-controls="screener-filters-body">
+            <span class="accordion__title">Filtry</span>
+            <span class="accordion__arrow"><?= $hasAnyFilter ? '▲' : '▼' ?></span>
+        </button>
+        <div class="accordion__body" id="screener-filters-body" <?= $hasAnyFilter ? '' : 'hidden' ?>>
     <form method="GET" action="/screener" class="screener-filters">
 
         <div class="screener-filters__search">
@@ -390,6 +406,8 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
             </div>
         </div>
     </form>
+        </div>
+    </div>
 </div>
 
 <!-- Results -->

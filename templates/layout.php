@@ -40,8 +40,8 @@ $asset = static function (string $path): string {
             <span class="nav-toggle__bar"></span>
         </button>
         <nav class="site-nav" id="site-nav">
-            <a href="/dashboard">Panel</a>
             <a href="/screener">Screener</a>
+            <a href="/dashboard">Analizy</a>
             <div class="admin-menu">
                 <button class="admin-menu__trigger" type="button" aria-haspopup="true">
                     Portfele <span class="admin-menu__caret">▾</span>
