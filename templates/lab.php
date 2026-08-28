@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 /** @var array<string, array<string, mixed>> $portfolioDefs code => config row (name, rules, hypothesis) */
 /** @var array<string, array<string, mixed>> $portfolios code => DB row (started_at, cash, ...) */
-/** @var array<string, list<array{date: string, value: float}>> $chartSeries code (+ 'LLM') => normalised series */
+/** @var array<string, list<array{date: string, value: float}>> $chartSeries code (+ four "Portfel ..." wallet keys) => normalised series */
 /** @var array<string, array<string, mixed>> $metrics code => computed metrics */
 /** @var array<string, array<string, array{quantity: float, avg_entry_price: float, entry_date: string}>> $positions code => ticker => position */
 /** @var string|null $d0 */
@@ -117,8 +117,25 @@ $palette = [
     'P6' => 'rgba(251,146,60,0.9)',
     'P7' => 'rgba(34,211,238,0.9)',
     'P8' => 'rgba(244,114,182,0.9)',
-    'LLM' => 'rgba(255,255,255,0.55)',
+    // Same brand colors as the wallet pages' own NAV chart
+    // (templates/partials/wallet-nav-chart.php's $walletChartPalette) — a
+    // line here should read as the same portfolio when you switch pages
+    // (change: llm-lab-wallets).
+    'Portfel Bazowy Claude' => 'rgba(64,144,224,0.9)',
+    'Portfel Free Claude'   => 'rgba(250,204,21,0.9)',
+    'Portfel Free Gemini'   => 'rgba(52,211,153,0.9)',
+    'Portfel Free GPT Luna' => 'rgba(251,146,60,0.9)',
 ];
+
+// Every line on this chart is dashed (change: llm-lab-wallets, user request
+// to unify with the wallet pages' dashed-benchmark convention) — P0-P8 use
+// one rhythm, the four live wallet series a tighter one, so the two
+// categories stay visually distinguishable even where a wallet's brand
+// color happens to coincide with a P-code's (P1/P2/P3/P6 above).
+$dashPatterns = [];
+foreach (array_keys($palette) as $seriesLabel) {
+    $dashPatterns[$seriesLabel] = str_starts_with($seriesLabel, 'Portfel ') ? [3, 2] : [6, 4];
+}
 ?>
 
 <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1.25rem;">
@@ -138,8 +155,11 @@ $palette = [
     (pierwsza sesja tygodnia). Stopy ochronne tam, gdzie występują (P3, P4), są
     sprawdzane <strong>codziennie</strong> i mogą wyrzucić pozycję z portfela
     niezależnie od cyklu rebalansu.
-    Linia LLM (istniejący <a href="/portfolio">Portfel</a>) pokazana wyłącznie
-    poglądowo — to inny mechanizm decyzyjny, poza tym eksperymentem.
+    Cztery linie <a href="/portfolio">Portfel Bazowy Claude</a>,
+    <a href="/llm-free">Portfel Free Claude</a>, <a href="/llm-gemini">Portfel
+    Free Gemini</a> i <a href="/llm-gpt-luna">Portfel Free GPT Luna</a>
+    pokazane wyłącznie poglądowo — to inny mechanizm decyzyjny (autonomiczne
+    portfele LLM), poza tym eksperymentem.
 </p>
 
 <p style="color:var(--c-muted);margin-bottom:1.25rem;max-width:70ch;font-size:var(--text-sm);">
@@ -188,8 +208,7 @@ $palette = [
 <script>
 window.addEventListener('load', function () {
     renderCvsNavChart('lab-nav-chart', <?= json_encode($chartSeries) ?>, <?= json_encode($palette) ?>, {
-        dashedLabels: ['LLM'],
-        labelFor: function (code) { return code === 'LLM' ? 'LLM (poglądowo)' : code; },
+        dashPatterns: <?= json_encode($dashPatterns) ?>,
     });
 });
 </script>

@@ -12,10 +12,12 @@ use CVS\Core\Response;
 /**
  * Read-only /lab view controller (change: cvs-experimental-portfolios).
  *
- * Renders the NAV chart, metrics table, and hypothesis cards for the seven
- * deterministic paper portfolios (P0-P6), plus a for-reference LLM series
- * pulled read-only from the (separate) Portfolio module's rebalance_cycle
- * table. Never touches CVS\Portfolio\* classes — see LabRepository::getLlmValueSeries().
+ * Renders the NAV chart, metrics table, and hypothesis cards for the nine
+ * deterministic paper portfolios (P0-P8), plus four for-reference LLM wallet
+ * series pulled read-only from the (separate) Portfolio/LlmFree/LlmGemini/
+ * LlmGptLuna modules' *_cycle tables (change: llm-lab-wallets). Never touches
+ * any CVS\Portfolio, CVS\LlmFree, CVS\LlmGemini, or CVS\LlmGptLuna class —
+ * see LabRepository::getLlmValueSeries() and its three siblings.
  */
 class LabController
 {
@@ -44,13 +46,19 @@ class LabController
             }
         }
 
-        $llmSeries = $d0 !== null ? $repo->getLlmValueSeries($d0) : [];
+        $llmSeries         = $d0 !== null ? $repo->getLlmValueSeries($d0) : [];
+        $llmFreeSeries     = $d0 !== null ? $repo->getLlmFreeValueSeries($d0) : [];
+        $llmGeminiSeries   = $d0 !== null ? $repo->getLlmGeminiValueSeries($d0) : [];
+        $llmGptLunaSeries  = $d0 !== null ? $repo->getLlmGptLunaValueSeries($d0) : [];
 
         $chartSeries = [];
         foreach ($codes as $code) {
             $chartSeries[$code] = LabMetrics::normaliseToBase100($navSeries[$code] ?? []);
         }
-        $chartSeries['LLM'] = LabMetrics::normaliseToBase100($llmSeries, 'value');
+        $chartSeries['Portfel Bazowy Claude'] = LabMetrics::normaliseToBase100($llmSeries, 'value');
+        $chartSeries['Portfel Free Claude']   = LabMetrics::normaliseToBase100($llmFreeSeries, 'value');
+        $chartSeries['Portfel Free Gemini']   = LabMetrics::normaliseToBase100($llmGeminiSeries, 'value');
+        $chartSeries['Portfel Free GPT Luna'] = LabMetrics::normaliseToBase100($llmGptLunaSeries, 'value');
 
         $p0Return = LabMetrics::totalReturnPct($navSeries['P0'] ?? []);
         $p1Return = LabMetrics::totalReturnPct($navSeries['P1'] ?? []);

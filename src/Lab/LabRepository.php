@@ -429,4 +429,77 @@ class LabRepository
         }
         return $out;
     }
+
+    /**
+     * Same read-only, for-reference pattern as getLlmValueSeries(), against the
+     * (separate) LLM Free wallet's llm_free_cycle table (change: llm-lab-wallets —
+     * literal structural clone, identical columns, no touch of CVS\LlmFree\*).
+     *
+     * @return list<array{date: string, value: float}>
+     */
+    public function getLlmFreeValueSeries(string $sinceDate): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT cycle_date, portfolio_value_usd FROM llm_free_cycle
+             WHERE status = 'completed' AND portfolio_value_usd IS NOT NULL AND cycle_date >= ?
+             ORDER BY cycle_date ASC"
+        );
+        $stmt->execute([$sinceDate]);
+        $rows = $stmt->fetchAll() ?: [];
+
+        $out = [];
+        foreach ($rows as $r) {
+            $out[] = ['date' => (string) $r['cycle_date'], 'value' => (float) $r['portfolio_value_usd']];
+        }
+        return $out;
+    }
+
+    /**
+     * Same read-only, for-reference pattern as getLlmValueSeries(), against the
+     * (separate) LLM Gemini wallet's llm_gemini_cycle table (change: llm-lab-wallets —
+     * literal structural clone, identical columns, no touch of CVS\LlmGemini\*).
+     *
+     * @return list<array{date: string, value: float}>
+     */
+    public function getLlmGeminiValueSeries(string $sinceDate): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT cycle_date, portfolio_value_usd FROM llm_gemini_cycle
+             WHERE status = 'completed' AND portfolio_value_usd IS NOT NULL AND cycle_date >= ?
+             ORDER BY cycle_date ASC"
+        );
+        $stmt->execute([$sinceDate]);
+        $rows = $stmt->fetchAll() ?: [];
+
+        $out = [];
+        foreach ($rows as $r) {
+            $out[] = ['date' => (string) $r['cycle_date'], 'value' => (float) $r['portfolio_value_usd']];
+        }
+        return $out;
+    }
+
+    /**
+     * Same read-only, for-reference pattern as getLlmValueSeries(), against the
+     * (separate) LLM GPT Luna wallet's llm_gpt_luna_cycle table (change:
+     * llm-lab-wallets — literal structural clone, identical columns, no touch of
+     * CVS\LlmGptLuna\*).
+     *
+     * @return list<array{date: string, value: float}>
+     */
+    public function getLlmGptLunaValueSeries(string $sinceDate): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT cycle_date, portfolio_value_usd FROM llm_gpt_luna_cycle
+             WHERE status = 'completed' AND portfolio_value_usd IS NOT NULL AND cycle_date >= ?
+             ORDER BY cycle_date ASC"
+        );
+        $stmt->execute([$sinceDate]);
+        $rows = $stmt->fetchAll() ?: [];
+
+        $out = [];
+        foreach ($rows as $r) {
+            $out[] = ['date' => (string) $r['cycle_date'], 'value' => (float) $r['portfolio_value_usd']];
+        }
+        return $out;
+    }
 }
