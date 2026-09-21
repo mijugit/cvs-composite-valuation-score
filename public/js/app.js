@@ -1903,6 +1903,13 @@ function renderCvsNavChart(canvasId, chartSeries, palette, opts) {
             ? '<div class="ticker-link-menu__empty">Limit ' + MAX_LINKS + ' linków osiągnięty</div>'
             : '<button type="button" class="ticker-link-menu__add">+ Dodaj link…</button>';
 
+        // "Zmień sektor" — admin-only (change: cvs-screener-sector-quickpick).
+        // Same display-only gate as the ✕ remove buttons above: the real
+        // check is TickersController::requireAdmin() on the server.
+        if (isAdmin) {
+            html += '<button type="button" class="ticker-link-menu__sector">🏷 Zmień sektor…</button>';
+        }
+
         menu.innerHTML = html;
     }
 
@@ -1947,6 +1954,10 @@ function renderCvsNavChart(canvasId, chartSeries, palette, opts) {
         }
         if (e.target.closest('.ticker-link-menu__add')) {
             openAddModal();
+            return;
+        }
+        if (e.target.closest('.ticker-link-menu__sector')) {
+            openSectorModal();
         }
     });
 
@@ -2047,4 +2058,167 @@ function renderCvsNavChart(canvasId, chartSeries, palette, opts) {
             // Silent — data-links stays as-is; the next successful call reconciles it.
         }
     }
+
+    // ------------------------------------------------------------------
+    // "Zmień sektor" — admin-only peer-group quick-pick (change:
+    // cvs-screener-sector-quickpick). Submits to the same
+    // TickersController::setOverride endpoint/validation as the
+    // /admin/tickers "Grupy porównawcze" form — this modal is a faster path
+    // to the identical assignment, not a different mechanism.
+    // ------------------------------------------------------------------
+
+    const bucketOptions = (() => {
+        try {
+            const parsed = JSON.parse(table.dataset.bucketOptions || '[]');
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            return [];
+        }
+    })();
+    const minSampleCount = parseInt(table.dataset.minSampleCount, 10) || 0;
+
+    const sectorModal       = document.getElementById('ticker-sector-modal');
+    const sectorTickerEl    = document.getElementById('ticker-sector-ticker');
+    const sectorCurrentEl   = document.getElementById('ticker-sector-current');
+    const sectorFilterInput = document.getElementById('ticker-sector-filter');
+    const sectorListEl      = document.getElementById('ticker-sector-list');
+    const sectorNewWrap     = document.getElementById('ticker-sector-new-wrap');
+    const sectorNewInput    = document.getElementById('ticker-sector-new-input');
+    const sectorReasonInput = document.getElementById('ticker-sector-reason-input');
+    const sectorReviewInput = document.getElementById('ticker-sector-review-input');
+    const sectorErrorEl     = document.getElementById('ticker-sector-error');
+    const sectorSubmitBtn   = document.getElementById('ticker-sector-submit');
+    const sectorCancelBtn   = document.getElementById('ticker-sector-cancel');
+
+    let selectedBucket = null; // string key, or '__new__', or null (nothing picked yet)
+
+    function renderSectorList(filterText) {
+        if (!sectorListEl) return;
+        const q = (filterText || '').trim().toUpperCase();
+
+        let html = '';
+        bucketOptions.forEach(b => {
+            if (q && b.key.toUpperCase().indexOf(q) === -1) return;
+            const below  = b.count < minSampleCount;
+            const active = selectedBucket === b.key;
+            html += '<button type="button" class="ticker-sector-list__item' + (active ? ' ticker-sector-list__item--active' : '') + '" data-bucket="' + esc(b.key) + '">'
+                + '<span>' + esc(b.key) + '</span>'
+                + '<span class="ticker-sector-list__meta">n=' + b.count + (below ? ' · poniżej progu' : '') + (b.custom ? ' · własna' : '') + '</span>'
+                + '</button>';
+        });
+
+        const newActive = selectedBucket === '__new__';
+        html += '<button type="button" class="ticker-sector-list__item ticker-sector-list__item--new' + (newActive ? ' ticker-sector-list__item--active' : '') + '" data-bucket="__new__">➕ Nowa grupa…</button>';
+
+        sectorListEl.innerHTML = html;
+    }
+
+    function openSectorModal() {
+        if (!sectorModal) return;
+        hideMenu();
+
+        const ticker = currentTicker;
+        selectedBucket = null;
+
+        const row      = tbody.querySelector('tr[data-ticker="' + CSS.escape(ticker || '') + '"]');
+        const industry = row?.dataset.industry || '—';
+        const override = row?.dataset.peerBucket || '';
+
+        if (sectorTickerEl)  sectorTickerEl.textContent = ticker || '';
+        if (sectorCurrentEl) {
+            sectorCurrentEl.textContent = override
+                ? 'Yahoo: ' + industry + '  →  obecnie: ' + override
+                : 'Yahoo: ' + industry + ' (bez nadpisania)';
+        }
+        if (sectorFilterInput) sectorFilterInput.value = '';
+        if (sectorNewWrap)     sectorNewWrap.hidden = true;
+        if (sectorNewInput)    sectorNewInput.value = '';
+        if (sectorReasonInput) sectorReasonInput.value = '';
+        if (sectorReviewInput) sectorReviewInput.value = '';
+        if (sectorErrorEl)     { sectorErrorEl.style.display = 'none'; sectorErrorEl.textContent = ''; }
+
+        renderSectorList('');
+        sectorModal.hidden = false;
+        setTimeout(() => sectorFilterInput?.focus(), 50);
+    }
+
+    function closeSectorModal() {
+        if (sectorModal) sectorModal.hidden = true;
+    }
+
+    function showSectorError(msg) {
+        if (!sectorErrorEl) return;
+        sectorErrorEl.textContent = msg;
+        sectorErrorEl.style.display = 'block';
+    }
+
+    sectorFilterInput?.addEventListener('input', () => renderSectorList(sectorFilterInput.value));
+
+    sectorListEl?.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-bucket]');
+        if (!btn) return;
+        selectedBucket = btn.dataset.bucket;
+        if (sectorNewWrap) sectorNewWrap.hidden = selectedBucket !== '__new__';
+        if (selectedBucket === '__new__') sectorNewInput?.focus();
+        renderSectorList(sectorFilterInput?.value || '');
+    });
+
+    sectorCancelBtn?.addEventListener('click', closeSectorModal);
+    sectorModal?.addEventListener('click', (e) => {
+        if (e.target === sectorModal) closeSectorModal();
+    });
+
+    sectorSubmitBtn?.addEventListener('click', async () => {
+        const ticker = currentTicker;
+        if (!ticker) return;
+
+        if (!selectedBucket) { showSectorError('Wybierz grupę z listy.'); return; }
+
+        let bucketKey = selectedBucket;
+        if (selectedBucket === '__new__') {
+            bucketKey = (sectorNewInput?.value ?? '').trim();
+            if (!bucketKey) { showSectorError('Podaj nazwę nowej grupy.'); return; }
+        }
+
+        const reason = (sectorReasonInput?.value ?? '').trim();
+        if (!reason) { showSectorError('Uzasadnienie jest wymagane.'); return; }
+
+        const review = (sectorReviewInput?.value ?? '').trim();
+        const csrf   = getCsrf();
+
+        sectorSubmitBtn.disabled = true;
+        try {
+            const resp = await fetch('/admin/tickers/peer-group', {
+                method:  'POST',
+                headers: {
+                    'Content-Type':     'application/x-www-form-urlencoded',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-Token':     csrf,
+                },
+                body: new URLSearchParams({
+                    ticker,
+                    bucket_key: bucketKey,
+                    reason,
+                    review_date: review,
+                    _csrf: csrf,
+                }),
+            });
+            const data = await resp.json();
+            if (!data.ok) { showSectorError(data.error || 'Nie udało się zapisać grupy.'); return; }
+
+            const row = tbody.querySelector('tr[data-ticker="' + CSS.escape(ticker) + '"]');
+            if (row) row.dataset.peerBucket = data.bucket_key || bucketKey;
+            closeSectorModal();
+        } catch (e) {
+            showSectorError('Błąd połączenia.');
+        } finally {
+            sectorSubmitBtn.disabled = false;
+        }
+    });
+
+    [sectorReasonInput, sectorNewInput].forEach(input => {
+        input?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') sectorSubmitBtn?.click();
+        });
+    });
 }());

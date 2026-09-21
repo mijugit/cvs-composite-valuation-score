@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace CVS\Screener;
 
 use CVS\CVS\Valuation\MedianResolver;
+use CVS\CVS\Valuation\PeerBucketOverrideRepository;
+use CVS\CVS\Valuation\PeerGroupOptions;
 use CVS\CVS\Valuation\PeerMedianRepository;
 use CVS\CVS\Valuation\PeerCoverage;
 use CVS\Auth\AuthController;
@@ -91,6 +93,25 @@ class ScreenerController
         $isAdmin       = (bool) ($_SESSION['is_admin'] ?? false);
         $currentUserId = (int) ($_SESSION['user_id'] ?? 0);
 
+        // Peer-group data for the same menu's admin-only "Zmień sektor" item
+        // (change: cvs-screener-sector-quickpick). Same display-only caveat
+        // as $isAdmin above — a forged request still hits
+        // TickersController::requireAdmin() server-side. Loaded only for an
+        // admin session: the bucket list and per-ticker overrides are
+        // /admin/tickers's own editorial data, not something every screener
+        // visitor needs pulled on every page view.
+        $bucketOptions = [];
+        $overrideMap   = [];
+        if ($isAdmin) {
+            $overrideRepo   = new PeerBucketOverrideRepository(Database::connection());
+            $bucketOptions  = PeerGroupOptions::build(
+                (string) ($this->cvsConfig['model_version'] ?? ''),
+                new PeerMedianRepository(Database::connection()),
+                $overrideRepo
+            );
+            $overrideMap = $overrideRepo->findBucketMap();
+        }
+
         // Build held-ticker map for screener badge enrichment (S-04).
         $portfolioRepo  = new PortfolioRepository(Database::connection());
         $holdings       = $portfolioRepo->getCurrentHoldings();
@@ -114,6 +135,9 @@ class ScreenerController
             'heldTickersMap'   => $heldTickersMap,
             'isAdmin'          => $isAdmin,
             'currentUserId'    => $currentUserId,
+            'bucketOptions'    => $bucketOptions,
+            'overrideMap'      => $overrideMap,
+            'minSampleCount'   => (int) ($this->cvsConfig['peer_group']['min_sample_count'] ?? 5),
             // Age badge: findAllLatest() has no upper bound on snapshot age, so a
             // ticker whose rescore keeps failing presents month-old numbers that
             // look identical to today's. Nothing is hidden — the age is just made

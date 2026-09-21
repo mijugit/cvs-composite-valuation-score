@@ -24,6 +24,9 @@ use CVS\Screener\SnapshotFreshness;
 /** @var array<string, true> $heldTickersMap */
 /** @var bool $isAdmin */
 /** @var int $currentUserId */
+/** @var array<int, array{key: string, count: int, custom: bool}> $bucketOptions */
+/** @var array<string, string> $overrideMap */
+/** @var int $minSampleCount */
 
 $recoOptions = [
     '⬆⬆ SILNE KUPUJ',
@@ -429,7 +432,9 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
     </p>
     <div class="screener-table-scroll">
     <table class="pillar-table" id="screener-table" style="width:100%;"
-           data-is-admin="<?= $isAdmin ? '1' : '0' ?>" data-user-id="<?= (int) $currentUserId ?>">
+           data-is-admin="<?= $isAdmin ? '1' : '0' ?>" data-user-id="<?= (int) $currentUserId ?>"
+           data-bucket-options="<?= htmlspecialchars(json_encode($bucketOptions, JSON_UNESCAPED_UNICODE) ?: '[]', ENT_QUOTES) ?>"
+           data-min-sample-count="<?= (int) $minSampleCount ?>">
         <thead>
             <tr>
                 <th scope="col"><?= $sortLink('ticker', 'Ticker') ?></th>
@@ -465,7 +470,9 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
         <tr class="<?= isset($heldTickersMap[(string) $row['ticker']]) ? 'tr--held' : '' ?>"
             data-ticker="<?= htmlspecialchars((string) $row['ticker']) ?>"
             data-company="<?= htmlspecialchars((string) ($row['company_name'] ?? '')) ?>"
-            data-links="<?= htmlspecialchars(json_encode($row['ticker_links'] ?? [], JSON_UNESCAPED_UNICODE) ?: '[]', ENT_QUOTES) ?>">
+            data-links="<?= htmlspecialchars(json_encode($row['ticker_links'] ?? [], JSON_UNESCAPED_UNICODE) ?: '[]', ENT_QUOTES) ?>"
+            data-industry="<?= htmlspecialchars((string) ($row['industry'] ?? '')) ?>"
+            data-peer-bucket="<?= $isAdmin ? htmlspecialchars((string) ($overrideMap[strtoupper((string) $row['ticker'])] ?? '')) : '' ?>">
             <td>
                 <?= TickerLogoPresenter::render((string) $row['ticker'], $row['company_name'] ?? null, $row['ticker_logo'] ?? null) ?>
                 <span class="ticker-hint">
@@ -543,6 +550,55 @@ $tickerHint = static function (string $ticker, array $row) use ($hintRecoColor):
         </div>
     </div>
 </div>
+
+<?php if ($isAdmin): ?>
+<!-- "Zmień sektor" quick-pick modal (change: cvs-screener-sector-quickpick) —
+     admin-only, reached from the same right-click menu. Submits to the exact
+     same endpoint/validation as the /admin/tickers "Grupy porównawcze" form
+     (TickersController::setOverride), just via fetch() instead of a page
+     reload; see app.js for the wiring. -->
+<div id="ticker-sector-modal" class="ai-modal" hidden>
+    <div class="ai-modal__inner" style="max-width:420px;text-align:left;">
+        <h3 style="margin-bottom:.25rem;font-size:var(--text-base);text-align:center;">
+            Zmień sektor — <span id="ticker-sector-ticker"></span>
+        </h3>
+        <p id="ticker-sector-current" style="text-align:center;color:var(--c-muted);font-size:var(--text-xs);margin-bottom:1rem;"></p>
+        <p style="color:var(--c-muted);font-size:.8rem;margin-bottom:.75rem;">
+            Wybierz grupę porównawczą, do której będzie należeć spółka. Klasyfikacja Yahoo pozostaje
+            nietknięta — zmienia się wyłącznie mediana, do której porównywany jest filar Wyceny.
+        </p>
+
+        <div class="form-group" style="margin-bottom:.5rem;">
+            <label for="ticker-sector-filter" class="u-sr-only">Filtruj grupy</label>
+            <input type="search" id="ticker-sector-filter" placeholder="Filtruj grupy…" autocomplete="off">
+        </div>
+
+        <div id="ticker-sector-list" class="ticker-sector-list"></div>
+
+        <div class="form-group" id="ticker-sector-new-wrap" style="margin-top:.75rem;" hidden>
+            <label for="ticker-sector-new-input">Nazwa nowej grupy</label>
+            <input id="ticker-sector-new-input" type="text" placeholder="Memory &amp; Storage" maxlength="100" autocomplete="off">
+        </div>
+
+        <div class="form-group" style="margin-top:.75rem;">
+            <label for="ticker-sector-reason-input">Uzasadnienie <span style="color:var(--c-danger)">*</span></label>
+            <input id="ticker-sector-reason-input" type="text" placeholder="Konkuruje w DRAM/NAND…" maxlength="255" autocomplete="off">
+        </div>
+
+        <div class="form-group" style="margin-top:.5rem;">
+            <label for="ticker-sector-review-input">Data przeglądu <span style="color:var(--c-muted);font-weight:400;">(opcjonalnie — puste = strukturalne)</span></label>
+            <input id="ticker-sector-review-input" type="date">
+        </div>
+
+        <div id="ticker-sector-error" class="alert alert--error" style="display:none;margin-top:.75rem;"></div>
+
+        <div style="display:flex;gap:.5rem;justify-content:center;margin-top:1rem;">
+            <button id="ticker-sector-submit" type="button" class="btn btn--primary btn--sm">Przypisz</button>
+            <button id="ticker-sector-cancel" type="button" class="btn btn--ghost btn--sm">Anuluj</button>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <p style="margin-top:1.5rem;font-size:var(--text-xs);color:var(--c-muted);">
     Dane aktualizowane codziennie.

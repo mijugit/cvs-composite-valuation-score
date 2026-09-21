@@ -219,6 +219,59 @@ button, a { -webkit-tap-highlight-color: rgba(64, 144, 224, .2); }
     font-size: .8rem;
     color: var(--c-muted);
 }
+/* Admin-only "Zmień sektor" entry — same look as __add (border-top divider,
+   same hover), distinct class only so app.js can bind its own click handler
+   next to the "+ Dodaj link…" one. */
+.ticker-link-menu__sector {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    border-top: 1px solid var(--c-border);
+    cursor: pointer;
+    padding: .45rem 1rem;
+    font-size: .875rem;
+    color: #a78bfa;
+    margin-top: .3rem;
+}
+.ticker-link-menu__sector:hover { background: rgba(255,255,255,.06); }
+
+/* --- Screener: "Zmień sektor" quick-pick modal's filterable bucket list --- */
+.ticker-sector-list {
+    max-height: 240px;
+    overflow-y: auto;
+    border: 1px solid var(--c-border);
+    border-radius: .4rem;
+}
+.ticker-sector-list__item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--c-border);
+    cursor: pointer;
+    padding: .5rem .75rem;
+    font-size: .8rem;
+    color: var(--c-text);
+}
+.ticker-sector-list__item:last-child { border-bottom: none; }
+.ticker-sector-list__item:hover { background: rgba(255,255,255,.06); }
+.ticker-sector-list__item--active {
+    background: rgba(167,139,250,.16);
+    color: #a78bfa;
+}
+.ticker-sector-list__item--new { color: var(--c-primary); }
+.ticker-sector-list__meta {
+    flex-shrink: 0;
+    font-size: .7rem;
+    color: var(--c-muted);
+}
+.ticker-sector-list__item--active .ticker-sector-list__meta { color: inherit; opacity: .85; }
 
 .site-main { flex: 1; padding: 2rem 0; }
 

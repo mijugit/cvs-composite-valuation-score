@@ -9,8 +9,8 @@ use CVS\Auth\AuthController;
 use CVS\Auth\UserRepository;
 use CVS\Core\Request;
 use CVS\Core\Response;
-use CVS\CVS\Valuation\MedianResolver;
 use CVS\CVS\Valuation\PeerBucketOverrideRepository;
+use CVS\CVS\Valuation\PeerGroupOptions;
 use CVS\CVS\Valuation\PeerMedianRepository;
 use CVS\TrackRecord\CvsSnapshotRepository;
 use CVS\Screener\MarketResolver;
@@ -69,7 +69,7 @@ class TickersController
             // Selectable peer groups. Free text was the wrong control: a typo
             // silently creates a fresh bucket with n=1, which then falls back to
             // the sector and quietly does nothing at all.
-            'bucketOptions'  => $this->buildBucketOptions(),
+            'bucketOptions'  => PeerGroupOptions::build($this->modelVersion, new PeerMedianRepository(), $this->overrides),
             'minSampleCount' => $this->minSampleCount,
         ]);
     }
@@ -130,42 +130,6 @@ class TickersController
      * Extract a ticker symbol from a Yahoo Finance quote URL
      * (e.g. https://finance.yahoo.com/quote/PKN.WA/) or a bare symbol.
      */
-    /**
-     * Every peer bucket an admin may pick, with how many companies back it.
-     *
-     * Union of the buckets that actually exist: Yahoo industries seen in the
-     * snapshot population, plus any custom group already in use. Sample counts
-     * come from peer_medians so the operator can see, at the moment of
-     * choosing, which buckets clear min_sample_count and which will fall back
-     * to the sector regardless.
-     *
-     * @return array<int, array{key: string, count: int, custom: bool}>
-     */
-    private function buildBucketOptions(): array
-    {
-        $counts = (new PeerMedianRepository())->findIndustrySampleCounts(
-            $this->modelVersion,
-            MedianResolver::VALUATION_METRICS
-        );
-
-        $custom = [];
-        foreach ($this->overrides->findAll() as $o) {
-            $custom[(string) $o['bucket_key']] = true;
-        }
-
-        $keys = array_unique(array_merge(array_keys($counts), array_keys($custom)));
-        sort($keys, SORT_NATURAL | SORT_FLAG_CASE);
-
-        $out = [];
-        foreach ($keys as $k) {
-            $out[] = [
-                'key'    => (string) $k,
-                'count'  => (int) ($counts[$k] ?? 0),
-                'custom' => isset($custom[$k]) && !isset($counts[$k]),
-            ];
-        }
-        return $out;
-    }
 
     /**
      * Assigns a ticker to an admin-defined peer bucket.
@@ -174,13 +138,25 @@ class TickersController
      * industry reclassifies the company into it, typing a new name creates a
      * custom group. One mechanism covers both, because both are the same
      * operation — choosing which median this company is measured against.
+     *
+     * Two callers, one mechanism: the /admin/tickers form (redirect + flash)
+     * and the screener's right-click "Zmień sektor" quick modal (change:
+     * cvs-screener-sector-quickpick), which sends the identical fields via
+     * fetch(). isAjax() (X-Requested-With header, same convention as
+     * TickerLinkController) picks the response shape — nothing about the
+     * validation or the upsert itself differs between the two.
      */
     public function setOverride(Request $req): void
     {
         AuthController::requireAuth();
-        $this->requireAdmin();
+        $ajax = $req->isAjax();
+        $this->requireAdmin($ajax);
 
         if (!$req->verifyCsrf()) {
+            if ($ajax) {
+                Response::json(['ok' => false, 'error' => 'Nieprawidłowy token CSRF.'], 403);
+                return;
+            }
             Response::redirect('/admin/tickers');
             return;
         }
@@ -197,7 +173,12 @@ class TickersController
         $review = trim((string) ($req->input('review_date') ?? ''));
 
         if ($symbol === null || $bucket === '') {
-            $_SESSION['_flash'] = 'Podaj ticker oraz nazwę grupy porównawczej.';
+            $msg = 'Podaj ticker oraz nazwę grupy porównawczej.';
+            if ($ajax) {
+                Response::json(['ok' => false, 'error' => $msg], 422);
+                return;
+            }
+            $_SESSION['_flash'] = $msg;
             Response::redirect('/admin/tickers');
             return;
         }
@@ -206,7 +187,12 @@ class TickersController
         // the next person to look at it (including a later you) needs to know
         // what the claim was in order to judge whether it still holds.
         if ($reason === '') {
-            $_SESSION['_flash'] = 'Uzasadnienie jest wymagane — nadpisanie grupy to decyzja modelowa, nie kosmetyka.';
+            $msg = 'Uzasadnienie jest wymagane — nadpisanie grupy to decyzja modelowa, nie kosmetyka.';
+            if ($ajax) {
+                Response::json(['ok' => false, 'error' => $msg], 422);
+                return;
+            }
+            $_SESSION['_flash'] = $msg;
             Response::redirect('/admin/tickers');
             return;
         }
@@ -219,11 +205,18 @@ class TickersController
             (int) ($_SESSION['user_id'] ?? 0) ?: null
         );
 
-        $_SESSION['_flash'] = sprintf(
+        $message = sprintf(
             '%s przypisany do grupy „%s". Zadziała po najbliższym przeliczeniu median i rescore.',
             $symbol,
             $bucket
         );
+
+        if ($ajax) {
+            Response::json(['ok' => true, 'ticker' => $symbol, 'bucket_key' => $bucket, 'message' => $message]);
+            return;
+        }
+
+        $_SESSION['_flash'] = $message;
         Response::redirect('/admin/tickers');
     }
 
@@ -318,12 +311,16 @@ class TickersController
     // Helpers
     // ------------------------------------------------------------------
 
-    private function requireAdmin(): void
+    private function requireAdmin(bool $ajax = false): void
     {
         $userId = (int) ($_SESSION['user_id'] ?? 0);
         $user   = $this->users->findById($userId);
 
         if (!$user || !(bool) $user['is_admin']) {
+            if ($ajax) {
+                Response::json(['ok' => false, 'error' => 'Brak uprawnień.'], 403);
+                return;
+            }
             Response::redirect('/dashboard');
         }
     }
