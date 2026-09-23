@@ -395,7 +395,7 @@ class ValuationPillar
     ): float {
         assert($this->resolver !== null);
 
-        $fwdFcfEst = $this->resolveForwardFcfEst($financials);
+        $fwdFcfEst = ValuationMetrics::resolveForwardFcfEst($financials, $this->valuationConfig);
         $evFcf     = ValuationMetrics::forwardEvFcf($financials, $growthPct, $fwdFcfEst);
         if ($evFcf === null) {
             return 50.0;
@@ -527,7 +527,7 @@ class ValuationPillar
 
         $fcf = $financials['free_cash_flow'] ?? null;
         if ($fcf !== null && (float) $fcf > 0) {
-            $fwdFcfEst = $this->resolveForwardFcfEst($financials);
+            $fwdFcfEst = ValuationMetrics::resolveForwardFcfEst($financials, $this->valuationConfig);
             $evFcf     = ValuationMetrics::forwardEvFcf($financials, $growthPct, $fwdFcfEst);
             if ($evFcf === null) {
                 return 50.0;
@@ -587,63 +587,6 @@ class ValuationPillar
         }
 
         return null;
-    }
-
-    // ------------------------------------------------------------------
-    // FCF normalization (FR-011)
-    // ------------------------------------------------------------------
-
-    /**
-     * Resolve the forward FCF estimate for use as EV/FCF denominator (FR-011).
-     *
-     * Reads config['valuation'] to apply the feature flag and bounds check.
-     * Returns the estimate (float) when all conditions pass; null triggers
-     * fallback to trailing_fcf × (1+g)² inside ValuationMetrics::forwardEvFcf().
-     *
-     * Bounds: ratio = free_cash_flow / trailing_eps must be within
-     * [fcf_to_eps_ratio_min, fcf_to_eps_ratio_max]. Outside → fallback.
-     *
-     * @param array<string, mixed> $financials
-     */
-    private function resolveForwardFcfEst(array $financials): ?float
-    {
-        if (!($this->valuationConfig['use_forward_fcf_estimate'] ?? true)) {
-            return null;
-        }
-
-        $fwdFcfEst   = $financials['forward_fcf_est']    ?? null;
-        $trailingEps = isset($financials['trailing_eps']) ? (float) $financials['trailing_eps'] : null;
-        $fcf         = isset($financials['free_cash_flow']) ? (float) $financials['free_cash_flow'] : null;
-        $shares      = isset($financials['shares_outstanding']) ? (float) $financials['shares_outstanding'] : null;
-
-        if ($fwdFcfEst === null) {
-            return null;
-        }
-        if ($trailingEps === null || $trailingEps <= 0.0) {
-            return null;
-        }
-        if ($fcf === null || $fcf <= 0.0) {
-            return null;
-        }
-        if ($shares === null || $shares <= 0.0) {
-            return null;
-        }
-
-        // Ratio = FCF per share / trailing EPS — dimensionless "FCF conversion ratio".
-        // Typical range [0.3, 3.0]: FCF is usually 30–300% of EPS.
-        // Outside bounds → pathological case (near-zero EPS, extreme capex cycle) → fallback.
-        // Note: plan text said "free_cash_flow / trailing_eps" but that is not dimensionless;
-        // correct formula uses per-share FCF (free_cash_flow / shares_outstanding) — same intent.
-        $fcfPerShare = $fcf / $shares;
-        $ratio       = $fcfPerShare / $trailingEps;
-        $ratioMin    = (float) ($this->valuationConfig['fcf_to_eps_ratio_min'] ?? 0.3);
-        $ratioMax    = (float) ($this->valuationConfig['fcf_to_eps_ratio_max'] ?? 3.0);
-
-        if ($ratio < $ratioMin || $ratio > $ratioMax) {
-            return null;
-        }
-
-        return (float) $fwdFcfEst;
     }
 
     // ------------------------------------------------------------------

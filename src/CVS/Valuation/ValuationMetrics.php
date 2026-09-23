@@ -94,6 +94,65 @@ class ValuationMetrics
     }
 
     /**
+     * Resolve the forward FCF estimate for use as an EV/FCF denominator (FR-011).
+     *
+     * Shared by ValuationPillar (scoring) and FairPriceCalculator (fair value) so
+     * both compute a company's forward FCF the same way — the same guardrail
+     * MedianResolver::fromConfig() gives the peer-median ladder ("every caller
+     * shares one configuration"). Before this was extracted, FairPriceCalculator
+     * always used trailing_fcf × (1+g)² while the pillar preferred this analyst
+     * estimate, so the two disagreed — sometimes about direction — for exactly
+     * the companies where the estimate diverges most from a trailing projection
+     * (e.g. NVDA post-beat, where forward FCF outruns trailing growth math).
+     *
+     * Returns the estimate (float) when the feature flag is on and the FCF/EPS
+     * conversion ratio (free_cash_flow / shares_outstanding / trailing_eps) sits
+     * within [fcf_to_eps_ratio_min, fcf_to_eps_ratio_max]; null otherwise —
+     * callers fall back to trailing_fcf × (1+g)².
+     *
+     * @param array<string, mixed> $financials
+     * @param array<string, mixed> $valuationConfig config['valuation'] section
+     */
+    public static function resolveForwardFcfEst(array $financials, array $valuationConfig = []): ?float
+    {
+        if (!($valuationConfig['use_forward_fcf_estimate'] ?? true)) {
+            return null;
+        }
+
+        $fwdFcfEst   = $financials['forward_fcf_est']        ?? null;
+        $trailingEps = isset($financials['trailing_eps'])       ? (float) $financials['trailing_eps']       : null;
+        $fcf         = isset($financials['free_cash_flow'])     ? (float) $financials['free_cash_flow']     : null;
+        $shares      = isset($financials['shares_outstanding']) ? (float) $financials['shares_outstanding'] : null;
+
+        if ($fwdFcfEst === null) {
+            return null;
+        }
+        if ($trailingEps === null || $trailingEps <= 0.0) {
+            return null;
+        }
+        if ($fcf === null || $fcf <= 0.0) {
+            return null;
+        }
+        if ($shares === null || $shares <= 0.0) {
+            return null;
+        }
+
+        // Ratio = FCF per share / trailing EPS — dimensionless "FCF conversion ratio".
+        // Typical range [0.3, 3.0]: FCF is usually 30–300% of EPS.
+        // Outside bounds → pathological case (near-zero EPS, extreme capex cycle) → fallback.
+        $fcfPerShare = $fcf / $shares;
+        $ratio       = $fcfPerShare / $trailingEps;
+        $ratioMin    = (float) ($valuationConfig['fcf_to_eps_ratio_min'] ?? 0.3);
+        $ratioMax    = (float) ($valuationConfig['fcf_to_eps_ratio_max'] ?? 3.0);
+
+        if ($ratio < $ratioMin || $ratio > $ratioMax) {
+            return null;
+        }
+
+        return (float) $fwdFcfEst;
+    }
+
+    /**
      * Forward EV/FCF ratio (Variant A — used when FCF > 0).
      *
      * Projects FCF two years forward using growth rate, then divides EV.

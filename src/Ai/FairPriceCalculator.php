@@ -6,11 +6,20 @@ namespace CVS\Ai;
 
 use CVS\CVS\Valuation\MedianResolver;
 use CVS\CVS\Valuation\ProfitabilityMetrics;
+use CVS\CVS\Valuation\ValuationMetrics;
 
 /**
  * CVS implied fair value: price at which Valuation pillar = 50 (sector-median parity).
- * Fair EV = median_ev_fcf × FCF × (1 + growth_capped)²
+ * Fair EV = median_ev_fcf × forward FCF
  * Fair Price = (Fair EV - debt + cash) / shares
+ *
+ * Forward FCF (FR-011): the same analyst estimate ValuationPillar prefers for
+ * the score (ValuationMetrics::resolveForwardFcfEst()) when it passes its
+ * sanity bounds, else the trailing_fcf × (1+growth_capped)² fallback. Both
+ * callers must resolve it the same way — the same "one caller, one
+ * configuration" guardrail MedianResolver::fromConfig() gives the peer-median
+ * ladder — or fair value and the pillar can disagree about direction for the
+ * same company (observed live on NVDA before this was shared).
  *
  * Extracted from AiAnalysisController — change: cvs-ai-critical-review — so
  * bin/generate_critical_review.php (no HTTP request, no controller instance)
@@ -180,24 +189,43 @@ final class FairPriceCalculator
         $cash   = (float) ($financials['cash']               ?? 0);
         $shares = (float) ($financials['shares_outstanding'] ?? 0);
 
-        $fwdEps   = (float) ($financials['forward_eps']  ?? 0);
-        $trailEps = (float) ($financials['trailing_eps'] ?? 0);
-        $growth   = null;
-        if ($fwdEps > 0 && $trailEps > 0) {
-            $implied = ($fwdEps / $trailEps - 1) * 100;
-            if ($implied > 0 && $implied <= 200) $growth = $implied;
-        }
-        if ($growth === null) {
-            $rg = (float) ($financials['revenue_growth'] ?? 0);
-            if ($rg > 0) $growth = $rg * 100;
-        }
-        if ($growth !== null) $growth = min($growth, $maxGrowth);
+        // FR-011: prefer the same analyst forward-FCF estimate ValuationPillar
+        // uses for the score (ValuationMetrics::resolveForwardFcfEst()), so fair
+        // value and the Valuation pillar always agree about which forward FCF
+        // the company is priced against. Before this shared resolution, fair
+        // value always fell back to trailing_fcf × (1+g)² even when the pillar
+        // was scoring off the analyst estimate — the two could disagree about
+        // direction entirely (observed live on NVDA: fair value implied +35%
+        // upside while the pillar scored it 0.5/100, maximally overvalued).
+        $fwdFcfEst = ValuationMetrics::resolveForwardFcfEst($financials, $cvsConfig['valuation'] ?? []);
 
-        if ($fcf <= 0 || $growth === null || $medEvFcf <= 0 || $shares <= 0) {
+        if ($fwdFcfEst !== null) {
+            $fwdFcf = $fwdFcfEst;
+        } else {
+            $fwdEps   = (float) ($financials['forward_eps']  ?? 0);
+            $trailEps = (float) ($financials['trailing_eps'] ?? 0);
+            $growth   = null;
+            if ($fwdEps > 0 && $trailEps > 0) {
+                $implied = ($fwdEps / $trailEps - 1) * 100;
+                if ($implied > 0 && $implied <= 200) $growth = $implied;
+            }
+            if ($growth === null) {
+                $rg = (float) ($financials['revenue_growth'] ?? 0);
+                if ($rg > 0) $growth = $rg * 100;
+            }
+
+            if ($fcf <= 0 || $growth === null) {
+                return null;
+            }
+
+            $growth = min($growth, $maxGrowth);
+            $fwdFcf = $fcf * (1 + $growth / 100) ** 2;
+        }
+
+        if ($medEvFcf <= 0 || $shares <= 0) {
             return null;
         }
 
-        $fwdFcf = $fcf * (1 + $growth / 100) ** 2;
         $fairEv = $medEvFcf * $fwdFcf;
         $price  = ($fairEv - $debt + $cash) / $shares;
 
