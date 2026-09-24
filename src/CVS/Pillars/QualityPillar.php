@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CVS\CVS\Pillars;
 
+use CVS\CVS\Valuation\ValuationMetrics;
+
 /**
  * Pillar — Quality score (S-05 replacement for FundamentalQualityPillar).
  *
@@ -44,7 +46,9 @@ class QualityPillar
         private readonly array $benchmark,
         private readonly array $config = [],
         /** @var array<string, mixed> config['real_estate'] — leverage bands for REITs */
-        private readonly array $realEstateConfig = []
+        private readonly array $realEstateConfig = [],
+        /** @var array<string, mixed> config['valuation'] — forward-growth guards shared with ValuationPillar */
+        private readonly array $valuationConfig = []
     ) {}
 
     /**
@@ -158,7 +162,7 @@ class QualityPillar
         // ------------------------------------------------------------------
         // 3. Forward growth quality
         // ------------------------------------------------------------------
-        $forwardGrowth = $this->extractForwardGrowth($financials);
+        $forwardGrowth = ValuationMetrics::extractForwardGrowth($financials, $this->valuationConfig);
 
         $ptsGrowth = 0.0;
         if ($forwardGrowth !== null) {
@@ -278,58 +282,4 @@ class QualityPillar
         return $this->lastSteps;
     }
 
-    // ------------------------------------------------------------------
-    // Helpers
-    // ------------------------------------------------------------------
-
-    /**
-     * Derive forward annual growth rate (%) from available financials.
-     *
-     * Mirrors SectorBenchmarkPillar::extractForwardGrowth() exactly.
-     *
-     * Priority order (mirrors Python v1.6 calc_relative):
-     *   a. EPS-based: forwardEps / trailingEps − 1
-     *      — skipped if > 2.0 (base effect) or > 3.5× revenue_growth (EPS/revenue gap)
-     *   b. revenue_growth × 100  (when > 0)
-     *   c. earnings_quarterly_growth × 100  (when 0 < value ≤ 2.0)
-     *   d. null → pts_growth = 0
-     *
-     * @param array<string, mixed> $financials
-     * @return float|null  Growth rate in % (e.g. 16.6), or null if unavailable
-     */
-    private function extractForwardGrowth(array $financials): ?float
-    {
-        $forwardEps  = isset($financials['forward_eps'])  ? (float) $financials['forward_eps']  : null;
-        $trailingEps = isset($financials['trailing_eps']) ? (float) $financials['trailing_eps'] : null;
-        $revGrowth   = isset($financials['revenue_growth']) ? (float) $financials['revenue_growth'] : null;
-
-        // a. EPS-based forward growth.
-        if ($forwardEps !== null && $trailingEps !== null && $trailingEps > 0) {
-            $epsFraction = ($forwardEps / $trailingEps) - 1.0;
-            $baseEffect  = $epsFraction > 2.0;
-            $epsRevGap   = $revGrowth !== null
-                        && $revGrowth > 0
-                        && ($epsFraction / $revGrowth) > 3.5;
-
-            if (!$baseEffect && !$epsRevGap) {
-                return $epsFraction * 100.0;
-            }
-        }
-
-        // b. Revenue growth.
-        if ($revGrowth !== null && $revGrowth > 0) {
-            return $revGrowth * 100.0;
-        }
-
-        // c. Earnings quarterly growth.
-        $eqg = isset($financials['earnings_quarterly_growth'])
-             ? (float) $financials['earnings_quarterly_growth']
-             : null;
-
-        if ($eqg !== null && $eqg > 0 && $eqg <= 2.0) {
-            return $eqg * 100.0;
-        }
-
-        return null;
-    }
 }

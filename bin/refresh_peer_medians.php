@@ -258,7 +258,7 @@ foreach ($todaysSectors as $targetSector) {
             }
         }
 
-        $growthPct = ValuationMetrics::extractForwardGrowth($financials);
+        $growthPct = ValuationMetrics::extractForwardGrowth($financials, $config['valuation'] ?? []);
         if ($growthPct === null) {
             $totalSkipped++;
             continue;

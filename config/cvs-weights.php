@@ -130,6 +130,22 @@ return [
         'use_forward_fcf_estimate' => true,
         'fcf_to_eps_ratio_min'     => 0.3,   // below → ratio too small, skip estimate
         'fcf_to_eps_ratio_max'     => 3.0,   // above → ratio too large, skip estimate
+
+        // Trailing EPS carrying non-operating gains (mark-to-market on equity
+        // stakes, disposals) is unusable as a base for anything forward-looking.
+        // Net income normally sits BELOW operating income (tax, interest), so
+        // profit_margin / operating_margin above this ratio means the bottom
+        // line is inflated by something that is not the business. When that
+        // happens the EPS-based forward growth and the FR-011 forward_fcf_est
+        // (forward_eps × FCF / trailing_eps) are both skipped in favour of
+        // revenue growth and the trailing-FCF fallback.
+        //
+        // Observed 2026-09-23 on GOOGL: profit margin 54.8% vs operating 34.0%
+        // (ratio 1.61) from equity-stake gains. Trailing EPS was inflated, so
+        // forward/trailing EPS read as NEGATIVE growth despite +24% revenue —
+        // which zeroed Quality's growth points (Quality 60 instead of 90) and
+        // depressed forward FCF twice over. Set to 0 to disable the check.
+        'max_net_to_operating_margin' => 1.25,
     ],
 
     // --- Peer-group configuration (Phase 3) ---

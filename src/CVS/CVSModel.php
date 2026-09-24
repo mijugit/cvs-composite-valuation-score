@@ -119,7 +119,8 @@ class CVSModel
         $qualScore = (new QualityPillar(
             $bm,
             $this->config['financials'] ?? [],
-            $this->config['real_estate'] ?? []
+            $this->config['real_estate'] ?? [],
+            $this->config['valuation'] ?? []
         ))->score($financials);
 
         // Step 3 — Weighted aggregate per mode.

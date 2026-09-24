@@ -141,7 +141,7 @@ class ValuationPillar
         }
 
         // Growth (needed for both variants).
-        $growthPct = ValuationMetrics::extractForwardGrowth($financials);
+        $growthPct = ValuationMetrics::extractForwardGrowth($financials, $this->valuationConfig);
         if ($growthPct === null) {
             $this->lastSource    = 'missing_growth';
             $this->lastBucketKey = '';
@@ -519,7 +519,7 @@ class ValuationPillar
             return 50.0;
         }
 
-        $growthPct = $this->legacyExtractForwardGrowth($financials);
+        $growthPct = ValuationMetrics::extractForwardGrowth($financials, $this->valuationConfig);
         if ($growthPct === null) {
             return 50.0;
         }
@@ -552,41 +552,6 @@ class ValuationPillar
         $ratio          = $adjusted / max($target, 0.01);
 
         return $this->sigmoid($ratio);
-    }
-
-    /**
-     * Forward growth extraction — mirrors ValuationMetrics::extractForwardGrowth().
-     * Kept inline in legacy path for zero-change backward compatibility.
-     *
-     * @param array<string, mixed> $financials
-     */
-    private function legacyExtractForwardGrowth(array $financials): ?float
-    {
-        $forwardEps  = isset($financials['forward_eps'])  ? (float) $financials['forward_eps']  : null;
-        $trailingEps = isset($financials['trailing_eps']) ? (float) $financials['trailing_eps'] : null;
-        $revGrowth   = isset($financials['revenue_growth']) ? (float) $financials['revenue_growth'] : null;
-
-        if ($forwardEps !== null && $trailingEps !== null && $trailingEps > 0) {
-            $epsFraction = ($forwardEps / $trailingEps) - 1.0;
-            $baseEffect  = $epsFraction > 2.0;
-            $epsRevGap   = $revGrowth !== null && $revGrowth > 0 && ($epsFraction / $revGrowth) > 3.5;
-            if (!$baseEffect && !$epsRevGap) {
-                return $epsFraction * 100.0;
-            }
-        }
-
-        if ($revGrowth !== null && $revGrowth > 0) {
-            return $revGrowth * 100.0;
-        }
-
-        $eqg = isset($financials['earnings_quarterly_growth'])
-             ? (float) $financials['earnings_quarterly_growth']
-             : null;
-        if ($eqg !== null && $eqg > 0 && $eqg <= 2.0) {
-            return $eqg * 100.0;
-        }
-
-        return null;
     }
 
     // ------------------------------------------------------------------

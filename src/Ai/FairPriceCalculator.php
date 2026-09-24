@@ -202,17 +202,11 @@ final class FairPriceCalculator
         if ($fwdFcfEst !== null) {
             $fwdFcf = $fwdFcfEst;
         } else {
-            $fwdEps   = (float) ($financials['forward_eps']  ?? 0);
-            $trailEps = (float) ($financials['trailing_eps'] ?? 0);
-            $growth   = null;
-            if ($fwdEps > 0 && $trailEps > 0) {
-                $implied = ($fwdEps / $trailEps - 1) * 100;
-                if ($implied > 0 && $implied <= 200) $growth = $implied;
-            }
-            if ($growth === null) {
-                $rg = (float) ($financials['revenue_growth'] ?? 0);
-                if ($rg > 0) $growth = $rg * 100;
-            }
+            // Same growth the pillar uses in its own fallback — this used to be a
+            // private copy that differed on negative EPS growth (fair value took
+            // revenue growth, the pillar took the decline), so the two could
+            // disagree again the moment the fallback path became active.
+            $growth = ValuationMetrics::extractForwardGrowth($financials, $cvsConfig['valuation'] ?? []);
 
             if ($fcf <= 0 || $growth === null) {
                 return null;

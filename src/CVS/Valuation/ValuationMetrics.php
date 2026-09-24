@@ -28,17 +28,23 @@ class ValuationMetrics
      *   c. earnings_quarterly_growth × 100  (when 0 < value ≤ 2.0 fraction)
      *   d. null → caller returns neutral 50 / skips ticker
      *
+     * Step (a) is skipped when trailingEpsDistorted() — a trailing EPS inflated by
+     * non-operating gains makes forward/trailing EPS read as a decline that the
+     * business is not having.
+     *
      * @param array<string, mixed> $financials
+     * @param array<string, mixed> $valuationConfig config['valuation'] section
      * @return float|null  Growth rate in % (e.g. 16.6), or null if unavailable
      */
-    public static function extractForwardGrowth(array $financials): ?float
+    public static function extractForwardGrowth(array $financials, array $valuationConfig = []): ?float
     {
         $forwardEps  = isset($financials['forward_eps'])  ? (float) $financials['forward_eps']  : null;
         $trailingEps = isset($financials['trailing_eps']) ? (float) $financials['trailing_eps'] : null;
         $revGrowth   = isset($financials['revenue_growth']) ? (float) $financials['revenue_growth'] : null;
 
         // a. EPS-based forward growth (fraction → %).
-        if ($forwardEps !== null && $trailingEps !== null && $trailingEps > 0) {
+        if ($forwardEps !== null && $trailingEps !== null && $trailingEps > 0
+            && !self::trailingEpsDistorted($financials, $valuationConfig)) {
             $epsFraction = ($forwardEps / $trailingEps) - 1.0;
             $baseEffect  = $epsFraction > 2.0;
             $epsRevGap   = $revGrowth !== null
@@ -94,6 +100,40 @@ class ValuationMetrics
     }
 
     /**
+     * True when trailing EPS is inflated by non-operating gains and must not be
+     * used as a base for forward growth or the FR-011 forward FCF estimate.
+     *
+     * Net income normally sits below operating income (tax, interest). When
+     * profit_margin / operating_margin exceeds config max_net_to_operating_margin
+     * — or the company earns a net profit on an operating loss — the bottom line
+     * carries something that is not the business (GOOGL 2026-09: equity-stake
+     * gains, net 54.8% vs operating 34.0%). Missing margins are not evidence of
+     * distortion (see lessons: "brak danych to nie zero"), so they return false.
+     *
+     * @param array<string, mixed> $financials
+     * @param array<string, mixed> $valuationConfig config['valuation'] section
+     */
+    public static function trailingEpsDistorted(array $financials, array $valuationConfig = []): bool
+    {
+        $maxRatio = (float) ($valuationConfig['max_net_to_operating_margin'] ?? 0.0);
+        if ($maxRatio <= 0.0) {
+            return false;
+        }
+
+        $net = isset($financials['profit_margin'])    ? (float) $financials['profit_margin']    : null;
+        $op  = isset($financials['operating_margin']) ? (float) $financials['operating_margin'] : null;
+        if ($net === null || $op === null || $net <= 0.0) {
+            return false;
+        }
+
+        if ($op <= 0.0) {
+            return true;
+        }
+
+        return ($net / $op) > $maxRatio;
+    }
+
+    /**
      * Resolve the forward FCF estimate for use as an EV/FCF denominator (FR-011).
      *
      * Shared by ValuationPillar (scoring) and FairPriceCalculator (fair value) so
@@ -116,6 +156,12 @@ class ValuationMetrics
     public static function resolveForwardFcfEst(array $financials, array $valuationConfig = []): ?float
     {
         if (!($valuationConfig['use_forward_fcf_estimate'] ?? true)) {
+            return null;
+        }
+
+        // The estimate is forward_eps × (FCF / trailing_eps): an inflated trailing
+        // EPS shrinks the conversion ratio, so the estimate comes out too low.
+        if (self::trailingEpsDistorted($financials, $valuationConfig)) {
             return null;
         }
 

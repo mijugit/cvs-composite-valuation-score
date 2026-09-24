@@ -233,6 +233,32 @@ class QualityPillarTest extends TestCase
         $this->assertLessThanOrEqual(10.0, $raw);
     }
 
+    /**
+     * GOOGL-shaped 2026-09: trailing EPS inflated by equity-stake gains (net
+     * margin 54.8% vs operating 34.0%), so forward/trailing EPS read as a
+     * decline while revenue grew 24.2%. The growth component must follow
+     * revenue, not the distorted EPS — this alone was costing 3 of 10 points.
+     */
+    public function test_growth_follows_revenue_when_trailing_eps_distorted(): void
+    {
+        $googl = $this->baseFinancials([
+            'forward_eps'      => 7.0,
+            'trailing_eps'     => 9.0,
+            'revenue_growth'   => 0.242,
+            'profit_margin'    => 0.548,
+            'operating_margin' => 0.340,
+        ]);
+
+        $unguarded = new QualityPillar($this->techBenchmark);
+        $unguarded->score($googl);
+        $this->assertSame(0.0, $unguarded->steps()['pts_growth']);
+
+        $guarded = new QualityPillar($this->techBenchmark, [], [], $this->config['valuation']);
+        $guarded->score($googl);
+        $this->assertSame(3.0, $guarded->steps()['pts_growth']);
+        $this->assertEqualsWithDelta(24.2, $guarded->steps()['forward_growth_pct'], 0.001);
+    }
+
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------

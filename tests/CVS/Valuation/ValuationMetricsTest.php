@@ -284,6 +284,79 @@ class ValuationMetricsTest extends TestCase
     // Helpers
     // ------------------------------------------------------------------
 
+    // ------------------------------------------------------------------
+    // trailingEpsDistorted — non-operating gains in trailing EPS
+    // ------------------------------------------------------------------
+
+    private const GUARD = ['max_net_to_operating_margin' => 1.25];
+
+    public function test_distorted_when_net_margin_far_above_operating(): void
+    {
+        // GOOGL-shaped 2026-09: net 54.8% vs operating 34.0% → 1.61 > 1.25.
+        $f = $this->base(['profit_margin' => 0.548, 'operating_margin' => 0.340]);
+        $this->assertTrue(ValuationMetrics::trailingEpsDistorted($f, self::GUARD));
+    }
+
+    public function test_not_distorted_for_ordinary_company(): void
+    {
+        // Net below operating (tax, interest) — the normal shape.
+        $f = $this->base(['profit_margin' => 0.24, 'operating_margin' => 0.31]);
+        $this->assertFalse(ValuationMetrics::trailingEpsDistorted($f, self::GUARD));
+    }
+
+    public function test_distorted_when_net_profit_on_operating_loss(): void
+    {
+        $f = $this->base(['profit_margin' => 0.05, 'operating_margin' => -0.02]);
+        $this->assertTrue(ValuationMetrics::trailingEpsDistorted($f, self::GUARD));
+    }
+
+    public function test_missing_margins_are_not_evidence_of_distortion(): void
+    {
+        $this->assertFalse(ValuationMetrics::trailingEpsDistorted($this->base(), self::GUARD));
+        $this->assertFalse(ValuationMetrics::trailingEpsDistorted(
+            $this->base(['profit_margin' => 0.548]), self::GUARD
+        ));
+    }
+
+    public function test_guard_disabled_without_config(): void
+    {
+        $f = $this->base(['profit_margin' => 0.548, 'operating_margin' => 0.340]);
+        $this->assertFalse(ValuationMetrics::trailingEpsDistorted($f, []));
+        $this->assertFalse(ValuationMetrics::trailingEpsDistorted($f, ['max_net_to_operating_margin' => 0]));
+    }
+
+    public function test_growth_ignores_eps_when_trailing_eps_distorted(): void
+    {
+        // Forward EPS below an inflated trailing EPS reads as −22% "growth";
+        // revenue is actually growing 24.2%.
+        $f = $this->base([
+            'forward_eps'      => 7.0,
+            'trailing_eps'     => 9.0,
+            'revenue_growth'   => 0.242,
+            'profit_margin'    => 0.548,
+            'operating_margin' => 0.340,
+        ]);
+
+        $this->assertLessThan(0.0, ValuationMetrics::extractForwardGrowth($f));
+        $this->assertEqualsWithDelta(24.2, ValuationMetrics::extractForwardGrowth($f, self::GUARD), 0.001);
+    }
+
+    public function test_forward_fcf_est_rejected_when_trailing_eps_distorted(): void
+    {
+        $cfg = self::GUARD + ['use_forward_fcf_estimate' => true];
+        // fcf/share = 1.5M/15B = 0.0001; trailing_eps = 0.0001 → ratio 1.0, inside bounds.
+        $f = $this->base([
+            'trailing_eps'     => 0.0001,
+            'forward_fcf_est'  => 1_200_000.0,
+        ]);
+
+        $this->assertSame(1_200_000.0, ValuationMetrics::resolveForwardFcfEst($f, $cfg));
+
+        $f['profit_margin']    = 0.548;
+        $f['operating_margin'] = 0.340;
+        $this->assertNull(ValuationMetrics::resolveForwardFcfEst($f, $cfg));
+    }
+
     /**
      * @param array<string, mixed> $overrides
      * @return array<string, mixed>

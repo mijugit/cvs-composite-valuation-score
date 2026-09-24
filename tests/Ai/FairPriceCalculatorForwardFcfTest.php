@@ -112,4 +112,52 @@ class FairPriceCalculatorForwardFcfTest extends TestCase
             . "(score=$score) must agree on direction for the same financials."
         );
     }
+
+    /**
+     * GOOGL-shaped 2026-09: trailing EPS inflated by equity-stake gains (net
+     * margin 54.8% vs operating 34.0%). forward_fcf_est must be ignored and
+     * growth taken from revenue (+24.2%), not from forward/trailing EPS (−22%).
+     * Before the shared growth helper, fair value took revenue growth while the
+     * pillar took the EPS decline — exactly the fallback path this guard enables.
+     */
+    public function testDistortedTrailingEpsUsesRevenueGrowthInBothFairValueAndPillar(): void
+    {
+        $financials = [
+            'sector'             => 'Technology',
+            'industry'           => 'Internet Content & Information',
+            'current_price'      => 100.0,
+            'shares_outstanding' => 1_000_000_000.0,
+            'total_debt'         => 0.0,
+            'cash'               => 0.0,
+            'free_cash_flow'     => 2_000_000_000.0,
+            'trailing_eps'       => 4.5,
+            'forward_eps'        => 3.5,     // below inflated trailing → "−22% growth"
+            'revenue_growth'     => 0.242,
+            'profit_margin'      => 0.548,
+            'operating_margin'   => 0.340,
+            // fcf/share 2.0 ÷ trailing EPS 4.5 = 0.44 — inside the FR-011 bounds, so
+            // only the distortion guard keeps this (too low) estimate out.
+            'forward_fcf_est'    => 3.5 * 2_000_000_000.0 / 4.5,
+        ];
+
+        $fairValue = FairPriceCalculator::compute($financials, $this->config);
+        $this->assertNotNull($fairValue);
+
+        // Static Technology benchmark: median_ev_fcf 32, max_growth 60.
+        // Revenue growth 24.2% → fwd FCF = 2B × 1.242² ≈ 3.085B → fair EV ≈ 98.7B → ≈ $98.72.
+        $expected = 32 * 2_000_000_000.0 * (1.242 ** 2) / 1_000_000_000.0;
+        $this->assertEqualsWithDelta($expected, $fairValue, 0.05);
+
+        $pillar = new ValuationPillar(
+            benchmarks: $this->config['benchmarks'],
+            resolver: null,
+            valuationConfig: $this->config['valuation'],
+        );
+        $score = $pillar->score($financials);
+
+        // Fair value ≈ price → pillar ≈ 50, and both must land on the same side.
+        $this->assertEqualsWithDelta(50.0, $score, 5.0, "Pillar should sit near parity, got $score");
+        $this->assertSame($fairValue > 100.0, $score > 50.0,
+            "Fair value $fairValue and pillar score $score must agree on direction.");
+    }
 }
