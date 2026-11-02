@@ -381,6 +381,30 @@ class FinancialDataFetcherFxTest extends TestCase
         $this->assertEqualsWithDelta($gbpToUsd / 100.0, (float) $result['price_fx_rate_to_usd'], 1e-12, 'quote rate includes pence');
     }
 
+    /**
+     * HY9H.F (SK hynix in Frankfurt): EUR quote, KRW statements, forwardEps in
+     * the QUOTE currency. An exchange rule ("statement currency outside USD
+     * listings") read it as KRW: 0.28 USD against 150 trailing, a -99.8%
+     * forecast that zeroed the valuation pillar.
+     */
+    public function testFrankfurtForwardEpsInQuoteCurrencyIsNotReadAsStatementCurrency(): void
+    {
+        $eurToUsd = 1.15;
+        $_SESSION['cvs_fx_EUR']    = $eurToUsd;
+        $_SESSION['cvs_fx_EUR_ts'] = time();
+
+        $raw = $this->baseRaw('EUR', 'KRW');
+        $raw['financialData']['currentPrice']       = ['raw' => 890.0];
+        $raw['defaultKeyStatistics']['trailingEps'] = ['raw' => 130.8];
+        $raw['defaultKeyStatistics']['forwardEps']  = ['raw' => 365.0];
+
+        $result = $this->callNormalise($this->fetcher(), $raw, 1.0 / 1440.0);
+
+        $this->assertNotNull($result);
+        $this->assertEqualsWithDelta(130.8 * $eurToUsd, (float) $result['trailing_eps'], 1e-9);
+        $this->assertEqualsWithDelta(365.0 * $eurToUsd, (float) $result['forward_eps'], 1e-9, 'EUR, not KRW');
+    }
+
     // ------------------------------------------------------------------
     // long_name — regression for the 2026-07-02 bug (cvs_snapshots.company_name
     // was NULL for every ticker in production: longName was being read from the

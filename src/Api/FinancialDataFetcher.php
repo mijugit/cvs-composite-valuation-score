@@ -734,6 +734,37 @@ class FinancialDataFetcher implements LatestPriceSource
     }
 
     /**
+     * Converts $raw with whichever candidate rate lands it nearest $reference
+     * (smallest |log(converted / reference)|) — for a Yahoo field whose
+     * currency is not documented and varies by exchange (forwardEps). Without a
+     * usable reference the first candidate wins.
+     *
+     * @param list<float> $rates
+     */
+    private static function nearestRateConversion(?float $raw, ?float $reference, array $rates): ?float
+    {
+        if ($raw === null || $rates === []) {
+            return null;
+        }
+        if ($reference === null || $reference <= 0.0 || $raw <= 0.0) {
+            return $raw * $rates[0];
+        }
+
+        $best     = $raw * $rates[0];
+        $bestDist = abs(log($best / $reference));
+        foreach (array_slice($rates, 1) as $rate) {
+            $candidate = $raw * $rate;
+            $dist      = abs(log($candidate / $reference));
+            if ($dist < $bestDist) {
+                $best     = $candidate;
+                $bestDist = $dist;
+            }
+        }
+
+        return $best;
+    }
+
+    /**
      * Picks the price rescore/screener/AnalysisController should treat as
      * "current" — prefers the extended-hours quote when Yahoo's `price`
      * module says the market is currently in that session, so a pre-market
@@ -1013,15 +1044,26 @@ class FinancialDataFetcher implements LatestPriceSource
         // 2026-11-02 against price / trailingPE and analyst consensus:
         //   - trailingEps is in the quote currency, major unit (TSM 15.43 USD
         //     per ADR, SAN.WA 3.88 PLN, SHEL.L 3.35 GBP).
-        //   - forwardEps is in the quote currency on a USD listing (TSM 23.39,
-        //     NVO 3.44, BABA 9.30 — all USD per ADR), but in the statement
-        //     currency elsewhere (SHEL.L 4.26 USD, ULVR.L 2.93 EUR).
+        //   - forwardEps follows no exchange rule: quote currency on a USD
+        //     listing (TSM 23.39, NVO 3.44 — USD per ADR) and in Frankfurt
+        //     (HY9H.F, EUR quote, KRW statements), statement currency in London
+        //     (SHEL.L 4.26 USD).
         // Converting both with the statement rate made TSM's trailing EPS 0.47
         // instead of 15.43: FCF/share ÷ EPS read 15x, the forward FCF estimate
         // was rejected for every ADR, and fair value fell back to a trailing
-        // projection. Mixed currencies also faked EPS growth on London listings.
-        $forwardEps  = $fxApply($v($ks['forwardEps']  ?? []), $majorQuote === 'USD' ? 1.0 : $fxF);
-        $trailingEps = $fxApply($v($ks['trailingEps'] ?? []), $fxPMajor);
+        // projection. An exchange-based guess for forwardEps then read HY9H.F's
+        // forward EPS as 0.28 against 150 trailing — a -99.8% "decline" that
+        // zeroed its valuation.
+        //
+        // So trailingEps, whose currency price / trailingPE confirms, takes the
+        // quote rate, and forwardEps takes whichever of the two candidate rates
+        // puts it nearest trailing EPS. A currency mismatch moves the ratio by
+        // the FX rate itself (32x for TWD, ~1400x for KRW); a real forecast
+        // rarely moves it by more than 2-3x. Where the two rates are close
+        // (GBP/USD/EUR) the choice barely matters either way.
+        $trailingEps   = $fxApply($v($ks['trailingEps'] ?? []), $fxPMajor);
+        $forwardEpsRaw = $v($ks['forwardEps'] ?? []);
+        $forwardEps    = self::nearestRateConversion($forwardEpsRaw, $trailingEps, [$fxPMajor, $fxF]);
 
         // forward_fcf_est: forward_eps × (fcfEffective / trailing_eps).
         // The ratio fcfEffective/trailingEps is dimensionless; multiplied by forwardEps_USD
