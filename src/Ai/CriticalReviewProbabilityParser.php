@@ -40,7 +40,7 @@ final class CriticalReviewProbabilityParser
     public static function parse(string $rawText): array
     {
         $fallback = [
-            'narrative'        => trim($rawText),
+            'narrative'        => self::stripPreamble($rawText),
             'bull_probability' => null,
             'bear_probability' => null,
             'rationale'        => null,
@@ -79,12 +79,30 @@ final class CriticalReviewProbabilityParser
         }
 
         return [
-            'narrative'        => trim($narrative),
+            'narrative'        => self::stripPreamble($narrative),
             'bull_probability' => $bull,
             'bear_probability' => $bear,
             'rationale'        => $rationale !== '' ? $rationale : null,
             'sources'          => $sources,
         ];
+    }
+
+    /**
+     * Drops anything the model wrote before the first mandated section
+     * heading (`## 1. …`, see CriticalReviewPrompt). After web search a model
+     * sometimes narrates its own process first ("Mam wystarczające dane.
+     * Przystępuję do pisania analizy.") — working notes, not analysis, which
+     * otherwise land on the page as the review's opening line. Text with no
+     * such heading is returned whole: a model that ignored the structure
+     * still keeps its narrative.
+     */
+    public static function stripPreamble(string $narrative): string
+    {
+        if (preg_match('/^##\s*1\.\s/m', $narrative, $m, PREG_OFFSET_CAPTURE) === 1) {
+            $narrative = substr($narrative, $m[0][1]);
+        }
+
+        return trim($narrative);
     }
 
     /**

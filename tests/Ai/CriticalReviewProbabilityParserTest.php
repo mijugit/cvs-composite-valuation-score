@@ -198,4 +198,29 @@ TEXT;
 
         $this->assertSame([], $result['sources']);
     }
+
+    public function test_strips_model_preamble_before_first_section(): void
+    {
+        $raw = "Mam wystarczające dane. Przystępuję do pisania analizy.\n\n"
+            . "## 1. Świeże katalizatory\nTreść narracji.\n\n"
+            . "```json\n{\"bull_probability\": 55, \"bear_probability\": 45, \"rationale\": \"Neutralnie.\"}\n```";
+
+        $result = CriticalReviewProbabilityParser::parse($raw);
+
+        $this->assertStringStartsWith("## 1. Świeże katalizatory", $result["narrative"]);
+        $this->assertStringNotContainsString("Przystępuję", $result["narrative"]);
+        $this->assertSame(55, $result["bull_probability"]);
+    }
+
+    public function test_strips_preamble_even_when_json_block_is_missing(): void
+    {
+        $result = CriticalReviewProbabilityParser::parse("Szukam newsów…\n## 1. Świeże katalizatory\nTreść.");
+
+        $this->assertSame("## 1. Świeże katalizatory\nTreść.", $result["narrative"]);
+    }
+
+    public function test_keeps_whole_text_when_no_section_heading_exists(): void
+    {
+        $this->assertSame("Narracja bez nagłówków.", CriticalReviewProbabilityParser::stripPreamble("  Narracja bez nagłówków.\n"));
+    }
 }

@@ -1118,7 +1118,8 @@
                         <?php if ($crCached): ?>
                         <div class="ai-narrative">
                             <?php
-                            $raw  = htmlspecialchars($crCached['content']);
+                            // Also covers reviews cached before the parser stripped preambles.
+                            $raw  = htmlspecialchars(\CVS\Ai\CriticalReviewProbabilityParser::stripPreamble((string) $crCached['content']));
                             $html = preg_replace('/^## (\d+\. .+)$/m', '<h3 class="ai-narrative__section">$1</h3>', $raw);
                             $html = preg_replace('/\n{2,}/', '</p><p>', $html ?? $raw);
                             $html = str_replace("\n", '<br>', $html ?? $raw);
