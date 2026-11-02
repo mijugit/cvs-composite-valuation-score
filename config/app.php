@@ -20,6 +20,12 @@ return [
 
     'session' => [
         'name'     => 'cvs_session',
-        'lifetime' => 7200, // seconds
+        // Sliding: every request pushes expiry forward, so only this much
+        // INACTIVITY logs a user out. Long enough for a monitoring bot.
+        'lifetime' => (int) ($_ENV['SESSION_LIFETIME'] ?? 604800), // seconds (7 days)
+        // Dedicated directory: the shared default save_path is swept by the
+        // host's own GC (php.ini gc_maxlifetime, often 24 min), which would
+        // delete our files long before the cookie expires.
+        'save_path' => dirname(__DIR__) . '/var/sessions',
     ],
 ];

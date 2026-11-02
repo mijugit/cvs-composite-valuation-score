@@ -10,6 +10,8 @@ composer.phar
 *.cache
 /tmp/
 
+# PHP session files (config/app.php → session.save_path)
+/var/
 # OS
 .DS_Store
 Thumbs.db
