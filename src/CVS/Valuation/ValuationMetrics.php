@@ -237,6 +237,31 @@ class ValuationMetrics
     }
 
     /**
+     * The forward EV/FCF a company is SCORED on: the analyst estimate when it
+     * passes resolveForwardFcfEst()'s bounds, else trailing_fcf × (1+g)².
+     *
+     * The single definition shared by ValuationPillar (the company's own
+     * multiple) and bin/refresh_peer_medians.php (the peer samples the median
+     * is built from). The crawl used to call forwardEvFcf() without the
+     * estimate, so every peer was measured on the trailing projection while the
+     * company was measured on the analyst figure — TSM read 35.4x against a
+     * 22.9x median although, measured the peers' way, it sat exactly on it
+     * (23.4x). A median is only a benchmark if both sides are the same number.
+     *
+     * @param array<string, mixed> $financials
+     * @param float                $growthPct       already capped to the sector's max_growth
+     * @param array<string, mixed> $valuationConfig config['valuation'] section
+     */
+    public static function scoredForwardEvFcf(array $financials, float $growthPct, array $valuationConfig = []): ?float
+    {
+        return self::forwardEvFcf(
+            $financials,
+            $growthPct,
+            self::resolveForwardFcfEst($financials, $valuationConfig)
+        );
+    }
+
+    /**
      * Growth-adjusted forward EV/Sales ratio (Variant B — FCF ≤ 0 or null).
      *
      * Normalises EV/Sales by a quality factor (growth × gross margin) and

@@ -47,6 +47,8 @@ class AnalysisController
     private int                  $trajectoryMinPoints;
     /** @var array<string, mixed> */
     private array                $atrZonesConfig;
+    /** @var array<string, mixed> config → fundamental_overrides */
+    private array                $overridePolicy;
 
     public function __construct()
     {
@@ -65,6 +67,7 @@ class AnalysisController
         $this->trajectoryMinPoints  = (int) ($config['trajectory']['min_points']  ?? 2);
         // Phase 8 (slice 2): ATR entry-zone knobs (consumed by AtrZoneCalculator).
         $this->atrZonesConfig = is_array($config['atr_zones'] ?? null) ? $config['atr_zones'] : [];
+        $this->overridePolicy = is_array($config['fundamental_overrides'] ?? null) ? $config['fundamental_overrides'] : [];
     }
 
     // ------------------------------------------------------------------
@@ -201,11 +204,19 @@ class AnalysisController
         // bin/rescore.php uses for peer_bucket_override.
         $overrideRepo = new FundamentalOverrideRepository();
         $overrideRows = $overrideRepo->findByTicker($ticker);
-        $financials   = FundamentalOverrideMerger::merge($financials, $overrideRows);
+        // Same release rule the daily rescore persists, applied read-only here so
+        // the page never shows a field as frozen that the rescore has let go.
+        $overridePolicy = $this->overridePolicy;
+        $overrideAsOf   = new DateTimeImmutable();
+        $releasedFields = FundamentalOverrideMerger::releasable($financials, $overrideRows, $overridePolicy, $overrideAsOf);
+        $financials     = FundamentalOverrideMerger::merge($financials, $overrideRows, $overridePolicy, $overrideAsOf);
 
         $suspectFields = array_keys(SuspectFieldDetector::detect($financials));
         $fieldStates   = array_fill_keys($suspectFields, 'suspect');
         foreach ($overrideRows as $field => $row) {
+            if ($row['status'] === 'released' || isset($releasedFields[$field])) {
+                continue; // live Yahoo again — only the suspect detector speaks for it
+            }
             $fieldStates[$field] = $row['status'] === 'validated' ? 'validated' : 'checked_no_data';
         }
         $validationRun = (new FundamentalsValidationRunRepository())->findByTicker($ticker);

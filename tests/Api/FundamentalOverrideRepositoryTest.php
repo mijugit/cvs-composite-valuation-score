@@ -89,4 +89,19 @@ class FundamentalOverrideRepositoryTest extends TestCase
         $repo = new FundamentalOverrideRepository($this->makePdo());
         $this->assertSame([], $repo->findAllGroupedByTicker());
     }
+
+    public function test_release_marks_only_a_validated_row_released(): void
+    {
+        $repo = new FundamentalOverrideRepository($this->makePdo());
+        $repo->upsert('TSM', 'free_cash_flow', '41595817052.178', 'validated');
+        $repo->upsert('TSM', 'gross_profit', null, 'checked_no_data');
+
+        $repo->release('TSM', 'free_cash_flow');
+        $repo->release('TSM', 'gross_profit');
+
+        $rows = $repo->findByTicker('TSM');
+        $this->assertSame('released', $rows['free_cash_flow']['status']);
+        $this->assertSame('41595817052.178', $rows['free_cash_flow']['value'], 'history kept');
+        $this->assertSame('checked_no_data', $rows['gross_profit']['status']);
+    }
 }

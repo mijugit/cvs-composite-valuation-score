@@ -165,7 +165,9 @@ foreach ($todaysSectors as $targetSector) {
     // as thin as 5-7 peers, one company's uncorrected Yahoo figure skews the
     // whole group's benchmark disproportionately (see bin/rescore.php's
     // identical merge for the full rationale).
-    $fundamentalOverrides = (new FundamentalOverrideRepository())->findAllGroupedByTicker();
+    $fundamentalOverrideRepo = new FundamentalOverrideRepository();
+    $fundamentalOverrides    = $fundamentalOverrideRepo->findAllGroupedByTicker();
+    $overridePolicy          = $config['fundamental_overrides'] ?? [];
 
     // --- Fetch all tickers for this sector ---
     foreach ($allTickers as $entry) {
@@ -184,7 +186,19 @@ foreach ($todaysSectors as $targetSector) {
 
         $tickerOverrides = $fundamentalOverrides[strtoupper($ticker)] ?? [];
         if ($tickerOverrides !== []) {
-            $financials = FundamentalOverrideMerger::merge($financials, $tickerOverrides);
+            // Same release rule as bin/rescore.php — a peer sample must not
+            // rest on figures the company itself is no longer scored on.
+            $asOf = new DateTimeImmutable();
+            $releasedFields = FundamentalOverrideMerger::releasable($financials, $tickerOverrides, $overridePolicy, $asOf);
+            if ($releasedFields !== []) {
+                Database::reconnect();
+                $fundamentalOverrideRepo = new FundamentalOverrideRepository();
+                foreach ($releasedFields as $field => $reason) {
+                    $fundamentalOverrideRepo->release($ticker, $field);
+                    $log(sprintf('refresh_peer_medians: override released for %s.%s (%s)', $ticker, $field, $reason));
+                }
+            }
+            $financials = FundamentalOverrideMerger::merge($financials, $tickerOverrides, $overridePolicy, $asOf);
         }
 
         $sector   = $financials['sector']   ?? null;
@@ -265,7 +279,9 @@ foreach ($todaysSectors as $targetSector) {
         }
         $growthPct = min($growthPct, (float) $bm['max_growth']);
 
-        $evFcf      = ValuationMetrics::forwardEvFcf($financials, $growthPct);
+        // The same definition the pillar scores the company on — see
+        // ValuationMetrics::scoredForwardEvFcf() for why it must not differ.
+        $evFcf      = ValuationMetrics::scoredForwardEvFcf($financials, $growthPct, $config['valuation'] ?? []);
         $evSalesAdj = ValuationMetrics::forwardEvSalesAdjusted($financials, $growthPct);
         $gmFrac     = isset($financials['gross_margins']) ? (float) $financials['gross_margins'] : null;
         $gmPct      = $gmFrac !== null ? $gmFrac * 100.0 : null;

@@ -128,7 +128,9 @@ $peerOverrides = (new PeerBucketOverrideRepository())->findBucketMap();
 // validated correction survives only until this exact script's next run
 // (twice daily), silently reverting to the uncorrected Yahoo fetch — the
 // entire feature is pointless without this line.
-$fundamentalOverrides = (new FundamentalOverrideRepository())->findAllGroupedByTicker();
+$fundamentalOverrideRepo = new FundamentalOverrideRepository();
+$fundamentalOverrides    = $fundamentalOverrideRepo->findAllGroupedByTicker();
+$overridePolicy          = $config['fundamental_overrides'] ?? [];
 
 // Names we believe each symbol stands for, read from the universe file the
 // admin screen maintains. Used only to notice when a symbol stops meaning what
@@ -185,7 +187,14 @@ foreach ($tickers as $ticker) {
     // a would-be skip into a scored ticker.
     $tickerOverrides = $fundamentalOverrides[strtoupper($ticker)] ?? [];
     if ($tickerOverrides !== []) {
-        $financials = FundamentalOverrideMerger::merge($financials, $tickerOverrides);
+        // Overrides Yahoo has caught up with, or that predate the latest report,
+        // go back to live data — and stay released (see config → fundamental_overrides).
+        $asOf = new DateTimeImmutable();
+        foreach (FundamentalOverrideMerger::releasable($financials, $tickerOverrides, $overridePolicy, $asOf) as $field => $reason) {
+            $fundamentalOverrideRepo->release($ticker, $field);
+            $log(sprintf('rescore: override released for %s.%s (%s)', $ticker, $field, $reason));
+        }
+        $financials = FundamentalOverrideMerger::merge($financials, $tickerOverrides, $overridePolicy, $asOf);
     }
 
     // Structurally-fine-but-empty payload (Yahoo 200 with an empty income

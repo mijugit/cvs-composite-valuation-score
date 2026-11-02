@@ -433,6 +433,26 @@ return [
         'live_price_range'       => '1d', // chart range for the light price read
     ],
 
+    // --- Admin-confirmed fundamental overrides (migration 039) ---
+    // An override exists because Yahoo was wrong at the time it was checked.
+    // It must not outlive that: TSM scored for two months on FCF, growth and
+    // EPS frozen on 2026-08-27 while Yahoo had moved on to a newer quarter.
+    // FundamentalOverrideMerger releases a field (status 'released', back to
+    // live Yahoo) when either holds:
+    //   - Yahoo now agrees with it within release_tolerance (relative) — the
+    //     correction has reached the source, the override has nothing to add;
+    //   - release_after_earnings and the company has reported since the
+    //     override was confirmed — every figure in it describes an old period.
+    // A released field that Yahoo gets wrong again is flagged by
+    // SuspectFieldDetector and re-validated like any other.
+    'fundamental_overrides' => [
+        'release_tolerance'      => 0.05,
+        'release_after_earnings' => true,
+        // days_since_earnings is itself one of the fields Yahoo has returned
+        // wrong (~37x off); beyond this it is not trusted to date a report.
+        'max_days_since_earnings' => 120,
+    ],
+
     // --- Data source ---
     'data_source' => [
         'provider'        => 'yahoo_finance',

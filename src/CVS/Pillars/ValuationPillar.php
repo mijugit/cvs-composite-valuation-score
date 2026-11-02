@@ -395,8 +395,7 @@ class ValuationPillar
     ): float {
         assert($this->resolver !== null);
 
-        $fwdFcfEst = ValuationMetrics::resolveForwardFcfEst($financials, $this->valuationConfig);
-        $evFcf     = ValuationMetrics::forwardEvFcf($financials, $growthPct, $fwdFcfEst);
+        $evFcf = ValuationMetrics::scoredForwardEvFcf($financials, $growthPct, $this->valuationConfig);
         if ($evFcf === null) {
             return 50.0;
         }
@@ -527,8 +526,7 @@ class ValuationPillar
 
         $fcf = $financials['free_cash_flow'] ?? null;
         if ($fcf !== null && (float) $fcf > 0) {
-            $fwdFcfEst = ValuationMetrics::resolveForwardFcfEst($financials, $this->valuationConfig);
-            $evFcf     = ValuationMetrics::forwardEvFcf($financials, $growthPct, $fwdFcfEst);
+            $evFcf = ValuationMetrics::scoredForwardEvFcf($financials, $growthPct, $this->valuationConfig);
             if ($evFcf === null) {
                 return 50.0;
             }

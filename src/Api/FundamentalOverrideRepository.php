@@ -82,6 +82,24 @@ class FundamentalOverrideRepository
     }
 
     /**
+     * Lifts one validated override so the field reads live Yahoo data again
+     * (decided by FundamentalOverrideMerger::releasable()). The row is kept —
+     * status 'released' — so the history of what was corrected survives; only
+     * a validated row is touched, never a checked_no_data one.
+     */
+    public function release(string $ticker, string $field): void
+    {
+        try {
+            $this->db->prepare(
+                "UPDATE fundamental_overrides SET status = 'released'
+                 WHERE ticker = ? AND field_name = ? AND status = 'validated'"
+            )->execute([strtoupper(trim($ticker)), $field]);
+        } catch (PDOException $e) {
+            error_log(sprintf('FundamentalOverrideRepository::release failed for %s.%s: %s', $ticker, $field, $e->getMessage()));
+        }
+    }
+
+    /**
      * Sets or replaces one field's override.
      *
      * @param string|null $value NULL means "checked, no value found" — the

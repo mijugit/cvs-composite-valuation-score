@@ -378,4 +378,38 @@ class ValuationMetricsTest extends TestCase
             'earnings_quarterly_growth'  => null,
         ], $overrides);
     }
+
+    /**
+     * The peer-median crawl and the pillar must measure a company the same way.
+     * TSM (2026-11-02, live figures): trailing projection 23.4x — exactly the
+     * Semiconductors median — but 35.4x on the analyst estimate the pillar
+     * scores it on. Before scoredForwardEvFcf() the crawl used the first and
+     * the pillar the second, so TSM read "expensive" against its own peers.
+     */
+    public function test_scored_forward_ev_fcf_uses_the_analyst_estimate_when_it_passes_bounds(): void
+    {
+        $f = [
+            'current_price'      => 400.6,
+            'shares_outstanding' => 5_186_474_013.0,
+            'total_debt'         => 25_099_832_082.7,
+            'cash'               => 123_201_354_254.5,
+            'free_cash_flow'     => 36_898_386_566.8,
+            'trailing_eps'       => 15.43,
+            'forward_eps'        => 23.385,
+            'forward_fcf_est'    => 55_922_195_100.3,
+            'profit_margin'      => 0.511,
+            'operating_margin'   => 0.587,
+        ];
+        $cfg = ['use_forward_fcf_estimate' => true, 'fcf_to_eps_ratio_min' => 0.3, 'fcf_to_eps_ratio_max' => 3.0, 'max_net_to_operating_margin' => 1.25];
+
+        $scored   = ValuationMetrics::scoredForwardEvFcf($f, 51.6, $cfg);
+        $trailing = ValuationMetrics::forwardEvFcf($f, 51.6);
+
+        $this->assertEqualsWithDelta(35.4, (float) $scored, 0.1, 'analyst estimate');
+        $this->assertEqualsWithDelta(23.4, (float) $trailing, 0.1, 'trailing projection — what the crawl used to sample');
+
+        // Estimate rejected (feature off) → both definitions coincide.
+        $off = ['use_forward_fcf_estimate' => false] + $cfg;
+        $this->assertSame($trailing, ValuationMetrics::scoredForwardEvFcf($f, 51.6, $off));
+    }
 }

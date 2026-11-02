@@ -262,7 +262,12 @@ class FundamentalsValidationController
             return;
         }
 
-        $merged  = FundamentalOverrideMerger::merge($financials, $this->overrideRepo->findByTicker($ticker));
+        $merged  = FundamentalOverrideMerger::merge(
+            $financials,
+            $this->overrideRepo->findByTicker($ticker),
+            is_array($this->cvsConfig['fundamental_overrides'] ?? null) ? $this->cvsConfig['fundamental_overrides'] : [],
+            new \DateTimeImmutable()
+        );
         $missing = PayloadCompleteness::missingEssentialFields($merged);
         if ($missing !== []) {
             Response::json(['ok' => false, 'message' => 'Dane po scaleniu nie przechodzą bramki kompletności.'], 422);
