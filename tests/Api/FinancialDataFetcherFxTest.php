@@ -331,6 +331,57 @@ class FinancialDataFetcherFxTest extends TestCase
     }
 
     // ------------------------------------------------------------------
+    // Per-share EPS takes the QUOTE rate (2026-11-02, TSM)
+    // ------------------------------------------------------------------
+
+    /**
+     * TSM: Yahoo's trailingEps / forwardEps are USD per ADR (price / trailingPE
+     * agrees), while the statements are TWD. Converting them with the TWD rate
+     * made trailing EPS 0.47 instead of 15.43, the FCF/EPS conversion ratio read
+     * 15x and the forward FCF estimate was rejected for every ADR.
+     */
+    public function testAdrEpsIsAlreadyUsdAndNotReconverted(): void
+    {
+        $raw = $this->baseRaw('USD', 'TWD');
+        $raw['financialData']['currentPrice']            = ['raw' => 400.0];
+        $raw['defaultKeyStatistics']['trailingEps']      = ['raw' => 15.43];
+        $raw['defaultKeyStatistics']['forwardEps']       = ['raw' => 23.39];
+
+        $result = $this->callNormalise($this->fetcher(), $raw, 1.0 / 32.0);
+
+        $this->assertNotNull($result);
+        $this->assertEqualsWithDelta(15.43, (float) $result['trailing_eps'], 1e-9);
+        $this->assertEqualsWithDelta(23.39, (float) $result['forward_eps'], 1e-9);
+        $this->assertSame(1.0, $result['price_fx_rate_to_usd'], 'an ADR quote is already USD');
+        $this->assertEqualsWithDelta(1.0 / 32.0, (float) $result['fx_rate_to_usd'], 1e-12, 'statements stay on the TWD rate');
+    }
+
+    /**
+     * SHEL.L: quoted in GBp, reports in USD. trailingEps is GBP (major unit,
+     * not pence), forwardEps is USD (statement currency) — both must land in
+     * USD so their ratio is real growth rather than a currency artefact.
+     */
+    public function testLondonEpsUsesMajorQuoteRateForTrailingAndStatementRateForForward(): void
+    {
+        $gbpToUsd = 1.30;
+        $_SESSION['cvs_fx_GBP']    = $gbpToUsd;
+        $_SESSION['cvs_fx_GBP_ts'] = time();
+
+        $raw = $this->baseRaw('GBp', 'USD');
+        $raw['financialData']['currentPrice']       = ['raw' => 3921.0];
+        $raw['defaultKeyStatistics']['trailingEps'] = ['raw' => 3.35];
+        $raw['defaultKeyStatistics']['forwardEps']  = ['raw' => 4.26];
+
+        $result = $this->callNormalise($this->fetcher(), $raw, 1.0);
+
+        $this->assertNotNull($result);
+        $this->assertEqualsWithDelta(3921.0 * $gbpToUsd / 100.0, (float) $result['current_price'], 1e-9);
+        $this->assertEqualsWithDelta(3.35 * $gbpToUsd, (float) $result['trailing_eps'], 1e-9, 'GBP, not pence');
+        $this->assertEqualsWithDelta(4.26, (float) $result['forward_eps'], 1e-9, 'already USD (statement currency)');
+        $this->assertEqualsWithDelta($gbpToUsd / 100.0, (float) $result['price_fx_rate_to_usd'], 1e-12, 'quote rate includes pence');
+    }
+
+    // ------------------------------------------------------------------
     // long_name — regression for the 2026-07-02 bug (cvs_snapshots.company_name
     // was NULL for every ticker in production: longName was being read from the
     // assetProfile module, which Yahoo never populates it under — it lives on

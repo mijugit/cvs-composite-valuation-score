@@ -84,11 +84,14 @@ class SingleTickerRescorer
             $fairValue
         );
 
+        // The price-alert cron re-prices a raw quote with this rate, so it must be
+        // the QUOTE rate: an ADR's quote is already USD while its statements are not.
+        $priceFxRate = isset($financials['price_fx_rate_to_usd']) ? (float) $financials['price_fx_rate_to_usd'] : $fxRateToUsd;
         $zone = null;
         if ($price !== null && !empty($financials['daily_ohlc'])) {
             $zone = AtrZoneCalculator::compute($financials['daily_ohlc'], $price, $this->atrZonesConfig);
             if ($zone['has_zone']) {
-                $this->priceAlertRepo->upsertZone($ticker, $zone, $fxRateToUsd);
+                $this->priceAlertRepo->upsertZone($ticker, $zone, $priceFxRate);
             }
         }
 

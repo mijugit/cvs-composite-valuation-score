@@ -193,10 +193,13 @@
         <?php else: ?>
 
             <?php
-            // Dual-currency display helpers (Phase 4 multi-currency-fx)
-            $nativeCcy   = (string) ($financials['native_currency'] ?? '');
-            $fxToUsd     = isset($financials['fx_rate_to_usd']) && (float) $financials['fx_rate_to_usd'] > 0
-                ? (float) $financials['fx_rate_to_usd'] : null;
+            // Dual-currency display helpers (Phase 4 multi-currency-fx).
+            // Prices are shown in the QUOTE currency with the quote rate — not
+            // native_currency, which is the statement currency: TSM's USD ADR
+            // price read "NT$400.80" because the two were paired.
+            $nativeCcy   = (string) ($financials['currency'] ?? '');
+            $fxToUsd     = isset($financials['price_fx_rate_to_usd']) && (float) $financials['price_fx_rate_to_usd'] > 0
+                ? (float) $financials['price_fx_rate_to_usd'] : null;
             $isDualCcy   = $nativeCcy !== '' && $nativeCcy !== 'USD' && $fxToUsd !== null;
 
             $ccySymbol = static function (string $code): string {

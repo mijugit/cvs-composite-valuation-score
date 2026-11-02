@@ -908,6 +908,11 @@ class FinancialDataFetcher implements LatestPriceSource
             $fxP = $this->fetchFxRateToUsd($majorQuote) ?? $fxF;
         }
 
+        // Yahoo's per-share EPS is quoted in the MAJOR unit (SHEL.L trailingEps
+        // 3.35 = GBP while the quote is 3921 GBp), so EPS takes the rate before
+        // the minor-unit step below.
+        $fxPMajor = $fxP;
+
         if ($minorUnit) {
             $fxP /= 100.0; // pence → pounds, cents → rand, agorot → shekel
         }
@@ -1002,8 +1007,21 @@ class FinancialDataFetcher implements LatestPriceSource
         $fcfEffective = $fxApply($fcfEffective, $fxF);
 
         // Convert EPS to USD so forward_fcf_est is derived from consistent USD inputs.
-        $forwardEps  = $fxApply($v($ks['forwardEps']  ?? []), $fxF);
-        $trailingEps = $fxApply($v($ks['trailingEps'] ?? []), $fxF);
+        //
+        // EPS is per SHARE, so it is not in the statement currency the way FCF
+        // is — and the two Yahoo fields do not even share a currency. Measured
+        // 2026-11-02 against price / trailingPE and analyst consensus:
+        //   - trailingEps is in the quote currency, major unit (TSM 15.43 USD
+        //     per ADR, SAN.WA 3.88 PLN, SHEL.L 3.35 GBP).
+        //   - forwardEps is in the quote currency on a USD listing (TSM 23.39,
+        //     NVO 3.44, BABA 9.30 — all USD per ADR), but in the statement
+        //     currency elsewhere (SHEL.L 4.26 USD, ULVR.L 2.93 EUR).
+        // Converting both with the statement rate made TSM's trailing EPS 0.47
+        // instead of 15.43: FCF/share ÷ EPS read 15x, the forward FCF estimate
+        // was rejected for every ADR, and fair value fell back to a trailing
+        // projection. Mixed currencies also faked EPS growth on London listings.
+        $forwardEps  = $fxApply($v($ks['forwardEps']  ?? []), $majorQuote === 'USD' ? 1.0 : $fxF);
+        $trailingEps = $fxApply($v($ks['trailingEps'] ?? []), $fxPMajor);
 
         // forward_fcf_est: forward_eps × (fcfEffective / trailing_eps).
         // The ratio fcfEffective/trailingEps is dimensionless; multiplied by forwardEps_USD
@@ -1043,6 +1061,12 @@ class FinancialDataFetcher implements LatestPriceSource
             'native_currency'    => $financialCurrency,
             'native_price'       => $nativePrice,
             'fx_rate_to_usd'     => $fxF,
+            // The rate that turns a raw Yahoo QUOTE into USD (minor unit
+            // included): native_price × price_fx_rate_to_usd = current_price.
+            // Anything re-pricing a fresh quote must use this, not
+            // fx_rate_to_usd — for an ADR the quote is already USD while the
+            // statements are in TWD/CNY/DKK.
+            'price_fx_rate_to_usd' => $fxP,
 
             // Company profile (assetProfile/quoteType — already fetched, zero extra cost)
             // longName lives on quoteType, not assetProfile — Yahoo's assetProfile module
